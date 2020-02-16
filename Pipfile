@@ -9,6 +9,11 @@ verify_ssl = true
 jupyter = "*"
 pandas = "*"
 numpy = "*"
+altair = "*"
+vega = "*"
+notebook = "*"
+numexpr = "*"
+bottleneck = "*"
 
 [requires]
 python_version = "3.8"
