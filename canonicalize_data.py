@@ -34,7 +34,7 @@ def _print_nuls_with_context(binary_stream):
                 nul_count = index - start_run_index
                 print("nul from [{}, {})".format(start_run_index, index))
                 print(repr(binary_stream[start_run_index-30:start_run_index]) +
-                      "{}X".format(nul_count) +'*NUL* ' +
+                      "{}X".format(nul_count) + '*NUL* ' +
                       repr(binary_stream[index:index+30]))
                 start_run_index = None
 
