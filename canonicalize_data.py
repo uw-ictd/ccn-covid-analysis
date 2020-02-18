@@ -6,6 +6,8 @@ import pickle
 import datetime
 import pandas as pd
 
+from collections import Counter
+
 
 def remove_nuls_from_file(source_path, dest_path):
     with open(source_path, mode='rb') as sourcefile:
@@ -42,28 +44,23 @@ def read_transactions_to_dataframe(transactions_file_path):
     purchases = list()
     transfers = list()
     topups = list()
-    data = dict()
-    users = dict()
+    data = Counter()
+    users = Counter()
 
     i = 0
     with open(transactions_file_path, newline='') as csvfile:
         transactions_reader = csv.reader(csvfile, delimiter=' ', quotechar='|')
         for row in transactions_reader:
             transactions.append(row)
-            if transactions[i][3] not in users.keys():
-                users[transactions[i][3]] = 1
-            else:
-                users[transactions[i][3]] += 1
+            users[transactions[i][3]] += 1
+
             if transactions[i][2] == 'PURCHASE':
-                purchases.append(row[0].split(','))
-                if transactions[i][5] not in data.keys():
-                    data[transactions[i][5]] = 1
-                else:
-                    data[transactions[i][5]] += 1
+                purchases.append(row)
+                data[transactions[i][5]] += 1
             elif transactions[i][2] == 'USERTRANSFER':
-                transfers.append(row[0].split(','))
+                transfers.append(row)
             else:
-                topups.append(row[0].split(','))
+                topups.append(row)
             i += 1
 
     frame = pd.DataFrame({'cost in indonesian rupiah': list(data.keys()),
