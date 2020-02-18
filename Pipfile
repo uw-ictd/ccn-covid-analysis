@@ -14,6 +14,7 @@ vega = "*"
 notebook = "*"
 numexpr = "*"
 bottleneck = "*"
+tables = "*"
 
 [requires]
 python_version = "3.8"
