@@ -9,10 +9,32 @@ import pandas as pd
 
 def remove_nuls_from_file(source_path, dest_path):
     with open(source_path, mode='rb') as sourcefile:
+        data = sourcefile.read()
+        nul_count = data.count(b'\x00')
+        if nul_count > 0:
+            print("{} nul values found-- file is corrupted".format(nul_count))
+            _print_nuls_with_context(data)
+
+        # Remove nuls from the file.
         with open(dest_path, mode='w+b') as destfile:
-            data = sourcefile.read()
             destfile.write(data.replace(b'\x00', b''))
-            print("writing")
+
+
+def _print_nuls_with_context(binary_stream):
+    """Print the context around runs of nul values"""
+    start_run_index = None
+    for index, byte in enumerate(binary_stream):
+        if byte == 0x00:
+            if start_run_index is None:
+                start_run_index = index
+        else:
+            if start_run_index is not None:
+                nul_count = index - start_run_index
+                print("nul from [{}, {})".format(start_run_index, index))
+                print(repr(binary_stream[start_run_index-30:start_run_index]) +
+                      "{}X".format(nul_count) +'*NUL* ' +
+                      repr(binary_stream[index:index+30]))
+                start_run_index = None
 
 
 def read_transactions_to_dataframe(transactions_file_path):
@@ -27,8 +49,6 @@ def read_transactions_to_dataframe(transactions_file_path):
     with open(transactions_file_path, newline='') as csvfile:
         transactions_reader = csv.reader(csvfile, delimiter=' ', quotechar='|')
         for row in transactions_reader:
-            print(row)
-
             transactions.append(row)
             if transactions[i][3] not in users.keys():
                 users[transactions[i][3]] = 1
