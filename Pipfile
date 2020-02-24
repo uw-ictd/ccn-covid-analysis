@@ -16,7 +16,7 @@ notebook = "*"
 numexpr = "*"
 bottleneck = "*"
 tables = "*"
-dask = {extras = ["complete"],version = "*"}
+dask = {extras = ["complete"],version = "==2.9.1"}
 python-snappy = "*"
 
 [requires]
