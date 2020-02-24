@@ -4,6 +4,7 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
+bokeh = "*"
 
 [packages]
 jupyter = "*"
@@ -15,6 +16,8 @@ notebook = "*"
 numexpr = "*"
 bottleneck = "*"
 tables = "*"
+dask = {extras = ["complete"],version = "*"}
+python-snappy = "*"
 
 [requires]
 python_version = "3.8"
