@@ -120,8 +120,7 @@ def canonicalize_flow_dict(flow):
         index = (flow["start_time"], flow["obfuscated_a"], flow["address_b"],
                  flow["port_a"], flow["port_b"], flow["transport_protocol"])
 
-        return TypicalFlow(index_col=str(index),
-                           start=flow["start_time"],
+        return TypicalFlow(start=flow["start_time"],
                            end=flow["end_time"],
                            user=flow["obfuscated_a"],
                            dest_ip=flow["address_b"].exploded,
@@ -141,8 +140,7 @@ def canonicalize_flow_dict(flow):
         index = (flow["start_time"], flow["obfuscated_b"], flow["address_a"],
                  flow["port_b"], flow["port_a"], flow["transport_protocol"])
 
-        return TypicalFlow(index_col=str(index),
-                           start=flow["start_time"],
+        return TypicalFlow(start=flow["start_time"],
                            end=flow["end_time"],
                            user=flow["obfuscated_b"],
                            dest_ip=flow["address_a"].exploded,
@@ -212,8 +210,8 @@ if __name__ == "__main__":
     dask.config.set({"distributed.scheduler.allowed-failures": 50})
     dask.config.set({"distributed.scheduler.work-stealing": True})
     dask.config.set({"distributed.worker.memory.target": 0.2})
-    dask.config.set({"distributed.worker.memory.spill": 0.4})
-    dask.config.set({"distributed.worker.memory.pause": 0.6})
+    dask.config.set({"distributed.worker.memory.spill": 0.7})
+    dask.config.set({"distributed.worker.memory.pause": 0.9})
     dask.config.set({"distributed.worker.memory.terminate": False})
     print(dask.config.config)
 
@@ -231,11 +229,11 @@ if __name__ == "__main__":
 
     # The memory limit parameter is undocumented and applies to each worker.
     cluster = dask.distributed.LocalCluster(n_workers=2,
-                                            threads_per_worker=1,
-                                            memory_limit='6GB')
+                                            threads_per_worker=2,
+                                            memory_limit='7GB')
     client = dask.distributed.Client(cluster)
 
-    # # Convert split files to parquet
+    # Convert split files to parquet
     # split_dir = os.path.join("data", "splits")
     # for filename in sorted(os.listdir(split_dir)):
     #     if not filename.endswith(".xz"):
@@ -248,6 +246,7 @@ if __name__ == "__main__":
     #
     #     # Strip the .xz extension on output
     #     parquet_name = filename[:-3]
+    #     working_log = working_log.set_index("start")
     #     working_log = working_log.repartition(npartitions=1)
     #     working_log.to_parquet(os.path.join(split_dir,
     #                                         "parquet",
@@ -256,40 +255,34 @@ if __name__ == "__main__":
 
     # Join parquet archive into one full archive
     print("Starting join...")
-    aggregated_log = None
-
+    logs_to_aggregate = list()
     for archive in os.listdir("data/splits/parquet"):
         filename = os.path.join("data", "splits", "parquet", archive)
         partial_log = dask.dataframe.read_parquet(filename)
-        partial_log = partial_log.set_index("index_col")
-        if aggregated_log is None:
-            aggregated_log = partial_log
-        else:
-            aggregated_log = dask.dataframe.multi.concat_indexed_dataframes([aggregated_log, partial_log])
-            print(aggregated_log.npartitions)
-            print(aggregated_log)
+        logs_to_aggregate.append(partial_log)
 
-            # aggregated_log = aggregated_log.merge(partial_log,
-            #                                       # how="outer",
-            #                                       left_index=True,
-            #                                       right_index=True)
-
-    # Repartition the final log to make it more uniform and efficient.
-    aggregated_log = aggregated_log.repartition(partition_size="100MB")
-    print(aggregated_log)
-    print(aggregated_log.shape)
-    print(len(aggregated_log))
-    aggregated_log.to_parquet("scratch/big-log", compression="snappy")
+    aggregated_log = dask.dataframe.multi.concat(logs_to_aggregate,
+                                                 interleave_partitions=True)
+    aggregated_log = aggregated_log.set_index("start")
+    aggregated_log = aggregated_log.repartition(freq="7D")
+    aggregated_log.to_parquet("scratch/checkpoint", compression="snappy")
 
     print("Starting deduplication")
-    # dedup_log = dask.dataframe.read_parquet("scratch/big-log")
-    # # Index on time
-    # dedup_log.set_index('')
-    # dedup_log = dedup_log.drop_duplicates()
-    # # Repartition the final log to make it more uniform and efficient.
-    # dedup_log = dedup_log.repartition(partition_size="100MB")
-    # dedup_log.to_parquet("data/clean/flows", compression="snappy")
+    next_stage = dask.dataframe.read_parquet("scratch/checkpoint")
 
-    print("import was successful!")
+    deduped_logs_to_aggregate = list()
+    for i in range(next_stage.npartitions):
+        subpart = next_stage.get_partition(i)
+        subpart = subpart.drop_duplicates()
+        deduped_logs_to_aggregate.append(subpart)
+
+    deduped_log = dask.dataframe.multi.concat(deduped_logs_to_aggregate,
+                                              interleave_partitions=True)
+
+    # # Repartition the final log to make it more uniform and efficient.
+    deduped_log = deduped_log.repartition(partition_size="100M")
+    print("Final size:", len(deduped_log))
+    deduped_log.to_parquet("data/clean/flows", compression="snappy")
+
     client.close()
     print("Exiting hopefully cleanly...")
