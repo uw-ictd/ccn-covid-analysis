@@ -20,4 +20,4 @@ dask = {extras = ["complete"],version = "==2.9.1"}
 python-snappy = "*"
 
 [requires]
-python_version = "3.8"
+python_version = "3"
