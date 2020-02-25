@@ -205,84 +205,126 @@ def import_to_dataframe(file_path):
 
 
 if __name__ == "__main__":
-    # Tuned for matt's 16GB laptop
-    dask.config.set({"dataframe.shuffle-compression": "snappy"})
+    # ------------------------------------------------
+    # Dask tuning, currently set for a 16GB RAM laptop
+    # ------------------------------------------------
+
+    # Compression sounds nice, but results in spikes on decompression
+    # that can lead to unstable RAM use and overflow.
+    dask.config.set({"dataframe.shuffle-compression": False})
     dask.config.set({"distributed.scheduler.allowed-failures": 50})
     dask.config.set({"distributed.scheduler.work-stealing": True})
+
+    # Aggressively write to disk but don't kill worker processes if
+    # they stray. With a small number of workers each worker killed is
+    # big loss. The OOM killer will take care of the overall system.
     dask.config.set({"distributed.worker.memory.target": 0.2})
-    dask.config.set({"distributed.worker.memory.spill": 0.7})
-    dask.config.set({"distributed.worker.memory.pause": 0.9})
+    dask.config.set({"distributed.worker.memory.spill": 0.4})
+    dask.config.set({"distributed.worker.memory.pause": 0.6})
     dask.config.set({"distributed.worker.memory.terminate": False})
-    print(dask.config.config)
-
-    # remove_nuls_from_file("data/originals/transactions-encoded-2020-02-19.log",
-    #                       "data/clean/transactions.log")
-    # read_transactions_to_dataframe("data/clean/transactions.log")
-
-    # split_lzma_file("data/originals/2019-05-17-flowlog_archive.xz",
-    #                 "data/splits/2019-05-17-flowlog_archive-{:03d}.xz",
-    #                 1000000)
-    #
-    # split_lzma_file("data/originals/2020-02-13-flowlog_archive.xz",
-    #                 "data/splits/2020-02-13-flowlog_archive-{:03d}.xz",
-    #                 1000000)
 
     # The memory limit parameter is undocumented and applies to each worker.
-    cluster = dask.distributed.LocalCluster(n_workers=2,
-                                            threads_per_worker=2,
-                                            memory_limit='7GB')
+    cluster = dask.distributed.LocalCluster(n_workers=3,
+                                            threads_per_worker=1,
+                                            memory_limit='3GB')
     client = dask.distributed.Client(cluster)
 
-    # Convert split files to parquet
-    # split_dir = os.path.join("data", "splits")
-    # for filename in sorted(os.listdir(split_dir)):
-    #     if not filename.endswith(".xz"):
-    #         print("Skipping:", filename)
-    #         continue
-    #
-    #     print("Converting", filename, "to parquet")
-    #     working_log = import_to_dataframe(os.path.join(split_dir, filename))
-    #     print("Row count ", filename, ":", len(working_log))
-    #
-    #     # Strip the .xz extension on output
-    #     parquet_name = filename[:-3]
-    #     working_log = working_log.set_index("start")
-    #     working_log = working_log.repartition(npartitions=1)
-    #     working_log.to_parquet(os.path.join(split_dir,
-    #                                         "parquet",
-    #                                         parquet_name),
-    #                            compression="snappy")
+    CLEAN_TRANSACTIONS = False
+    SPLIT_FLOWLOGS = False
+    DEDUPLICATE_FLOWLOGS = True
 
-    # Join parquet archive into one full archive
-    print("Starting join...")
-    logs_to_aggregate = list()
-    for archive in os.listdir("data/splits/parquet"):
-        filename = os.path.join("data", "splits", "parquet", archive)
-        partial_log = dask.dataframe.read_parquet(filename)
-        logs_to_aggregate.append(partial_log)
+    if CLEAN_TRANSACTIONS:
+        remove_nuls_from_file("data/originals/transactions-encoded-2020-02-19.log",
+                              "data/clean/transactions.log")
+        read_transactions_to_dataframe("data/clean/transactions.log")
 
-    aggregated_log = dask.dataframe.multi.concat(logs_to_aggregate,
-                                                 interleave_partitions=True)
-    aggregated_log = aggregated_log.set_index("start")
-    aggregated_log = aggregated_log.repartition(freq="7D")
-    aggregated_log.to_parquet("scratch/checkpoint", compression="snappy")
+    if SPLIT_FLOWLOGS:
+        split_lzma_file("data/originals/2019-05-17-flowlog_archive.xz",
+                        "data/splits/2019-05-17-flowlog_archive-{:03d}.xz",
+                        1000000)
 
-    print("Starting deduplication")
-    next_stage = dask.dataframe.read_parquet("scratch/checkpoint")
+        split_lzma_file("data/originals/2020-02-13-flowlog_archive.xz",
+                        "data/splits/2020-02-13-flowlog_archive-{:03d}.xz",
+                        1000000)
 
-    deduped_logs_to_aggregate = list()
-    for i in range(next_stage.npartitions):
-        subpart = next_stage.get_partition(i)
-        subpart = subpart.drop_duplicates()
-        deduped_logs_to_aggregate.append(subpart)
+        # Convert split files to parquet
+        split_dir = os.path.join("data", "splits")
+        for filename in sorted(os.listdir(split_dir)):
+            if not filename.endswith(".xz"):
+                print("Skipping:", filename)
+                continue
 
-    deduped_log = dask.dataframe.multi.concat(deduped_logs_to_aggregate,
-                                              interleave_partitions=True)
+            print("Converting", filename, "to parquet")
+            working_log = import_to_dataframe(os.path.join(split_dir, filename))
+            print("Row count ", filename, ":", len(working_log))
 
-    # # Repartition the final log to make it more uniform and efficient.
-    deduped_log = deduped_log.repartition(partition_size="100M")
-    print("Final size:", len(deduped_log))
-    deduped_log.to_parquet("data/clean/flows", compression="snappy")
+            # Strip the .xz extension on output
+            parquet_name = filename[:-3]
+            # working_log = working_log.set_index("start")
+            working_log = working_log.repartition(npartitions=1)
+            working_log.to_parquet(os.path.join(split_dir,
+                                                "parquet",
+                                                parquet_name),
+                                   compression="snappy",
+                                   engine="pyarrow")
+
+    if DEDUPLICATE_FLOWLOGS:
+        # Join *all* parquet split archives into one full archive
+        print("Starting de-duplication join...")
+        logs_to_aggregate = list()
+        split_directory = os.path.join("data", "splits", "parquet")
+
+        for archive in os.listdir(split_directory):
+            filename = os.path.join(split_directory, archive)
+            partial_log = dask.dataframe.read_parquet(filename, engine="pyarrow")
+            logs_to_aggregate.append(partial_log)
+
+        aggregated_log = dask.dataframe.multi.concat(logs_to_aggregate,
+                                                     interleave_partitions=False)
+
+        aggregated_log = aggregated_log.set_index("start")
+        aggregated_log = aggregated_log.repartition(freq="4H")
+        aggregated_log.to_parquet("scratch/checkpoint",
+                                  compression="snappy",
+                                  engine="pyarrow")
+
+        print("-----------------------------------")
+        print("Made it to deduplication checkpoint")
+        print("-----------------------------------")
+
+        aggregated_log = dask.dataframe.read_parquet("scratch/checkpoint",
+                                                     engine="pyarrow")
+        aggregate_length = len(aggregated_log)
+
+        deduped_logs_to_aggregate = list()
+        for i in range(aggregated_log.npartitions):
+            subpart = aggregated_log.get_partition(i)
+            subpart = subpart.drop_duplicates()
+            deduped_logs_to_aggregate.append(subpart)
+
+        deduped_log = dask.dataframe.multi.concat(deduped_logs_to_aggregate,
+                                                  interleave_partitions=False)
+
+        # Reset the index since partitioning may be broken by not
+        # using interleaving in the concatenation above and the source
+        # divisions are coming from different database
+        # dumps. Interleaving results in partitions that are too large
+        # to hold in memory on a laptop, and I was not able to find a
+        # good way to tune the number of divisions created.
+        deduped_log["start"] = deduped_log.index
+        deduped_log = deduped_log.set_index("start")
+        print("Index has been reset after concatenation")
+
+        # Repartition the final log to make it more uniform and efficient.
+        deduped_log = deduped_log.repartition(freq="1D")
+        dedupe_length = len(deduped_log)
+
+        print("Raw concat size:", aggregate_length)
+        print("Final size:", dedupe_length)
+        print("Removed {} duplicates!".format(aggregate_length - dedupe_length))
+        deduped_log.to_parquet("data/clean/flows",
+                               compression="snappy",
+                               engine="pyarrow")
 
     client.close()
     print("Exiting hopefully cleanly...")
