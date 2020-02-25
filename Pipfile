@@ -7,16 +7,14 @@ verify_ssl = true
 bokeh = "*"
 
 [packages]
-jupyter = "*"
 pandas = "*"
 numpy = "*"
 altair = "*"
 vega = "*"
-notebook = "*"
 numexpr = "*"
 bottleneck = "*"
 tables = "*"
-dask = {extras = ["complete"],version = "==2.9.1"}
+dask = {extras = ["array, dataframe, distributed"],version = "~=2.11"}
 python-snappy = "*"
 pyarrow = "*"
 
