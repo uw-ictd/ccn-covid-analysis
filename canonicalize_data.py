@@ -159,7 +159,7 @@ def canonicalize_flow_dict(flow):
                                      b_port=flow["port_b"],
                                      bytes_a_to_b=flow["bytes_a_to_b"],
                                      bytes_b_to_a=flow["bytes_b_to_a"],
-                                     protocol=flow["protocol"],
+                                     protocol=flow["transport_protocol"],
                                      )
 
     if ("obfuscated_a" not in flow) and ("obfuscated_b" not in flow):
@@ -176,7 +176,7 @@ def canonicalize_flow_dict(flow):
                                  b_port=flow["port_b"],
                                  bytes_a_to_b=flow["bytes_a_to_b"],
                                  bytes_b_to_a=flow["bytes_b_to_a"],
-                                 protocol=flow["protocol"],
+                                 protocol=flow["transport_protocol"],
                                  )
 
     raise NotImplementedError(
