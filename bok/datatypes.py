@@ -15,7 +15,7 @@ TypicalFlow = namedtuple("TypicalFlow", [
 
 AnomalyPeerToPeerFlow = namedtuple("AnomalyPeerToPeerFlow", [
     "start",
-    "end"
+    "end",
     "user_a",
     "user_b",
     "a_port",
@@ -27,7 +27,7 @@ AnomalyPeerToPeerFlow = namedtuple("AnomalyPeerToPeerFlow", [
 
 AnomalyNoUserFlow = namedtuple("AnomalyNoUserFlow", [
     "start",
-    "end"
+    "end",
     "ip_a",
     "ip_b",
     "a_port",
