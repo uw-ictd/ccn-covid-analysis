@@ -200,7 +200,6 @@ def import_to_dataframe(file_path):
                 # Log loop progress
                 if (i % 100000 == 0) and (len(chunk) != 0):
                     print("Processed", i)
-                i += 1
 
                 # Load data
                 flowlog = pickle.load(f)
@@ -220,6 +219,8 @@ def import_to_dataframe(file_path):
             except EOFError as e:
                 # An exception at the end of the file is accepted and normal
                 break
+
+            i += 1
 
     # Clean up and add any remaining entries.
     if len(chunk) > 0:
