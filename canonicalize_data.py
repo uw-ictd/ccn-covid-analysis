@@ -111,7 +111,7 @@ def split_lzma_file(input_path, out_format_pattern, chunksize):
 
 
 def canonicalize_flow_dict(flow):
-    if ("obfuscated_a" in flow) and not ("obfuscated_b" in flow):
+    if ("obfuscated_a" in flow) and ("obfuscated_b" not in flow):
         # Normal case where endpoint A is the user
         if "address_a" in flow:
             # Ensure the flowlog only has one address_a, the obfuscated one!
@@ -128,7 +128,7 @@ def canonicalize_flow_dict(flow):
                            protocol=flow["transport_protocol"],
                            )
 
-    if not ("obfuscated_a" in flow) and ("obfuscated_b" in flow):
+    if ("obfuscated_a" not in flow) and ("obfuscated_b" in flow):
         # Normal case where endpoint B is the user
         if "address_b" in flow:
             # Ensure the flowlog only has one address_b, the obfuscated one!
