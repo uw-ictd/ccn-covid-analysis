@@ -187,11 +187,12 @@ def canonicalize_flow_dict(flow):
 def import_to_dataframe(file_path):
     """Import a compressed pickle archive into dask dataframes
     """
-    max_rows_per_division = 1000000
+    max_rows_per_division = 10000
     chunk = list()
     # Initialize an empty dask dataframe from an empty pandas dataframe. No
     # native dask empty frame constructor is available.
-    aggregated_log = dask.dataframe.from_pandas(pd.DataFrame(), chunksize=1000)
+    aggregated_log = dask.dataframe.from_pandas(
+        pd.DataFrame(), chunksize=max_rows_per_division)
 
     with lzma.open(file_path, mode="rb") as f:
         i = 0
