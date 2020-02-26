@@ -212,8 +212,12 @@ def import_to_dataframe(file_path):
 
                 # Create a new division if needed.
                 if len(chunk) >= max_rows_per_division:
-                    aggregated_log.append(dask.dataframe.from_pandas(
-                        pd.DataFrame(chunk), chunksize=max_rows_per_division))
+                    aggregated_log = aggregated_log.append(
+                        dask.dataframe.from_pandas(
+                            pd.DataFrame(chunk),
+                            chunksize=max_rows_per_division
+                        )
+                    )
                     chunk = list()
 
             except EOFError as e:
@@ -224,8 +228,12 @@ def import_to_dataframe(file_path):
 
     # Clean up and add any remaining entries.
     if len(chunk) > 0:
-        aggregated_log.append(dask.dataframe.from_pandas(
-            pd.DataFrame(chunk), chunksize=max_rows_per_division))
+        aggregated_log = aggregated_log.append(
+            dask.dataframe.from_pandas(
+                pd.DataFrame(chunk),
+                chunksize=max_rows_per_division
+            )
+        )
 
     print("Finished processing {} with {} rows".format(
           file_path, i))
