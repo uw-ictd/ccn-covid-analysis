@@ -170,8 +170,8 @@ def canonicalize_flow_dict(flow):
 
         return AnomalyNoUserFlow(start=flow["start_time"],
                                  end=flow["end_time"],
-                                 ip_a=flow["address_a"],
-                                 ip_b=flow["address_b"],
+                                 ip_a=flow["address_a"].exploded,
+                                 ip_b=flow["address_b"].exploded,
                                  a_port=flow["port_a"],
                                  b_port=flow["port_b"],
                                  bytes_a_to_b=flow["bytes_a_to_b"],
