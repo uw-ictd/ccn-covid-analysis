@@ -147,13 +147,37 @@ def canonicalize_flow_dict(flow):
 
     if ("obfuscated_a" in flow) and ("obfuscated_b" in flow):
         # Anomaly with user-user LAN traffic
-        #print("TODO: Implement two user handling")
-        return None
+        if ("address_a" in flow) or ("address_b" in flow):
+            # Ensure the flowlog only has obfuscated addresses!
+            raise ValueError("Flowlog is malformed!")
 
-    if not ("obfuscated_a" in flow) and not ("obfuscated_b" in flow):
+        return AnomalyPeerToPeerFlow(start=flow["start_time"],
+                                     end=flow["end_time"],
+                                     user_a=flow["obfuscated_a"],
+                                     user_b=flow["obfuscated_b"],
+                                     a_port=flow["port_a"],
+                                     b_port=flow["port_b"],
+                                     bytes_a_to_b=flow["bytes_a_to_b"],
+                                     bytes_b_to_a=flow["bytes_b_to_a"],
+                                     protocol=flow["protocol"],
+                                     )
+
+    if ("obfuscated_a" not in flow) and ("obfuscated_b" not in flow):
         # Anomaly with traffic with no user
-        #print("TODO: Implement no user handling")
-        return None
+        if ("address_a" not in flow) or ("address_b" not in flow):
+            # The flowlog is missing an address!
+            raise ValueError("Flowlog is malformed!")
+
+        return AnomalyNoUserFlow(start=flow["start_time"],
+                                 end=flow["end_time"],
+                                 ip_a=flow["address_a"],
+                                 ip_b=flow["address_b"],
+                                 a_port=flow["port_a"],
+                                 b_port=flow["port_b"],
+                                 bytes_a_to_b=flow["bytes_a_to_b"],
+                                 bytes_b_to_a=flow["bytes_b_to_a"],
+                                 protocol=flow["protocol"],
+                                 )
 
     raise NotImplementedError(
         "Control should not reach here, uncovered case with flow {}".format(
@@ -163,6 +187,7 @@ def canonicalize_flow_dict(flow):
 def import_to_dataframe(file_path):
     """Import a compressed pickle archive into dask dataframes
     """
+    max_rows_per_division = 1000000
     chunk = list()
     # Initialize an empty dask dataframe from an empty pandas dataframe. No
     # native dask empty frame constructor is available.
@@ -172,13 +197,12 @@ def import_to_dataframe(file_path):
         i = 0
         while True:
             try:
+                # Log loop progress
                 if (i % 100000 == 0) and (len(chunk) != 0):
-                    temp_frame = dask.dataframe.from_pandas(pd.DataFrame(chunk), chunksize=100000)
-                    aggregated_log = aggregated_log.append(temp_frame)
-                    del chunk
-                    chunk = list()
                     print("Processed", i)
+                i += 1
 
+                # Load data
                 flowlog = pickle.load(f)
                 flow = canonicalize_flow_dict(flowlog)
                 if isinstance(flow, TypicalFlow):
@@ -187,13 +211,23 @@ def import_to_dataframe(file_path):
                     # TODO(matt9j) Aggregate additional flow types
                     pass
 
-                i += 1
+                # Create a new division if needed.
+                if len(chunk) >= max_rows_per_division:
+                    aggregated_log.append(dask.dataframe.from_pandas(
+                        pd.DataFrame(chunk), chunksize=max_rows_per_division))
+                    chunk = list()
+
             except EOFError as e:
-                temp_frame = dask.dataframe.from_pandas(pd.DataFrame(chunk), chunksize=100000)
-                aggregated_log = aggregated_log.append(temp_frame)
-                print("Finished processing {} with {} rows".format(
-                      file_path, i))
+                # An exception at the end of the file is accepted and normal
                 break
+
+    # Clean up and add any remaining entries.
+    if len(chunk) > 0:
+        aggregated_log.append(dask.dataframe.from_pandas(
+            pd.DataFrame(chunk), chunksize=max_rows_per_division))
+
+    print("Finished processing {} with {} rows".format(
+          file_path, i))
 
     return aggregated_log
 
