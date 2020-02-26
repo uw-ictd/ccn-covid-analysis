@@ -117,9 +117,6 @@ def canonicalize_flow_dict(flow):
             # Ensure the flowlog only has one address_a, the obfuscated one!
             raise ValueError("Flowlog is malformed!")
 
-        index = (flow["start_time"], flow["obfuscated_a"], flow["address_b"],
-                 flow["port_a"], flow["port_b"], flow["transport_protocol"])
-
         return TypicalFlow(start=flow["start_time"],
                            end=flow["end_time"],
                            user=flow["obfuscated_a"],
@@ -136,9 +133,6 @@ def canonicalize_flow_dict(flow):
         if "address_b" in flow:
             # Ensure the flowlog only has one address_b, the obfuscated one!
             raise ValueError("Flowlog is malformed!")
-
-        index = (flow["start_time"], flow["obfuscated_b"], flow["address_a"],
-                 flow["port_b"], flow["port_a"], flow["transport_protocol"])
 
         return TypicalFlow(start=flow["start_time"],
                            end=flow["end_time"],
