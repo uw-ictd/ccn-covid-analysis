@@ -378,10 +378,14 @@ if __name__ == "__main__":
                     flow_type = "p2p"
                 elif index == 2:
                     flow_type = "nouser"
-                working_log.to_parquet(os.path.join(split_dir,
-                                                    "parquet",
-                                                    flow_type,
-                                                    parquet_name),
+
+                out_path = os.path.join(split_dir,
+                                        "parquet",
+                                        flow_type,
+                                        parquet_name)
+
+                os.removedirs(out_path)
+                working_log.to_parquet(out_path,
                                        compression="snappy",
                                        engine="pyarrow")
 
@@ -398,9 +402,10 @@ if __name__ == "__main__":
 
         aggregated_log = dask.dataframe.multi.concat(logs_to_aggregate,
                                                      interleave_partitions=False)
-
         aggregated_log = aggregated_log.set_index("start")
         aggregated_log = aggregated_log.repartition(freq="4H")
+
+        os.removedirs("scratch/checkpoint")
         aggregated_log.to_parquet("scratch/checkpoint",
                                   compression="snappy",
                                   engine="pyarrow")
