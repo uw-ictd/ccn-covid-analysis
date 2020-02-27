@@ -53,9 +53,12 @@ if __name__ == "__main__":
     # Once you have a total, you might want to dump it to disk so you don't
     # have to re-run the dask computations again! At this point you can work
     # in a jupyter notebook from the intermediate file if that's easier too.
-    user_totals.to_parquet("scratch/temp",
-                           compression="snappy",
-                           engine="pyarrow")
+    # user_totals.to_parquet("scratch/temp",
+    #                        compression="snappy",
+    #                        engine="pyarrow")
+    #
+    # user_totals = dask.dataframe.read_parquet("scratch/temp",
+    #                                           engine="pyarrow").compute()
 
     # Once user_totals has been computed and you can do things with
     # it as a normal dataframe : )
@@ -74,12 +77,26 @@ if __name__ == "__main__":
                                    )
     print(user_totals)
     print("Check out a basic chart!")
-    altair.Chart(user_totals).mark_bar().encode(
-        x="direction",
-        y="amount:Q",
+    chart = altair.Chart(user_totals).mark_bar().encode(
+        x=altair.X("direction", title="", axis=altair.Axis(labels=False)),
+        y=altair.Y("amount:Q", title="Amount (Bytes)"),
         color="direction",
         column=altair.Column('user',
-                             title="User",
-                             header=altair.Header(labelAngle=60,labelOrient="top")
+                             title="",
+                             header=altair.Header(labelOrient="bottom",
+                                                  labelAngle=-60,
+                                                  labelAnchor="middle",
+                                                  labelAlign="right",
+                                                  ),
+                             sort=altair.SortField(field="amount",
+                                                   order="descending"
+                                                   ),
                             ),
+    ).properties(
+        title="Data used per user"
+    ).configure_title(
+        fontSize=20,
+        font='Courier',
+        anchor='start',
+        color='gray'
     ).serve()
