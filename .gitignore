@@ -19,3 +19,4 @@ venv.bak/
 
 # Ignore source data
 data/
+dask-worker-space/
