@@ -184,7 +184,7 @@ def canonicalize_flow_dict(flow):
             str(flow)))
 
 
-def import_to_dataframe(file_path):
+def import_flowlog_to_dataframes(file_path):
     """Import a compressed pickle archive into dask dataframes
 
     Returns 3 dataframes:
@@ -307,7 +307,7 @@ if __name__ == "__main__":
                 continue
 
             print("Converting", filename, "to parquet")
-            frames = import_to_dataframe(os.path.join(split_dir, filename))
+            frames = import_flowlog_to_dataframes(os.path.join(split_dir, filename))
             for index, working_log in enumerate(frames):
                 print("Row count ", filename, ":", index, ":", len(working_log))
                 # Strip the .xz extension on output
