@@ -403,7 +403,7 @@ if __name__ == "__main__":
         aggregated_log = dask.dataframe.multi.concat(logs_to_aggregate,
                                                      interleave_partitions=False)
         aggregated_log = aggregated_log.set_index("start")
-        aggregated_log = aggregated_log.repartition(freq="4H")
+        aggregated_log = aggregated_log.repartition(freq="4H", force=True)
 
         os.removedirs("scratch/checkpoint")
         aggregated_log.to_parquet("scratch/checkpoint",
