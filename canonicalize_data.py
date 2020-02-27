@@ -186,40 +186,52 @@ def canonicalize_flow_dict(flow):
 
 def import_to_dataframe(file_path):
     """Import a compressed pickle archive into dask dataframes
+
+    Returns 3 dataframes:
+    0: all standard user->site flows
+    1: All user->user flows
+    2: All ip->ip flows
     """
     max_rows_per_division = 10000
-    chunk = list()
+    chunks = [list(), list(), list()]
     # Initialize an empty dask dataframe from an empty pandas dataframe. No
     # native dask empty frame constructor is available.
-    aggregated_log = dask.dataframe.from_pandas(
-        pd.DataFrame(), chunksize=max_rows_per_division)
+    frames = [dask.dataframe.from_pandas(pd.DataFrame(), chunksize=max_rows_per_division),
+              dask.dataframe.from_pandas(pd.DataFrame(), chunksize=max_rows_per_division),
+              dask.dataframe.from_pandas(pd.DataFrame(), chunksize=max_rows_per_division),
+              ]
 
     with lzma.open(file_path, mode="rb") as f:
         i = 0
         while True:
             try:
                 # Log loop progress
-                if (i % 100000 == 0) and (len(chunk) != 0):
+                if i % 100000 == 0:
                     print("Processed", i)
 
                 # Load data
                 flowlog = pickle.load(f)
                 flow = canonicalize_flow_dict(flowlog)
                 if isinstance(flow, TypicalFlow):
-                    chunk.append(flow)
+                    chunks[0].append(flow)
+                elif isinstance(flow, AnomalyPeerToPeerFlow):
+                    chunks[1].append(flow)
+                elif isinstance(flow, AnomalyNoUserFlow):
+                    chunks[2].append(flow)
                 else:
-                    # TODO(matt9j) Aggregate additional flow types
-                    pass
+                    print(flow)
+                    raise ValueError("Flow type was unable to be parsed")
 
                 # Create a new division if needed.
-                if len(chunk) >= max_rows_per_division:
-                    aggregated_log = aggregated_log.append(
-                        dask.dataframe.from_pandas(
-                            pd.DataFrame(chunk),
-                            chunksize=max_rows_per_division
+                for index, chunk in enumerate(chunks):
+                    if len(chunk) >= max_rows_per_division:
+                        frames[index] = frames[index].append(
+                            dask.dataframe.from_pandas(
+                                pd.DataFrame(chunk),
+                                chunksize=max_rows_per_division,
+                            )
                         )
-                    )
-                    chunk = list()
+                        chunks[index] = list()
 
             except EOFError as e:
                 # An exception at the end of the file is accepted and normal
@@ -228,18 +240,19 @@ def import_to_dataframe(file_path):
             i += 1
 
     # Clean up and add any remaining entries.
-    if len(chunk) > 0:
-        aggregated_log = aggregated_log.append(
-            dask.dataframe.from_pandas(
-                pd.DataFrame(chunk),
-                chunksize=max_rows_per_division
+    for index, chunk in enumerate(chunks):
+        if len(chunk) > 0:
+            frames[index] = frames[index].append(
+                dask.dataframe.from_pandas(
+                    pd.DataFrame(chunk),
+                    chunksize=max_rows_per_division,
+                )
             )
-        )
 
     print("Finished processing {} with {} rows".format(
           file_path, i))
 
-    return aggregated_log
+    return frames
 
 
 if __name__ == "__main__":
@@ -285,7 +298,8 @@ if __name__ == "__main__":
                         "data/splits/2020-02-13-flowlog_archive-{:03d}.xz",
                         1000000)
 
-        # Convert split files to parquet
+    if INGEST_FLOWLOGS:
+        # Import split files and archive to parquet
         split_dir = os.path.join("data", "splits")
         for filename in sorted(os.listdir(split_dir)):
             if not filename.endswith(".xz"):
@@ -293,18 +307,28 @@ if __name__ == "__main__":
                 continue
 
             print("Converting", filename, "to parquet")
-            working_log = import_to_dataframe(os.path.join(split_dir, filename))
-            print("Row count ", filename, ":", len(working_log))
-
-            # Strip the .xz extension on output
-            parquet_name = filename[:-3]
-            # working_log = working_log.set_index("start")
-            working_log = working_log.repartition(npartitions=1)
-            working_log.to_parquet(os.path.join(split_dir,
-                                                "parquet",
-                                                parquet_name),
-                                   compression="snappy",
-                                   engine="pyarrow")
+            frames = import_to_dataframe(os.path.join(split_dir, filename))
+            for index, working_log in enumerate(frames):
+                print("Row count ", filename, ":", index, ":", len(working_log))
+                # Strip the .xz extension on output
+                parquet_name = filename[:-3]
+                # working_log = working_log.set_index("start")
+                print("earlypartition_count:", working_log.npartitions)
+                working_log = working_log.repartition(partition_size="50M")
+                print("partition_count:", working_log.npartitions)
+                flow_type = None
+                if index == 0:
+                    flow_type = "typical"
+                elif index == 1:
+                    flow_type = "p2p"
+                elif index == 2:
+                    flow_type = "nouser"
+                working_log.to_parquet(os.path.join(split_dir,
+                                                    "parquet",
+                                                    flow_type,
+                                                    parquet_name),
+                                       compression="snappy",
+                                       engine="pyarrow")
 
     if DEDUPLICATE_FLOWLOGS:
         # Join *all* parquet split archives into one full archive
