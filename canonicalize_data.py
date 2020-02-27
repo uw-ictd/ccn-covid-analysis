@@ -14,7 +14,8 @@ from collections import Counter
 
 from bok.datatypes import (TypicalFlow,
                            AnomalyPeerToPeerFlow,
-                           AnomalyNoUserFlow)
+                           AnomalyNoUserFlow,
+                           DnsResponse)
 
 
 def remove_nuls_from_file(source_path, dest_path):
@@ -182,6 +183,60 @@ def canonicalize_flow_dict(flow):
     raise NotImplementedError(
         "Control should not reach here, uncovered case with flow {}".format(
             str(flow)))
+
+
+def canonicalize_dnslog_dict(dns_response):
+    """Takes a raw DNS log and normalizes the address direction and naming
+    """
+    logs_to_return = list()
+    if ("obfuscated_src" in dns_response) and ("obfuscated_dst" not in dns_response):
+        if "src_ip" in dns_response:
+            raise ValueError("Malformed dns log {}".format(dns_response))
+
+        for address, ttl in zip(dns_response["response_addresses"],
+                                dns_response["response_ttls"]):
+            logs_to_return.append(
+                DnsResponse(timestamp=dns_response["timestamp"],
+                            user=dns_response["obfuscated_src"],
+                            dns_server=dns_response["dest_ip"],
+                            user_port=dns_response["src_port"],
+                            server_port=dns_response["dst_port"],
+                            protocol=dns_response["protocol"],
+                            opcode=dns_response["opcode"],
+                            resultcode=dns_response["resultcode"],
+                            domain_name=dns_response["host"],
+                            ip_address=address.exploded,
+                            ttl=ttl,
+                            )
+            )
+
+        return logs_to_return
+
+    if ("obfuscated_src" not in dns_response) and ("obfuscated_dst" in dns_response):
+        if "dst_ip" in dns_response:
+            raise ValueError("Malformed dns log {}".format(dns_response))
+
+        for address, ttl in zip(dns_response["response_addresses"],
+                                dns_response["response_ttls"]):
+            logs_to_return.append(
+                DnsResponse(timestamp=dns_response["timestamp"],
+                            user=dns_response["obfuscated_dst"],
+                            dns_server=dns_response["src_ip"],
+                            user_port=dns_response["dst_port"],
+                            server_port=dns_response["src_port"],
+                            protocol=dns_response["protocol"],
+                            opcode=dns_response["opcode"],
+                            resultcode=dns_response["resultcode"],
+                            domain_name=dns_response["host"],
+                            ip_address=address.exploded,
+                            ttl=ttl,
+                            )
+            )
+
+        return logs_to_return
+
+    raise NotImplementedError("Unsupported DNS log: {}".format(
+        str(dns_response)))
 
 
 def import_flowlog_to_dataframes(file_path):
