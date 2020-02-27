@@ -9,6 +9,7 @@ import lzma
 import pandas as pd
 import pickle
 import os
+import shutil
 
 from collections import Counter
 
@@ -310,6 +311,80 @@ def import_flowlog_to_dataframes(file_path):
     return frames
 
 
+def consolidate_datasets(input_directory,
+                         output,
+                         index_column,
+                         checkpoint=False):
+    """Load all data from input, concatenate into one deduplicated output
+    """
+    logs_to_aggregate = list()
+
+    for archive in os.listdir(input_directory):
+        archive_path = os.path.join(input_directory, archive)
+        partial_log = dask.dataframe.read_parquet(archive_path,
+                                                  engine="pyarrow")
+        logs_to_aggregate.append(partial_log)
+
+    aggregated_log = dask.dataframe.multi.concat(logs_to_aggregate,
+                                                 interleave_partitions=False)
+
+    aggregated_log = aggregated_log.reset_index()
+    aggregated_log = aggregated_log.set_index(index_column)
+
+    # This repartition must be done on one of the keys we wish to check
+    # uniqueness against below!
+    aggregated_log = aggregated_log.repartition(freq="4H", force=True)
+
+    if checkpoint:
+        try:
+            shutil.rmtree("scratch/checkpoint")
+        except FileNotFoundError:
+            # No worries if the output doesn't exist yet.
+            pass
+
+        aggregated_log.to_parquet("scratch/checkpoint",
+                                  compression="snappy",
+                                  engine="pyarrow")
+
+        print("Wrote deduplication checkpoint!")
+
+        aggregated_log = dask.dataframe.read_parquet("scratch/checkpoint",
+                                                     engine="pyarrow")
+
+    aggregate_length = len(aggregated_log)
+
+    # Run deduplicate on the log subparts binned by date.
+    # This only works since timestamp is part of the uniqueness criteria!
+    deduped_logs_to_aggregate = list()
+    for i in range(aggregated_log.npartitions):
+        subpart = aggregated_log.get_partition(i)
+        subpart = subpart.drop_duplicates()
+        deduped_logs_to_aggregate.append(subpart)
+
+    deduped_log = dask.dataframe.multi.concat(deduped_logs_to_aggregate,
+                                              interleave_partitions=False)
+
+    # Reset the index since partitioning may be broken by not
+    # using interleaving in the concatenation above and the source
+    # divisions are coming from different database
+    # dumps. Interleaving results in partitions that are too large
+    # to hold in memory on a laptop, and I was not able to find a
+    # good way to tune the number of divisions created.
+    deduped_log[index_column] = deduped_log.index
+    deduped_log = deduped_log.set_index(index_column)
+
+    # Repartition the final log to make it more uniform and efficient.
+    deduped_log = deduped_log.repartition(freq="1D")
+    dedupe_length = len(deduped_log)
+
+    print("Raw concat size:", aggregate_length)
+    print("Final size:", dedupe_length)
+    print("Removed {} duplicates!".format(aggregate_length - dedupe_length))
+    deduped_log.to_parquet(output,
+                           compression="snappy",
+                           engine="pyarrow")
+
+
 if __name__ == "__main__":
     # ------------------------------------------------
     # Dask tuning, currently set for a 16GB RAM laptop
@@ -337,6 +412,7 @@ if __name__ == "__main__":
 
     CLEAN_TRANSACTIONS = False
     SPLIT_FLOWLOGS = False
+    INGEST_FLOWLOGS = True
     DEDUPLICATE_FLOWLOGS = True
 
     if CLEAN_TRANSACTIONS:
@@ -355,7 +431,7 @@ if __name__ == "__main__":
 
     if INGEST_FLOWLOGS:
         # Import split files and archive to parquet
-        split_dir = os.path.join("data", "splits")
+        split_dir = os.path.join("scratch", "splits")
         for filename in sorted(os.listdir(split_dir)):
             if not filename.endswith(".xz"):
                 print("Skipping:", filename)
@@ -364,13 +440,17 @@ if __name__ == "__main__":
             print("Converting", filename, "to parquet")
             frames = import_flowlog_to_dataframes(os.path.join(split_dir, filename))
             for index, working_log in enumerate(frames):
+                if len(working_log) == 0:
+                    continue
+
                 print("Row count ", filename, ":", index, ":", len(working_log))
                 # Strip the .xz extension on output
                 parquet_name = filename[:-3]
                 # working_log = working_log.set_index("start")
-                print("earlypartition_count:", working_log.npartitions)
-                working_log = working_log.repartition(partition_size="50M")
-                print("partition_count:", working_log.npartitions)
+                working_log = working_log.set_index("start")
+                working_log = working_log.repartition(partition_size="32M",
+                                                      force=True)
+
                 flow_type = None
                 if index == 0:
                     flow_type = "typical"
@@ -383,70 +463,33 @@ if __name__ == "__main__":
                                         "parquet",
                                         flow_type,
                                         parquet_name)
+                try:
+                    shutil.rmtree(out_path)
+                except FileNotFoundError:
+                    # No worries if the output doesn't exist yet.
+                    pass
 
-                os.removedirs(out_path)
                 working_log.to_parquet(out_path,
                                        compression="snappy",
                                        engine="pyarrow")
 
     if DEDUPLICATE_FLOWLOGS:
-        # Join *all* parquet split archives into one full archive
-        print("Starting de-duplication join...")
-        logs_to_aggregate = list()
-        split_directory = os.path.join("data", "splits", "parquet")
+        input_path = os.path.join("scratch", "splits", "parquet")
+        output_path = os.path.join("scratch", "test_output")
+        for flow_kind in ["typical", "p2p", "nouser"]:
+            specific_output = os.path.join(output_path, flow_kind)
+            try:
+                shutil.rmtree(specific_output)
+            except FileNotFoundError:
+                # No worries if the output doesn't exist yet.
+                pass
 
-        for archive in os.listdir(split_directory):
-            filename = os.path.join(split_directory, archive)
-            partial_log = dask.dataframe.read_parquet(filename, engine="pyarrow")
-            logs_to_aggregate.append(partial_log)
-
-        aggregated_log = dask.dataframe.multi.concat(logs_to_aggregate,
-                                                     interleave_partitions=False)
-        aggregated_log = aggregated_log.set_index("start")
-        aggregated_log = aggregated_log.repartition(freq="4H", force=True)
-
-        os.removedirs("scratch/checkpoint")
-        aggregated_log.to_parquet("scratch/checkpoint",
-                                  compression="snappy",
-                                  engine="pyarrow")
-
-        print("-----------------------------------")
-        print("Made it to deduplication checkpoint")
-        print("-----------------------------------")
-
-        aggregated_log = dask.dataframe.read_parquet("scratch/checkpoint",
-                                                     engine="pyarrow")
-        aggregate_length = len(aggregated_log)
-
-        deduped_logs_to_aggregate = list()
-        for i in range(aggregated_log.npartitions):
-            subpart = aggregated_log.get_partition(i)
-            subpart = subpart.drop_duplicates()
-            deduped_logs_to_aggregate.append(subpart)
-
-        deduped_log = dask.dataframe.multi.concat(deduped_logs_to_aggregate,
-                                                  interleave_partitions=False)
-
-        # Reset the index since partitioning may be broken by not
-        # using interleaving in the concatenation above and the source
-        # divisions are coming from different database
-        # dumps. Interleaving results in partitions that are too large
-        # to hold in memory on a laptop, and I was not able to find a
-        # good way to tune the number of divisions created.
-        deduped_log["start"] = deduped_log.index
-        deduped_log = deduped_log.set_index("start")
-        print("Index has been reset after concatenation")
-
-        # Repartition the final log to make it more uniform and efficient.
-        deduped_log = deduped_log.repartition(freq="1D")
-        dedupe_length = len(deduped_log)
-
-        print("Raw concat size:", aggregate_length)
-        print("Final size:", dedupe_length)
-        print("Removed {} duplicates!".format(aggregate_length - dedupe_length))
-        deduped_log.to_parquet("data/clean/flows",
-                               compression="snappy",
-                               engine="pyarrow")
+            print("Starting de-duplication join for {} flows...".format(
+                flow_kind))
+            consolidate_datasets(input_directory=os.path.join(input_path,
+                                                              flow_kind),
+                                 output=specific_output,
+                                 index_column="start")
 
     client.close()
     print("Exiting hopefully cleanly...")
