@@ -387,7 +387,9 @@ def import_dnslog_to_dataframes(file_path):
 def consolidate_datasets(input_directory,
                          output,
                          index_column,
-                         checkpoint=False):
+                         time_slice,
+                         checkpoint=False,
+                         client=None):
     """Load all data from input, concatenate into one deduplicated output
     """
     logs_to_aggregate = list()
@@ -401,12 +403,18 @@ def consolidate_datasets(input_directory,
     aggregated_log = dask.dataframe.multi.concat(logs_to_aggregate,
                                                  interleave_partitions=False)
 
+    # Reset the index since partitioning may be broken by not
+    # using interleaving in the concatenation above and the source
+    # divisions are coming from different database
+    # dumps. Interleaving results in partitions that are too large
+    # to hold in memory on a laptop, and I was not able to find a
+    # good way to tune the number of divisions created.
     aggregated_log = aggregated_log.reset_index()
     aggregated_log = aggregated_log.set_index(index_column)
 
     # This repartition must be done on one of the keys we wish to check
     # uniqueness against below!
-    aggregated_log = aggregated_log.repartition(freq="4H", force=True)
+    aggregated_log = aggregated_log.repartition(freq=time_slice, force=True)
 
     if checkpoint:
         try:
@@ -424,7 +432,7 @@ def consolidate_datasets(input_directory,
         aggregated_log = dask.dataframe.read_parquet("scratch/checkpoint",
                                                      engine="pyarrow")
 
-    aggregate_length = len(aggregated_log)
+    aggregate_length = aggregated_log.shape[0]
 
     # Run deduplicate on the log subparts binned by date.
     # This only works since timestamp is part of the uniqueness criteria!
@@ -436,26 +444,18 @@ def consolidate_datasets(input_directory,
 
     deduped_log = dask.dataframe.multi.concat(deduped_logs_to_aggregate,
                                               interleave_partitions=False)
+    dedupe_length = deduped_log.shape[0]
 
-    # Reset the index since partitioning may be broken by not
-    # using interleaving in the concatenation above and the source
-    # divisions are coming from different database
-    # dumps. Interleaving results in partitions that are too large
-    # to hold in memory on a laptop, and I was not able to find a
-    # good way to tune the number of divisions created.
-    deduped_log[index_column] = deduped_log.index
-    deduped_log = deduped_log.set_index(index_column)
+    write_delayed = deduped_log.to_parquet(output,
+                                           compression="snappy",
+                                           engine="pyarrow",
+                                           compute=False)
+    results = client.compute([aggregate_length, dedupe_length, write_delayed],
+                             sync=True)
 
-    # Repartition the final log to make it more uniform and efficient.
-    deduped_log = deduped_log.repartition(freq="1D")
-    dedupe_length = len(deduped_log)
-
-    print("Raw concat size:", aggregate_length)
-    print("Final size:", dedupe_length)
-    print("Removed {} duplicates!".format(aggregate_length - dedupe_length))
-    deduped_log.to_parquet(output,
-                           compression="snappy",
-                           engine="pyarrow")
+    print("Raw concat size:", results[0])
+    print("Final size:", results[1])
+    print("Removed {} duplicates!".format(results[0] - results[1]))
 
 
 if __name__ == "__main__":
