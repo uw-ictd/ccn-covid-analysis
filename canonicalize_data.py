@@ -316,6 +316,74 @@ def import_flowlog_to_dataframes(file_path):
     return frames
 
 
+def import_dnslog_to_dataframes(file_path):
+    """Import a compressed pickle archive of DNS queries into dask dataframes
+
+    Returns 1 dataframe:
+    0: all standard user->dns->user responses
+    """
+    max_rows_per_division = 10000
+    chunks = [list()]
+    # Initialize an empty dask dataframe from an empty pandas dataframe. No
+    # native dask empty frame constructor is available.
+    frames = [dask.dataframe.from_pandas(pd.DataFrame(), chunksize=max_rows_per_division),
+              ]
+
+    with lzma.open(file_path, mode="rb") as f:
+        i = 0
+        response_count = 0
+        while True:
+            try:
+                # Log loop progress
+                if i % 100000 == 0:
+                    print("Processed", i)
+
+                # Load data
+                dnslog = pickle.load(f)
+                dns_responses = canonicalize_dnslog_dict(dnslog)
+                for response in dns_responses:
+                    if isinstance(response, DnsResponse):
+                        chunks[0].append(response)
+                        response_count += 1
+                    else:
+                        print("----------------")
+                        print("--Bad DNS type--")
+                        print(response)
+                        # raise ValueError("DNS type was unable to be parsed")
+
+                # Create a new division if needed.
+                for index, chunk in enumerate(chunks):
+                    if len(chunk) >= max_rows_per_division:
+                        frames[index] = frames[index].append(
+                            dask.dataframe.from_pandas(
+                                pd.DataFrame(chunk),
+                                chunksize=max_rows_per_division,
+                            )
+                        )
+                        chunks[index] = list()
+
+            except EOFError as e:
+                # An exception at the end of the file is accepted and normal
+                break
+
+            i += 1
+
+    # Clean up and add any remaining entries.
+    for index, chunk in enumerate(chunks):
+        if len(chunk) > 0:
+            frames[index] = frames[index].append(
+                dask.dataframe.from_pandas(
+                    pd.DataFrame(chunk),
+                    chunksize=max_rows_per_division,
+                )
+            )
+
+    print("Finished processing {} with {} rows and {} responses".format(
+        file_path, i, response_count))
+
+    return frames
+
+
 def consolidate_datasets(input_directory,
                          output,
                          index_column,
