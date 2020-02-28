@@ -193,13 +193,15 @@ def canonicalize_dnslog_dict(dns_response):
     if ("obfuscated_src" in dns_response) and ("obfuscated_dst" not in dns_response):
         if "src_ip" in dns_response:
             raise ValueError("Malformed dns log {}".format(dns_response))
+        if "dest_ip" not in dns_response:
+            return [dns_response]
 
         for address, ttl in zip(dns_response["response_addresses"],
                                 dns_response["response_ttls"]):
             logs_to_return.append(
                 DnsResponse(timestamp=dns_response["timestamp"],
                             user=dns_response["obfuscated_src"],
-                            dns_server=dns_response["dest_ip"],
+                            dns_server=dns_response["dest_ip"].exploded,
                             user_port=dns_response["src_port"],
                             server_port=dns_response["dst_port"],
                             protocol=dns_response["protocol"],
@@ -216,13 +218,15 @@ def canonicalize_dnslog_dict(dns_response):
     if ("obfuscated_src" not in dns_response) and ("obfuscated_dst" in dns_response):
         if "dst_ip" in dns_response:
             raise ValueError("Malformed dns log {}".format(dns_response))
+        if "src_ip" not in dns_response:
+            return [dns_response]
 
         for address, ttl in zip(dns_response["response_addresses"],
                                 dns_response["response_ttls"]):
             logs_to_return.append(
                 DnsResponse(timestamp=dns_response["timestamp"],
                             user=dns_response["obfuscated_dst"],
-                            dns_server=dns_response["src_ip"],
+                            dns_server=dns_response["src_ip"].exploded,
                             user_port=dns_response["dst_port"],
                             server_port=dns_response["src_port"],
                             protocol=dns_response["protocol"],
@@ -236,6 +240,7 @@ def canonicalize_dnslog_dict(dns_response):
 
         return logs_to_return
 
+    return [dns_response]
     raise NotImplementedError("Unsupported DNS log: {}".format(
         str(dns_response)))
 
