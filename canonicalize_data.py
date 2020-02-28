@@ -523,7 +523,6 @@ if __name__ == "__main__":
                 print("Row count ", filename, ":", index, ":", len(working_log))
                 # Strip the .xz extension on output
                 parquet_name = filename[:-3]
-                # working_log = working_log.set_index("start")
                 working_log = working_log.set_index("start")
                 working_log = working_log.repartition(partition_size="32M",
                                                       force=True)
@@ -553,8 +552,8 @@ if __name__ == "__main__":
     if DEDUPLICATE_FLOWLOGS:
         input_path = os.path.join("scratch", "splits", "parquet")
         output_path = os.path.join("scratch", "test_output")
-        for flow_kind in ["typical", "p2p", "nouser"]:
-            specific_output = os.path.join(output_path, flow_kind)
+        for case_kind in ["typical", "p2p", "nouser"]:
+            specific_output = os.path.join(output_path, case_kind)
             try:
                 shutil.rmtree(specific_output)
             except FileNotFoundError:
