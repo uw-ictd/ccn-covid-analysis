@@ -489,8 +489,11 @@ if __name__ == "__main__":
 
     CLEAN_TRANSACTIONS = False
     SPLIT_FLOWLOGS = False
-    INGEST_FLOWLOGS = True
-    DEDUPLICATE_FLOWLOGS = True
+    INGEST_FLOWLOGS = False
+    DEDUPLICATE_FLOWLOGS = False
+
+    INGEST_DNSLOGS = False
+    DEDUPLICATE_DNSLOGS = False
 
     if CLEAN_TRANSACTIONS:
         remove_nuls_from_file("data/originals/transactions-encoded-2020-02-19.log",
@@ -561,11 +564,72 @@ if __name__ == "__main__":
                 pass
 
             print("Starting de-duplication join for {} flows...".format(
-                flow_kind))
+                case_kind))
             consolidate_datasets(input_directory=os.path.join(input_path,
-                                                              flow_kind),
+                                                              case_kind),
                                  output=specific_output,
                                  index_column="start")
+
+    if INGEST_DNSLOGS:
+        # Import dns logs and archive to parquet
+        dns_archives_directory = os.path.join("scratch", "dns", "splits")
+        for filename in sorted(os.listdir(dns_archives_directory)):
+            if not filename.endswith(".xz"):
+                print("Skipping:", filename)
+                continue
+
+            print("Converting", filename, "to parquet")
+            frames = import_dnslog_to_dataframes(os.path.join(dns_archives_directory, filename))
+            for index, working_log in enumerate(frames):
+                if len(working_log) == 0:
+                    continue
+
+                print("Row count ", filename, ":", index, ":", len(working_log))
+                # Strip the .xz extension on output
+                parquet_name = filename[:-3]
+                working_log = working_log.set_index("timestamp")
+                working_log = working_log.repartition(partition_size="32M",
+                                                      force=True)
+                dns_type = None
+                if index == 0:
+                    dns_type = "typical"
+                else:
+                    raise RuntimeError("PANICCCSSSSS")
+
+                out_path = os.path.join(dns_archives_directory,
+                                        "parquet",
+                                        dns_type,
+                                        parquet_name)
+                try:
+                    shutil.rmtree(out_path)
+                except FileNotFoundError:
+                    # No worries if the output doesn't exist yet.
+                    pass
+
+                working_log.to_parquet(out_path,
+                                       compression="snappy",
+                                       engine="pyarrow")
+
+    if DEDUPLICATE_DNSLOGS:
+        input_path = os.path.join("scratch", "dns", "splits", "parquet")
+        output_path = os.path.join("scratch", "dns", "deduplicated_output")
+        for case_kind in ["typical"]:
+            specific_output = os.path.join(output_path, case_kind)
+            try:
+                shutil.rmtree(specific_output)
+            except FileNotFoundError:
+                # No worries if the output doesn't exist yet.
+                pass
+
+            print("Starting de-duplication join for {} dns...".format(
+                case_kind))
+            consolidate_datasets(input_directory=os.path.join(input_path,
+                                                              case_kind),
+                                 output=specific_output,
+                                 index_column="timestamp",
+                                 time_slice="4H",
+                                 checkpoint=True,
+                                 client=client)
 
     client.close()
     print("Exiting hopefully cleanly...")
