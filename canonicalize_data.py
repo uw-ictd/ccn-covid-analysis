@@ -477,6 +477,10 @@ if __name__ == "__main__":
     dask.config.set({"distributed.worker.memory.pause": 0.6})
     dask.config.set({"distributed.worker.memory.terminate": False})
 
+    # Remove memory warning logs
+    dask.config.set({"logging.distributed": "error"})
+    dask.config.set({"logging.'distributed.worker'": "error"})
+
     # The memory limit parameter is undocumented and applies to each worker.
     cluster = dask.distributed.LocalCluster(n_workers=3,
                                             threads_per_worker=1,
