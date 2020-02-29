@@ -458,6 +458,137 @@ def consolidate_datasets(input_directory,
     print("Removed {} duplicates!".format(results[0] - results[1]))
 
 
+def drop_and_reindex(input_path, output_path, index_key=None, drops=None, reset_index=False):
+    frame = dask.dataframe.read_parquet(input_path, engine="pyarrow")
+    print("Dropping and re-indexing {} to {}".format(input_path, output_path))
+    print("{} has {} partitions".format(input_path, frame.npartitions))
+    if drops is not None:
+        frame = frame.drop(drops, axis="columns")
+
+    if reset_index:
+        frame = frame.reset_index()
+
+    if index_key is not None:
+        frame = frame.set_index(index_key)
+
+    try:
+        shutil.rmtree(output_path)
+    except FileNotFoundError:
+        # No worries if the output doesn't exist yet.
+        pass
+
+    #print("{} has {} partitions".format(output_path, frame.npartitions))
+    frame.to_parquet(output_path,
+                     compression="snappy",
+                     engine="pyarrow",
+                     compute=True)
+
+
+def annotate_flows_with_dns(flowlog_path, dns_path, client):
+    """Annotate flows with the fqdn they are likely communicating with
+    """
+    def _combine_user_addr(row):
+        return row['user'] + row['dest_ip']
+
+    print("Generate minimized DNS frame")
+    slim_dns_frame = dask.dataframe.read_parquet("data/clean/dnslogs/typical",
+                                                 engine="pyarrow")
+    print("Slim dns has {} partitions".format(slim_dns_frame.npartitions))
+    slim_dns_frame = slim_dns_frame.drop(["dns_server",
+                                          "user_port",
+                                          "server_port",
+                                          "protocol",
+                                          "opcode",
+                                          "resultcode",
+                                          "ttl",
+                                          ],
+                                          axis="columns")
+
+    # Ensure the timestamp doesn't get lost in the merge.
+    slim_dns_frame = slim_dns_frame.reset_index()
+
+    deduped_logs_to_aggregate = list()
+    for i in range(slim_dns_frame.npartitions):
+        subpart = slim_dns_frame.get_partition(i)
+        subpart = subpart.drop_duplicates(subset=["user",
+                                                  "domain_name",
+                                                  "ip_address"])
+        deduped_logs_to_aggregate.append(subpart)
+
+    slim_dns_frame = dask.dataframe.multi.concat(deduped_logs_to_aggregate,
+                                                 interleave_partitions=False)
+
+    # Change column names to overlap for merge
+    slim_dns_frame = slim_dns_frame.rename(columns={"ip_address": "dest_ip"})
+
+    slim_dns_frame["user_and_addr"] = slim_dns_frame.apply(_combine_user_addr, axis=1)
+
+    slim_dns_frame = slim_dns_frame.set_index("user_and_addr", npartitions=1000)
+
+    print("slim_length =", len(slim_dns_frame))
+    print("slim partitions=", slim_dns_frame.npartitions)
+
+    try:
+        shutil.rmtree("scratch/dnslogs/slim")
+    except FileNotFoundError:
+        # No worries if the output doesn't exist yet.
+        pass
+    print(slim_dns_frame)
+    slim_dns_frame.to_parquet("scratch/dnslogs/slim",
+                              compression="snappy",
+                              engine="pyarrow",
+                              compute=True)
+
+    print("chopping flows")
+    flows = dask.dataframe.read_parquet("data/clean/flows/typical",
+                                        engine="pyarrow")
+    flows = flows.reset_index()
+
+    flows["user_and_addr"] = flows.apply(_combine_user_addr, axis=1)
+
+    flows = flows.set_index("user_and_addr", npartitions=2000)
+
+    try:
+        shutil.rmtree("scratch/flows/slim")
+    except FileNotFoundError:
+        # No worries if the output doesn't exist yet.
+        pass
+    flows.to_parquet("scratch/flows/slim",
+                     compression="snappy",
+                     engine="pyarrow",
+                     compute=True)
+
+    print("Loading realized intermediate indexed datasets")
+    flows = dask.dataframe.read_parquet("scratch/flows/slim",
+                                        engine="pyarrow")
+    slim_dns_frame = dask.dataframe.read_parquet("scratch/dnslogs/slim",
+                                                 engine="pyarrow")
+
+    print("Partition counts")
+    print("flows", flows.npartitions)
+    print("dns", slim_dns_frame.npartitions)
+
+    merged_flows = flows.merge(slim_dns_frame,
+                               how="left",
+                               left_index=True,
+                               right_index=True,
+                               indicator=True)
+
+    print("merged partitions:", merged_flows.npartitions)
+    print(merged_flows)
+
+    try:
+        shutil.rmtree("scratch/flows/dns_merged")
+    except FileNotFoundError:
+        # No worries if the output doesn't exist yet.
+        pass
+    merged_flows.to_parquet("scratch/flows/dns_merged",
+                            compression="snappy",
+                            engine="pyarrow",
+                            compute=True,
+                            partition_on=["user"])
+
+
 if __name__ == "__main__":
     # ------------------------------------------------
     # Dask tuning, currently set for a 16GB RAM laptop
@@ -481,6 +612,9 @@ if __name__ == "__main__":
     dask.config.set({"logging.distributed": "error"})
     dask.config.set({"logging.'distributed.worker'": "error"})
 
+    # Shuffle with disk
+    dask.config.set(shuffle='disk')
+
     # The memory limit parameter is undocumented and applies to each worker.
     cluster = dask.distributed.LocalCluster(n_workers=3,
                                             threads_per_worker=1,
@@ -494,6 +628,8 @@ if __name__ == "__main__":
 
     INGEST_DNSLOGS = False
     DEDUPLICATE_DNSLOGS = False
+
+    COMBINE_DNS_WITH_FLOWS = True
 
     if CLEAN_TRANSACTIONS:
         remove_nuls_from_file("data/originals/transactions-encoded-2020-02-19.log",
@@ -630,6 +766,9 @@ if __name__ == "__main__":
                                  time_slice="4H",
                                  checkpoint=True,
                                  client=client)
+
+    if COMBINE_DNS_WITH_FLOWS:
+        annotate_flows_with_dns(None, None, None)
 
     client.close()
     print("Exiting hopefully cleanly...")
