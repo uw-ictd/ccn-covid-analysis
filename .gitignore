@@ -6,7 +6,6 @@ __pycache__/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-
 # Environments
 .env
 .venv
@@ -19,4 +18,9 @@ venv.bak/
 
 # Ignore source data
 data/
+
+# Ignore the temporary results
+scratch/
+
+# Ignore dask disk overflow space
 dask-worker-space/

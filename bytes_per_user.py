@@ -56,11 +56,14 @@ if __name__ == "__main__":
     # user_totals.to_parquet("scratch/temp",
     #                        compression="snappy",
     #                        engine="pyarrow")
+    
+    # user_totals = dask.dataframe.read_parquet("scratch/temp",
+    #                                           engine="pyarrow").compute()
 
     # Once user_totals has been computed and you can do things with
     # it as a normal dataframe : )
-    # print(user_totals)
-    # print("user_totals is a ", type(user_totals))
+    print(user_totals)
+    print("user_totals is a ", type(user_totals))
 
     # Add the index back as a dataframe column
     user_totals["user"] = user_totals.index
@@ -74,12 +77,26 @@ if __name__ == "__main__":
                                    )
     print(user_totals)
     print("Check out a basic chart!")
-    altair.Chart(user_totals).mark_bar().encode(
-        x="direction",
-        y="amount:Q",
+    chart = altair.Chart(user_totals).mark_bar().encode(
+        x=altair.X("direction", title="", axis=altair.Axis(labels=False)),
+        y=altair.Y("amount:Q", title="Amount (Bytes)"),
         color="direction",
         column=altair.Column('user',
-                             title="User",
-                             header=altair.Header(labelAngle=60,labelOrient="top")
+                             title="",
+                             header=altair.Header(labelOrient="bottom",
+                                                  labelAngle=-60,
+                                                  labelAnchor="middle",
+                                                  labelAlign="right",
+                                                  ),
+                             sort=altair.SortField(field="amount",
+                                                   order="descending"
+                                                   ),
                             ),
+    ).properties(
+        title="Data used per user"
+    ).configure_title(
+        fontSize=20,
+        font='Courier',
+        anchor='start',
+        color='gray'
     ).serve()

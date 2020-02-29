@@ -36,3 +36,17 @@ AnomalyNoUserFlow = namedtuple("AnomalyNoUserFlow", [
     "bytes_b_to_a",
     "protocol",
 ])
+
+DnsResponse = namedtuple("DnsResponse", [
+    "timestamp",
+    "user",
+    "dns_server",
+    "user_port",
+    "server_port",
+    "protocol",
+    "opcode",
+    "resultcode",
+    "domain_name",
+    "ip_address",
+    "ttl",
+])
