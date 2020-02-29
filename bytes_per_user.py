@@ -53,14 +53,14 @@ if __name__ == "__main__":
     # Once you have a total, you might want to dump it to disk so you don't
     # have to re-run the dask computations again! At this point you can work
     # in a jupyter notebook from the intermediate file if that's easier too.
-    user_totals.to_parquet("scratch/temp",
-                           compression="snappy",
-                           engine="pyarrow")
+    # user_totals.to_parquet("scratch/temp",
+    #                        compression="snappy",
+    #                        engine="pyarrow")
 
     # Once user_totals has been computed and you can do things with
     # it as a normal dataframe : )
-    print(user_totals)
-    print("user_totals is a ", type(user_totals))
+    # print(user_totals)
+    # print("user_totals is a ", type(user_totals))
 
     # Add the index back as a dataframe column
     user_totals["user"] = user_totals.index
