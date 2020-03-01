@@ -11,7 +11,7 @@ import pickle
 import os
 import shutil
 
-from collections import Counter
+from collections import (Counter, defaultdict)
 
 from bok.datatypes import (TypicalFlow,
                            AnomalyPeerToPeerFlow,
@@ -573,6 +573,66 @@ def split_by_user(flowlog_path, dns_path, client):
         _clean_write_parquet(frame, "scratch/flowlogs/sorted_per_user/" + str(user))
 
 
+def augment_user_flow_with_dns(flow_frame, dns_frame):
+    """Iterate over the flows and track DNS state for the user
+
+    Will not be correct unless the flow and dns are indexed by time
+    """
+    flow_frame["fqdn"] = ""
+
+    flow_frame["ambiguous_fqdn_count"] = 0
+
+    dns_state = dict()
+    dns_ambiguity_state = defaultdict(set)
+    dns_iterator = dns_frame.itertuples()
+    pending_dns_log = None
+
+    for flow in flow_frame.itertuples():
+        flow_start_time = flow.Index
+
+        if (pending_dns_log is not None and
+            pending_dns_log.Index < flow_start_time):
+            # Handle any dangling DNS logs from previous flow loop iterations
+            dns_state[pending_dns_log.ip_address] = pending_dns_log.domain_name
+            dns_ambiguity_state[pending_dns_log.ip_address].add(
+                pending_dns_log.domain_name)
+            pending_dns_log = None
+
+        # Advance DNS to the first log past the start of the flow
+        while ((dns_iterator is not None) and
+               (pending_dns_log is None)):
+            try:
+                dns_log = next(dns_iterator)
+                print("dns log")
+                print(dns_log)
+                if dns_log.Index < flow_start_time:
+                    # Account for the dns log immediately.
+                    dns_state[dns_log.ip_address] = dns_log.domain_name
+                    dns_ambiguity_state[dns_log.ip_address].add(dns_log.domain_name)
+                else:
+                    # DNS has now advanced up to or beyond the flow frontier,
+                    # store this log for future comparisons.
+                    pending_dns_log = dns_log
+
+            except StopIteration:
+                # We made it to the end of the DNS log! On the off chance the
+                # dask iterators are not well behaved, stop calling next on them
+                # after they stop once : )
+                dns_iterator = None
+
+        # Update the flow fqdn if available!
+        if flow.dest_ip in dns_state:
+            print("setting")
+            print(flow_frame.loc[flow.Index])
+            flow_frame.loc[flow.Index, "fqdn"] = dns_state[flow.dest_ip]
+            flow_frame.loc[flow.Index, "ambiguous_fqdn_count"] = len(dns_ambiguity_state[flow.dest_ip])
+
+        print("flow_entry")
+        print(flow)
+
+    return flow_frame
+
+
 if __name__ == "__main__":
     # ------------------------------------------------
     # Dask tuning, currently set for a 16GB RAM laptop
@@ -752,7 +812,39 @@ if __name__ == "__main__":
                                  client=client)
 
     if COMBINE_DNS_WITH_FLOWS:
-        split_by_user(None, None, None)
+        # split_by_user(None, None, None)
+        users_in_dns_log = sorted(os.listdir("scratch/dnslogs/sorted_per_user/"))
+        # TODO Run with all users! test for now...
+        # users_in_flow_log = sorted(os.listdir("scratch/flowlogs/sorted_per_user/"))
+        users_in_flow_log = [
+            "0af23e141b859ce9d5644bccc26a38cca3e83e6f5daf069b0622242ad778ffe1",
+            "0b12c979bf3e784304aa73f86614dcee65bbc83792c3b54ee1c0b7fda511b13d"
+        ]
+        missing_dns_users = list()
+        for user in users_in_flow_log:
+            if user not in users_in_dns_log:
+                print("Missing dns for user with flows:", user)
+                missing_dns_users.append(user)
+                continue
+
+            print("Doing dns to flow mapping for user:", user)
+            flow_frame = dask.dataframe.read_parquet(
+                "scratch/flowlogs/sorted_per_user/" + str(user),
+                engine="fastparquet")
+
+            dns_frame = dask.dataframe.read_parquet(
+                "scratch/dnslogs/sorted_per_user/" + str(user),
+                engine="fastparquet")
+
+            augmented_flow_frame = augment_user_flow_with_dns(flow_frame,
+                                                              dns_frame)
+            _clean_write_parquet(
+                flow_frame,
+                "scratch/flowlogs/sorted_per_user_with_fqdn/" + str(user))
+
+        print("Completed DNS augmentation")
+        print("The following users had no DNS logs")
+        print(missing_dns_users)
 
     client.close()
     print("Exiting hopefully cleanly...")
