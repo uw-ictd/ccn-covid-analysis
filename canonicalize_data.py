@@ -458,38 +458,21 @@ def consolidate_datasets(input_directory,
     print("Removed {} duplicates!".format(results[0] - results[1]))
 
 
-def drop_and_reindex(input_path, output_path, index_key=None, drops=None, reset_index=False):
-    frame = dask.dataframe.read_parquet(input_path, engine="pyarrow")
-    print("Dropping and re-indexing {} to {}".format(input_path, output_path))
-    print("{} has {} partitions".format(input_path, frame.npartitions))
-    if drops is not None:
-        frame = frame.drop(drops, axis="columns")
-
-    if reset_index:
-        frame = frame.reset_index()
-
-    if index_key is not None:
-        frame = frame.set_index(index_key)
-
+def _clean_write_parquet(dataframe, path, engine="fastparquet"):
     try:
-        shutil.rmtree(output_path)
+        shutil.rmtree(path)
     except FileNotFoundError:
         # No worries if the output doesn't exist yet.
         pass
-
-    #print("{} has {} partitions".format(output_path, frame.npartitions))
-    frame.to_parquet(output_path,
-                     compression="snappy",
-                     engine="pyarrow",
-                     compute=True)
+    dataframe.to_parquet(path,
+                         compression="snappy",
+                         engine=engine,
+                         compute=True)
 
 
-def annotate_flows_with_dns(flowlog_path, dns_path, client):
+def split_by_user(flowlog_path, dns_path, client):
     """Annotate flows with the fqdn they are likely communicating with
     """
-    def _combine_user_addr(row):
-        return row['user'] + row['dest_ip']
-
     print("Generate minimized DNS frame")
     slim_dns_frame = dask.dataframe.read_parquet("data/clean/dnslogs/typical",
                                                  engine="pyarrow")
@@ -504,9 +487,6 @@ def annotate_flows_with_dns(flowlog_path, dns_path, client):
                                           ],
                                           axis="columns")
 
-    # Ensure the timestamp doesn't get lost in the merge.
-    slim_dns_frame = slim_dns_frame.reset_index()
-
     deduped_logs_to_aggregate = list()
     for i in range(slim_dns_frame.npartitions):
         subpart = slim_dns_frame.get_partition(i)
@@ -518,75 +498,79 @@ def annotate_flows_with_dns(flowlog_path, dns_path, client):
     slim_dns_frame = dask.dataframe.multi.concat(deduped_logs_to_aggregate,
                                                  interleave_partitions=False)
 
-    # Change column names to overlap for merge
-    slim_dns_frame = slim_dns_frame.rename(columns={"ip_address": "dest_ip"})
-
-    slim_dns_frame["user_and_addr"] = slim_dns_frame.apply(_combine_user_addr, axis=1)
-
-    slim_dns_frame = slim_dns_frame.set_index("user_and_addr", npartitions=1000)
-
     print("slim_length =", len(slim_dns_frame))
     print("slim partitions=", slim_dns_frame.npartitions)
 
-    try:
-        shutil.rmtree("scratch/dnslogs/slim")
-    except FileNotFoundError:
-        # No worries if the output doesn't exist yet.
-        pass
-    print(slim_dns_frame)
-    slim_dns_frame.to_parquet("scratch/dnslogs/slim",
-                              compression="snappy",
-                              engine="pyarrow",
-                              compute=True)
+    _clean_write_parquet(slim_dns_frame, "scratch/dnslogs/slim_deduplicated")
+
+    slim_dns_frame = dask.dataframe.read_parquet("scratch/dnslogs/slim_deduplicated",
+                                                 engine="fastparquet",)
+
+    # Partition by user.
+
+    print("setting index")
+    slim_dns_frame = slim_dns_frame.reset_index()
+    slim_dns_frame = slim_dns_frame.set_index("user").repartition(npartitions=200)
+    _clean_write_parquet(slim_dns_frame, "scratch/dnslogs/slim_user_indexed")
+
+    slim_dns_frame = dask.dataframe.read_parquet("scratch/dnslogs/slim_user_indexed",
+                                                 engine="fastparquet",)
+
+    dns_by_users = slim_dns_frame.groupby("user")
+    users_in_dns_log = slim_dns_frame.index.unique()
+    print(users_in_dns_log.values)
+    for user in users_in_dns_log:
+        print("running user", user)
+        user_dns_logs = dns_by_users.get_group(user)
+        _clean_write_parquet(user_dns_logs,
+                             "scratch/dnslogs/slim_per_user/" + str(user))
 
     print("chopping flows")
     flows = dask.dataframe.read_parquet("data/clean/flows/typical",
                                         engine="pyarrow")
+
     flows = flows.reset_index()
+    flows = flows.set_index("user")
+    _clean_write_parquet(flows, "scratch/flowlogs/all_indexed_by_user")
 
-    flows["user_and_addr"] = flows.apply(_combine_user_addr, axis=1)
+    flows = dask.dataframe.read_parquet("scratch/flowlogs/all_indexed_by_user", engine="fastparquet")
+    print("read!")
+    flows = flows.repartition(npartitions=200)
+    print("repartitioned!")
 
-    flows = flows.set_index("user_and_addr", npartitions=2000)
+    _clean_write_parquet(flows, "scratch/flowlogs/all_indexed_by_user_partitioned")
+    print("wrote")
+    flows = dask.dataframe.read_parquet("scratch/flowlogs/all_indexed_by_user_partitioned",
+                                        engine="fastparquet")
+    flows_by_user = flows.groupby("user")
 
-    try:
-        shutil.rmtree("scratch/flows/slim")
-    except FileNotFoundError:
-        # No worries if the output doesn't exist yet.
-        pass
-    flows.to_parquet("scratch/flows/slim",
-                     compression="snappy",
-                     engine="pyarrow",
-                     compute=True)
+    users_in_flow_log = flows.index.unique()
+    print(users_in_flow_log.values)
+    for user in users_in_flow_log:
+        print("Flow for user:", user)
+        user_flow_logs = flows_by_user.get_group(user)
+        _clean_write_parquet(user_flow_logs,
+                             "scratch/flowlogs/per_user/" + str(user))
 
-    print("Loading realized intermediate indexed datasets")
-    flows = dask.dataframe.read_parquet("scratch/flows/slim",
-                                        engine="pyarrow")
-    slim_dns_frame = dask.dataframe.read_parquet("scratch/dnslogs/slim",
-                                                 engine="pyarrow")
+    print("running sorts")
+    users_in_dns_log = sorted(os.listdir("scratch/dnslogs/slim_per_user/"))
+    users_in_flow_log = sorted(os.listdir("scratch/flowlogs/per_user"))
 
-    print("Partition counts")
-    print("flows", flows.npartitions)
-    print("dns", slim_dns_frame.npartitions)
+    for user in users_in_dns_log:
+        print("DNS user:", user)
+        frame = dask.dataframe.read_parquet("scratch/dnslogs/slim_per_user/" + str(user),
+                                            engine="fastparquet")
+        frame = frame.reset_index().set_index("timestamp").repartition(partition_size="64M",
+                                                                       force=True)
+        _clean_write_parquet(frame, "scratch/dnslogs/sorted_per_user/" + str(user))
 
-    merged_flows = flows.merge(slim_dns_frame,
-                               how="left",
-                               left_index=True,
-                               right_index=True,
-                               indicator=True)
-
-    print("merged partitions:", merged_flows.npartitions)
-    print(merged_flows)
-
-    try:
-        shutil.rmtree("scratch/flows/dns_merged")
-    except FileNotFoundError:
-        # No worries if the output doesn't exist yet.
-        pass
-    merged_flows.to_parquet("scratch/flows/dns_merged",
-                            compression="snappy",
-                            engine="pyarrow",
-                            compute=True,
-                            partition_on=["user"])
+    for user in users_in_flow_log:
+        print("Flow user:", user)
+        frame = dask.dataframe.read_parquet("scratch/flowlogs/per_user/" + str(user),
+                                            engine="fastparquet")
+        frame = frame.reset_index().set_index("start").repartition(partition_size="64M",
+                                                                   force=True)
+        _clean_write_parquet(frame, "scratch/flowlogs/sorted_per_user/" + str(user))
 
 
 if __name__ == "__main__":
@@ -616,9 +600,9 @@ if __name__ == "__main__":
     dask.config.set(shuffle='disk')
 
     # The memory limit parameter is undocumented and applies to each worker.
-    cluster = dask.distributed.LocalCluster(n_workers=3,
+    cluster = dask.distributed.LocalCluster(n_workers=1,
                                             threads_per_worker=1,
-                                            memory_limit='3GB')
+                                            memory_limit='10GB')
     client = dask.distributed.Client(cluster)
 
     CLEAN_TRANSACTIONS = False
@@ -768,7 +752,7 @@ if __name__ == "__main__":
                                  client=client)
 
     if COMBINE_DNS_WITH_FLOWS:
-        annotate_flows_with_dns(None, None, None)
+        split_by_user(None, None, None)
 
     client.close()
     print("Exiting hopefully cleanly...")
