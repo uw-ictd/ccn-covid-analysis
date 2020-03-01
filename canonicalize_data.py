@@ -578,16 +578,24 @@ def augment_user_flow_with_dns(flow_frame, dns_frame):
 
     Will not be correct unless the flow and dns are indexed by time
     """
-    flow_frame["fqdn"] = ""
 
-    flow_frame["ambiguous_fqdn_count"] = 0
+    # Bookeeping for building a new frame
+    max_rows_per_division = 10000
+    out_chunk = list()
+    # Initialize an empty dask dataframe from an empty pandas dataframe. No
+    # native dask empty frame constructor is available.
+    out_frame = dask.dataframe.from_pandas(pd.DataFrame(),
+                                           chunksize=max_rows_per_division)
 
     dns_state = dict()
     dns_ambiguity_state = defaultdict(set)
     dns_iterator = dns_frame.itertuples()
     pending_dns_log = None
 
-    for flow in flow_frame.itertuples():
+    for i, flow in enumerate(flow_frame.itertuples()):
+        if i % 10000 == 0:
+            print("Processed flow", i)
+
         flow_start_time = flow.Index
 
         if (pending_dns_log is not None and
@@ -603,8 +611,6 @@ def augment_user_flow_with_dns(flow_frame, dns_frame):
                (pending_dns_log is None)):
             try:
                 dns_log = next(dns_iterator)
-                print("dns log")
-                print(dns_log)
                 if dns_log.Index < flow_start_time:
                     # Account for the dns log immediately.
                     dns_state[dns_log.ip_address] = dns_log.domain_name
@@ -621,16 +627,37 @@ def augment_user_flow_with_dns(flow_frame, dns_frame):
                 dns_iterator = None
 
         # Update the flow fqdn if available!
+        augmented_flow = flow._asdict()
         if flow.dest_ip in dns_state:
-            print("setting")
-            print(flow_frame.loc[flow.Index])
-            flow_frame.loc[flow.Index, "fqdn"] = dns_state[flow.dest_ip]
-            flow_frame.loc[flow.Index, "ambiguous_fqdn_count"] = len(dns_ambiguity_state[flow.dest_ip])
+            augmented_flow["fqdn"] = dns_state[flow.dest_ip]
+            augmented_flow["ambiguous_fqdn_count"] = len(dns_ambiguity_state[flow.dest_ip])
+            augmented_flow["fqdn_source"] = "user_dns_log"
+        else:
+            augmented_flow["fqdn"] = ""
+            augmented_flow["ambiguous_fqdn_count"] = 0
+            augmented_flow["fqdn_source"] = "none"
 
-        print("flow_entry")
-        print(flow)
+        out_chunk.append(augmented_flow)
+        if len(out_chunk) >= max_rows_per_division:
+            out_frame = out_frame.append(
+                dask.dataframe.from_pandas(
+                    pd.DataFrame(out_chunk),
+                    chunksize=max_rows_per_division,
+                )
+            )
+            out_chunk = list()
 
-    return flow_frame
+    if len(out_chunk) > 0:
+        out_frame = out_frame.append(dask.dataframe.from_pandas(
+            pd.DataFrame(out_chunk),
+            chunksize=max_rows_per_division,
+            )
+        )
+
+    out_frame = out_frame.set_index("Index", sorted=True).repartition(partition_size="64M",
+                                                                      force=True)
+    out_frame = out_frame.categorize(columns=["fqdn_source"])
+    return out_frame
 
 
 if __name__ == "__main__":
