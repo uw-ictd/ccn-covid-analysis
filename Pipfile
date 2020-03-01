@@ -17,6 +17,7 @@ tables = "*"
 dask = {extras = ["array, dataframe, distributed"],version = "~=2.11"}
 python-snappy = "*"
 pyarrow = "*"
+fastparquet = "*"
 
 [requires]
 python_version = "3"
