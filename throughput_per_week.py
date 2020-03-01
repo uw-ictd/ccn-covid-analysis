@@ -1,4 +1,4 @@
-""" Computing active and registered users on the network over time
+""" Computes daily throughput in the network
 """
 
 import altair
