@@ -16,7 +16,7 @@ day_intervals = 7
 max_date = datetime.datetime.strptime('2020-02-13 21:29:54', '%Y-%m-%d %H:%M:%S')
 
 def get_month_year(x):
-    return x["start"].apply(lambda x_1: str(x_1.month) + "/" + str(x_1.year), meta=('start', 'object'))
+    return x["start"].apply(lambda x_1: datetime.datetime(year=x_1.year, month=x_1.month, day=1), meta=('start', 'datetime64[ns]'))
 
 def get_revenue_query(transactions):
     # Set down the types for the dataframe
@@ -80,15 +80,16 @@ if __name__ == "__main__":
     revenue = revenue.melt(id_vars=["month_year"], value_vars=["price"], var_name="time", value_name="revenue (rupiah)")
     # Reset the types of the dataframe
     types = {
-        "month_year": "object",
+        "month_year": "datetime64",
         "revenue (rupiah)": "int64"
     }
     revenue = revenue.astype(types)
     # Compute the query
     revenue = revenue.compute()
+    print(revenue)
 
     altair.Chart(revenue).mark_line().encode(
-        x="month_year",
+        x="month_year:T",
         y="revenue (rupiah)",
     ).serve()
     
