@@ -886,12 +886,7 @@ if __name__ == "__main__":
             dns_fail_cache = set()
 
         users_in_dns_log = sorted(os.listdir("scratch/dnslogs/sorted_per_user/"))
-        # TODO Run with all users! test for now...
-        # users_in_flow_log = sorted(os.listdir("scratch/flowlogs/sorted_per_user/"))
-        users_in_flow_log = [
-            "0af23e141b859ce9d5644bccc26a38cca3e83e6f5daf069b0622242ad778ffe1",
-            "0b12c979bf3e784304aa73f86614dcee65bbc83792c3b54ee1c0b7fda511b13d"
-        ]
+        users_in_flow_log = sorted(os.listdir("scratch/flowlogs/sorted_per_user/"))
         missing_dns_users = list()
         for user in users_in_flow_log:
             if user not in users_in_dns_log:
