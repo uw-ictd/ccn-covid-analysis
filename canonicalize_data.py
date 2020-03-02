@@ -5,11 +5,13 @@ import csv
 import dask.config
 import dask.dataframe
 import dask.distributed
+import ipaddress
 import lzma
 import pandas as pd
 import pickle
 import os
 import shutil
+import socket
 
 from collections import (Counter, defaultdict)
 
@@ -573,7 +575,10 @@ def split_by_user(flowlog_path, dns_path, client):
         _clean_write_parquet(frame, "scratch/flowlogs/sorted_per_user/" + str(user))
 
 
-def augment_user_flow_with_dns(flow_frame, dns_frame):
+def augment_user_flow_with_dns(flow_frame,
+                               dns_frame,
+                               reverse_dns_cache,
+                               reverse_dns_failures):
     """Iterate over the flows and track DNS state for the user
 
     Will not be correct unless the flow and dns are indexed by time
@@ -629,13 +634,36 @@ def augment_user_flow_with_dns(flow_frame, dns_frame):
         # Update the flow fqdn if available!
         augmented_flow = flow._asdict()
         if flow.dest_ip in dns_state:
+            # The most accurate result is the domain the user was actually
+            # trying to reach.
             augmented_flow["fqdn"] = dns_state[flow.dest_ip]
             augmented_flow["ambiguous_fqdn_count"] = len(dns_ambiguity_state[flow.dest_ip])
             augmented_flow["fqdn_source"] = "user_dns_log"
         else:
-            augmented_flow["fqdn"] = ""
-            augmented_flow["ambiguous_fqdn_count"] = 0
-            augmented_flow["fqdn_source"] = "none"
+            # Attempt to lookup the name if needed and the address is global
+            # and likely to be observable from the US.
+            if ((flow.dest_ip not in reverse_dns_cache) and
+                (flow.dest_ip not in reverse_dns_failures) and
+                    ipaddress.ip_address(flow.dest_ip).is_global):
+                try:
+                    lookup = socket.gethostbyaddr(flow.dest_ip)
+                    reverse_dns_cache[flow.dest_ip] = lookup[0]
+                    print("Looked up:", flow.dest_ip, "-->", lookup[0])
+                except socket.herror:
+                    # Unable to find a domain name!
+                    print("Failed lookup:", flow.dest_ip)
+                    reverse_dns_failures.add(flow.dest_ip)
+                    pass
+
+            # Fill from rDNS if available
+            if flow.dest_ip in reverse_dns_cache:
+                augmented_flow["fqdn"] = reverse_dns_cache[flow.dest_ip]
+                augmented_flow["ambiguous_fqdn_count"] = 1
+                augmented_flow["fqdn_source"] = "reverse_dns"
+            else:
+                augmented_flow["fqdn"] = ""
+                augmented_flow["ambiguous_fqdn_count"] = 0
+                augmented_flow["fqdn_source"] = "none"
 
         out_chunk.append(augmented_flow)
         if len(out_chunk) >= max_rows_per_division:
@@ -840,6 +868,23 @@ if __name__ == "__main__":
 
     if COMBINE_DNS_WITH_FLOWS:
         # split_by_user(None, None, None)
+
+        dns_cache_path = "scratch/reverse_dns_cache.pickle"
+        try:
+            with open(dns_cache_path, mode="rb") as f:
+                reverse_dns_cache = pickle.load(f)
+        except FileNotFoundError:
+            # Start the cache fresh
+            reverse_dns_cache = dict()
+
+        dns_fail_cache_path = "scratch/reverse_dns_failures.pickle"
+        try:
+            with open(dns_fail_cache_path, mode="rb") as f:
+                dns_fail_cache = pickle.load(f)
+        except FileNotFoundError:
+            # Start the cache fresh
+            dns_fail_cache = set()
+
         users_in_dns_log = sorted(os.listdir("scratch/dnslogs/sorted_per_user/"))
         # TODO Run with all users! test for now...
         # users_in_flow_log = sorted(os.listdir("scratch/flowlogs/sorted_per_user/"))
@@ -864,10 +909,22 @@ if __name__ == "__main__":
                 engine="fastparquet")
 
             augmented_flow_frame = augment_user_flow_with_dns(flow_frame,
-                                                              dns_frame)
+                                                              dns_frame,
+                                                              reverse_dns_cache,
+                                                              dns_fail_cache)
+            print(augmented_flow_frame)
+            print(augmented_flow_frame.head(10, compute=True))
             _clean_write_parquet(
                 flow_frame,
                 "scratch/flowlogs/sorted_per_user_with_fqdn/" + str(user))
+
+            print("Saving reverse dns cache to:", dns_cache_path)
+            with open(dns_cache_path, mode="w+b") as f:
+                pickle.dump(reverse_dns_cache, f)
+
+            print("Saving reverse dns failures cache to:", dns_fail_cache_path)
+            with open(dns_fail_cache_path, mode="w+b") as f:
+                pickle.dump(dns_fail_cache, f)
 
         print("Completed DNS augmentation")
         print("The following users had no DNS logs")
