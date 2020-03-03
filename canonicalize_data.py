@@ -682,8 +682,9 @@ def augment_user_flow_with_dns(flow_frame,
             chunksize=max_rows_per_division,
             )
         )
+    out_frame = out_frame.rename(columns={"Index": "start"})
 
-    out_frame = out_frame.set_index("Index", sorted=True).repartition(partition_size="64M",
+    out_frame = out_frame.set_index("start", sorted=True).repartition(partition_size="64M",
                                                                       force=True)
     out_frame = out_frame.categorize(columns=["fqdn_source"])
     return out_frame
@@ -700,7 +701,7 @@ if __name__ == "__main__":
     INGEST_DNSLOGS = False
     DEDUPLICATE_DNSLOGS = False
 
-    COMBINE_DNS_WITH_FLOWS = False
+    COMBINE_DNS_WITH_FLOWS = True
     RE_MERGE_FLOWS = True
 
     if CLEAN_TRANSACTIONS:
@@ -883,7 +884,7 @@ if __name__ == "__main__":
             print(augmented_flow_frame)
             print(augmented_flow_frame.head(10, compute=True))
             _clean_write_parquet(
-                flow_frame,
+                augmented_flow_frame,
                 "scratch/flowlogs/sorted_per_user_with_fqdn/" + str(user))
 
             print("Saving reverse dns cache to:", dns_cache_path)
