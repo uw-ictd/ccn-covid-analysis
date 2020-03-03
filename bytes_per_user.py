@@ -2,36 +2,14 @@
 """
 
 import altair
-import dask.config
+import bok.dask_infra
 import dask.dataframe
 import dask.distributed
 import numpy as np
 import pandas as pd
 
 if __name__ == "__main__":
-    # ------------------------------------------------
-    # Dask tuning, currently set for a 16GB RAM laptop
-    # ------------------------------------------------
-
-    # Compression sounds nice, but results in spikes on decompression
-    # that can lead to unstable RAM use and overflow.
-    dask.config.set({"dataframe.shuffle-compression": False})
-    dask.config.set({"distributed.scheduler.allowed-failures": 50})
-    dask.config.set({"distributed.scheduler.work-stealing": True})
-
-    # Aggressively write to disk but don't kill worker processes if
-    # they stray. With a small number of workers each worker killed is
-    # big loss. The OOM killer will take care of the overall system.
-    dask.config.set({"distributed.worker.memory.target": 0.2})
-    dask.config.set({"distributed.worker.memory.spill": 0.4})
-    dask.config.set({"distributed.worker.memory.pause": 0.6})
-    dask.config.set({"distributed.worker.memory.terminate": False})
-
-    # The memory limit parameter is undocumented and applies to each worker.
-    cluster = dask.distributed.LocalCluster(n_workers=2,
-                                            threads_per_worker=1,
-                                            memory_limit='4GB')
-    client = dask.distributed.Client(cluster)
+    client = bok.dask_infra.setup_dask_client()
 
     # Import the flows dataset
     #
