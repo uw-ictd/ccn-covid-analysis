@@ -728,7 +728,8 @@ if __name__ == "__main__":
     INGEST_DNSLOGS = False
     DEDUPLICATE_DNSLOGS = False
 
-    COMBINE_DNS_WITH_FLOWS = True
+    COMBINE_DNS_WITH_FLOWS = False
+    RE_MERGE_FLOWS = True
 
     if CLEAN_TRANSACTIONS:
         remove_nuls_from_file("data/originals/transactions-encoded-2020-02-19.log",
@@ -924,6 +925,30 @@ if __name__ == "__main__":
         print("Completed DNS augmentation")
         print("The following users had no DNS logs")
         print(missing_dns_users)
+
+    if RE_MERGE_FLOWS:
+        # Initialize an empty dask dataframe from an empty pandas dataframe. No
+        # native dask empty frame constructor is available.
+        max_rows_per_division = 10000
+        merged_frame = dask.dataframe.from_pandas(pd.DataFrame(),
+                                                  chunksize=max_rows_per_division)
+        users_on_disk = sorted(os.listdir("scratch/flowlogs/sorted_per_user_with_fqdn/"))
+        for user in users_on_disk:
+            flow_frame = dask.dataframe.read_parquet(
+                "scratch/flowlogs/sorted_per_user_with_fqdn/" + str(user),
+                engine="fastparquet")
+            merged_frame = merged_frame.append(flow_frame)
+
+        merged_frame = merged_frame.reset_index().set_index(
+            "start"
+        ).repartition(
+            partition_size="64M",
+            force=True
+        )
+
+        print("writing")
+        _clean_write_parquet(merged_frame, "scratch/flowlogs/typical_with_fqdn/")
+
 
     client.close()
     print("Exiting hopefully cleanly...")
