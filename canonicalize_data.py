@@ -1,6 +1,7 @@
 """ Loads data from raw data files and stores in an analysis friendly manner
 """
 
+import bok.dask_infra
 import csv
 import dask.config
 import dask.dataframe
@@ -689,36 +690,7 @@ def augment_user_flow_with_dns(flow_frame,
 
 
 if __name__ == "__main__":
-    # ------------------------------------------------
-    # Dask tuning, currently set for a 16GB RAM laptop
-    # ------------------------------------------------
-
-    # Compression sounds nice, but results in spikes on decompression
-    # that can lead to unstable RAM use and overflow.
-    dask.config.set({"dataframe.shuffle-compression": False})
-    dask.config.set({"distributed.scheduler.allowed-failures": 50})
-    dask.config.set({"distributed.scheduler.work-stealing": True})
-
-    # Aggressively write to disk but don't kill worker processes if
-    # they stray. With a small number of workers each worker killed is
-    # big loss. The OOM killer will take care of the overall system.
-    dask.config.set({"distributed.worker.memory.target": 0.2})
-    dask.config.set({"distributed.worker.memory.spill": 0.4})
-    dask.config.set({"distributed.worker.memory.pause": 0.6})
-    dask.config.set({"distributed.worker.memory.terminate": False})
-
-    # Remove memory warning logs
-    dask.config.set({"logging.distributed": "error"})
-    dask.config.set({"logging.'distributed.worker'": "error"})
-
-    # Shuffle with disk
-    dask.config.set(shuffle='disk')
-
-    # The memory limit parameter is undocumented and applies to each worker.
-    cluster = dask.distributed.LocalCluster(n_workers=1,
-                                            threads_per_worker=1,
-                                            memory_limit='10GB')
-    client = dask.distributed.Client(cluster)
+    client = bok.dask_infra.setup_dask_client()
 
     CLEAN_TRANSACTIONS = False
     SPLIT_FLOWLOGS = False
@@ -948,7 +920,6 @@ if __name__ == "__main__":
 
         print("writing")
         _clean_write_parquet(merged_frame, "scratch/flowlogs/typical_with_fqdn/")
-
 
     client.close()
     print("Exiting hopefully cleanly...")
