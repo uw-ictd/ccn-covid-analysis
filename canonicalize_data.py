@@ -1,6 +1,7 @@
 """ Loads data from raw data files and stores in an analysis friendly manner
 """
 
+import bok.domains
 import bok.dask_infra
 import csv
 import dask.config
@@ -701,8 +702,10 @@ if __name__ == "__main__":
     INGEST_DNSLOGS = False
     DEDUPLICATE_DNSLOGS = False
 
-    COMBINE_DNS_WITH_FLOWS = True
-    RE_MERGE_FLOWS = True
+    COMBINE_DNS_WITH_FLOWS = False
+    RE_MERGE_FLOWS = False
+
+    ADD_CATEGORIES = True
 
     if CLEAN_TRANSACTIONS:
         remove_nuls_from_file("data/originals/transactions-encoded-2020-02-19.log",
@@ -921,6 +924,20 @@ if __name__ == "__main__":
 
         print("writing")
         _clean_write_parquet(merged_frame, "scratch/flowlogs/typical_with_fqdn/")
+
+    if ADD_CATEGORIES:
+        frame = dask.dataframe.read_parquet(
+            "scratch/flowlogs/typical_with_fqdn/",
+            engine="fastparquet")
+
+        print(frame)
+
+        frame["category"] = frame.apply(
+            lambda row: bok.domains.assign_category(row["fqdn"]),
+            axis="columns",
+            meta=("category", object))
+
+        _clean_write_parquet(frame, "scratch/flowlogs/typical_with_fqdn_category/")
 
     client.close()
     print("Exiting hopefully cleanly...")
