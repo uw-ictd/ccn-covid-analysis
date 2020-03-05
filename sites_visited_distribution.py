@@ -12,9 +12,6 @@ def get_sites_visited_query(data):
     query = data.reset_index()
     # Group by the number of times each site was visited
     query = query.groupby("category").count()
-    # Leave it as the index for now
-    # # Get the category column back
-    # query = query.reset_index()
     # Create a frequency column
     query["frequency"] = query["user"]
     return query
@@ -41,6 +38,7 @@ if __name__ == "__main__":
     # Convert to pandas!
     # This should be quick since the grouby has already happened.
     sites_visited = sites_visited.compute()
+    # Get the category column back
     sites_visited = sites_visited.reset_index()
     sites_visited = sites_visited.melt(id_vars=["category"], value_vars=["frequency"], var_name="website", value_name="frequency")
 
