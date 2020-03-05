@@ -3,13 +3,9 @@
 
 import altair
 import bok.dask_infra
-import dask.config
 import dask.dataframe
 import dask.distributed
-import datetime
-import math
-import numpy as np
-import pandas as pd
+
 
 def get_sites_visited_query(data):
     # Get the date column back
@@ -21,6 +17,7 @@ def get_sites_visited_query(data):
     # Create a frequency column
     query["frequency"] = query["user"]
     return query
+
 
 if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
