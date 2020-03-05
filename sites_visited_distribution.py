@@ -32,12 +32,10 @@ if __name__ == "__main__":
 
     data = dask.dataframe.read_parquet("data/clean/typical_with_fqdn_category", engine="pyarrow")
     length = len(data)
-    transactions = dask.dataframe.read_csv("data/clean/first_time_user_transactions.csv")
     print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
     print("Processing {} flows".format(length))
 
     sites_visited = get_sites_visited_query(data)
-    sites_visited = sites_visited.compute()
     sites_visited = sites_visited.melt(id_vars=["category"], value_vars=["frequency"], var_name="website", value_name="frequency")
     sites_visited = sites_visited.compute()
 
