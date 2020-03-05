@@ -3,6 +3,7 @@
 
 import dask.config
 import dask.distributed
+import shutil
 
 
 def setup_dask_client():
@@ -32,5 +33,17 @@ def setup_dask_client():
                                             memory_limit='2GB')
 
     return dask.distributed.Client(cluster)
+
+
+def clean_write_parquet(dataframe, path, engine="fastparquet"):
+    try:
+        shutil.rmtree(path)
+    except FileNotFoundError:
+        # No worries if the output doesn't exist yet.
+        pass
+    dataframe.to_parquet(path,
+                         compression="snappy",
+                         engine=engine,
+                         compute=True)
 
 
