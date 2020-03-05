@@ -50,3 +50,12 @@ DnsResponse = namedtuple("DnsResponse", [
     "ip_address",
     "ttl",
 ])
+
+Transaction = namedtuple("Transaction", [
+    "timestamp",
+    "kind",
+    "user",
+    "dest_user",
+    "amount_bytes",
+    "amount_idr",
+])
