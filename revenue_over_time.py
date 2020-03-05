@@ -41,7 +41,7 @@ def get_revenue_query(transactions):
     # Convert query back into a dataframe
     query = query.reset_index()
     # Do a rolling average of the days
-    query["rolling_avg"] = query.iloc[:,1].rolling(window=30).mean()
+    query["rolling_avg"] = query.iloc[:,1].rolling(window=30, win_type="blackman").mean()
     # Drop all NA values
     query = query.dropna(how="any")
 

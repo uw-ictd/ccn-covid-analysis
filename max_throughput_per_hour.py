@@ -88,7 +88,6 @@ if __name__ == "__main__":
     throughput = throughput.astype(types)
     # Compute the query
     throughput = throughput.compute()
-    print(throughput)
 
     altair.Chart(throughput).mark_line().encode(
         x="date",
