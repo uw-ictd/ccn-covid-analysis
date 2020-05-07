@@ -401,7 +401,7 @@ def consolidate_datasets(input_directory,
     for archive in os.listdir(input_directory):
         archive_path = os.path.join(input_directory, archive)
         partial_log = dask.dataframe.read_parquet(archive_path,
-                                                  engine="pyarrow")
+                                                  engine="fastparquet")
         logs_to_aggregate.append(partial_log)
 
     aggregated_log = dask.dataframe.multi.concat(logs_to_aggregate,
@@ -421,20 +421,12 @@ def consolidate_datasets(input_directory,
     aggregated_log = aggregated_log.repartition(freq=time_slice, force=True)
 
     if checkpoint:
-        try:
-            shutil.rmtree("scratch/checkpoint")
-        except FileNotFoundError:
-            # No worries if the output doesn't exist yet.
-            pass
-
-        aggregated_log.to_parquet("scratch/checkpoint",
-                                  compression="snappy",
-                                  engine="pyarrow")
+        _clean_write_parquet(aggregated_log, "scratch/checkpoint")
 
         print("Wrote deduplication checkpoint!")
 
         aggregated_log = dask.dataframe.read_parquet("scratch/checkpoint",
-                                                     engine="pyarrow")
+                                                     engine="fastparquet")
 
     aggregate_length = aggregated_log.shape[0]
 
@@ -452,7 +444,7 @@ def consolidate_datasets(input_directory,
 
     write_delayed = deduped_log.to_parquet(output,
                                            compression="snappy",
-                                           engine="pyarrow",
+                                           engine="fastparquet",
                                            compute=False)
     results = client.compute([aggregate_length, dedupe_length, write_delayed],
                              sync=True)
@@ -479,7 +471,7 @@ def split_by_user(flowlog_path, dns_path, client):
     """
     print("Generate minimized DNS frame")
     slim_dns_frame = dask.dataframe.read_parquet("data/clean/dnslogs/typical",
-                                                 engine="pyarrow")
+                                                 engine="fastparquet")
     print("Slim dns has {} partitions".format(slim_dns_frame.npartitions))
     slim_dns_frame = slim_dns_frame.drop(["dns_server",
                                           "user_port",
@@ -531,7 +523,7 @@ def split_by_user(flowlog_path, dns_path, client):
 
     print("chopping flows")
     flows = dask.dataframe.read_parquet("data/clean/flows/typical",
-                                        engine="pyarrow")
+                                        engine="fastparquet")
 
     flows = flows.reset_index()
     flows = flows.set_index("user")
@@ -697,15 +689,15 @@ if __name__ == "__main__":
     CLEAN_TRANSACTIONS = False
     SPLIT_FLOWLOGS = False
     INGEST_FLOWLOGS = False
-    DEDUPLICATE_FLOWLOGS = False
+    DEDUPLICATE_FLOWLOGS = True
 
     INGEST_DNSLOGS = False
-    DEDUPLICATE_DNSLOGS = False
+    DEDUPLICATE_DNSLOGS = True
 
     COMBINE_DNS_WITH_FLOWS = False
     RE_MERGE_FLOWS = False
 
-    ADD_CATEGORIES = True
+    ADD_CATEGORIES = False
 
     if CLEAN_TRANSACTIONS:
         remove_nuls_from_file("data/originals/transactions-encoded-2020-02-19.log",
@@ -719,11 +711,16 @@ if __name__ == "__main__":
 
         split_lzma_file("data/originals/2020-02-13-flowlog_archive.xz",
                         "data/splits/2020-02-13-flowlog_archive-{:03d}.xz",
-                        1000000)
+                         1000000)
+
+        # split_lzma_file("data/originals/2020-05-04-flowlog_archive.xz",
+        #                 "scratch/splits/flows/archives/2020-05-04-flowlog_archive-{:03d}.xz",
+        #                 1000000)
+
 
     if INGEST_FLOWLOGS:
         # Import split files and archive to parquet
-        split_dir = os.path.join("scratch", "splits")
+        split_dir = os.path.join("scratch", "splits", "flows", "archives")
         for filename in sorted(os.listdir(split_dir)):
             if not filename.endswith(".xz"):
                 print("Skipping:", filename)
@@ -754,19 +751,12 @@ if __name__ == "__main__":
                                         "parquet",
                                         flow_type,
                                         parquet_name)
-                try:
-                    shutil.rmtree(out_path)
-                except FileNotFoundError:
-                    # No worries if the output doesn't exist yet.
-                    pass
 
-                working_log.to_parquet(out_path,
-                                       compression="snappy",
-                                       engine="pyarrow")
+                _clean_write_parquet(working_log, out_path)
 
     if DEDUPLICATE_FLOWLOGS:
-        input_path = os.path.join("scratch", "splits", "parquet")
-        output_path = os.path.join("scratch", "test_output")
+        input_path = os.path.join("scratch", "splits", "flows", "parquet")
+        output_path = os.path.join("scratch", "partially-aggregated-flows")
         for case_kind in ["typical", "p2p", "nouser"]:
             specific_output = os.path.join(output_path, case_kind)
             try:
@@ -780,11 +770,14 @@ if __name__ == "__main__":
             consolidate_datasets(input_directory=os.path.join(input_path,
                                                               case_kind),
                                  output=specific_output,
-                                 index_column="start")
+                                 index_column="start",
+                                 time_slice="4H",
+                                 checkpoint=True,
+                                 client=client)
 
     if INGEST_DNSLOGS:
         # Import dns logs and archive to parquet
-        dns_archives_directory = os.path.join("scratch", "dns", "splits")
+        dns_archives_directory = os.path.join("scratch", "splits", "dns", "archives")
         for filename in sorted(os.listdir(dns_archives_directory)):
             if not filename.endswith(".xz"):
                 print("Skipping:", filename)
@@ -800,7 +793,7 @@ if __name__ == "__main__":
                 # Strip the .xz extension on output
                 parquet_name = filename[:-3]
                 working_log = working_log.set_index("timestamp")
-                working_log = working_log.repartition(partition_size="32M",
+                working_log = working_log.repartition(partition_size="64M",
                                                       force=True)
                 dns_type = None
                 if index == 0:
@@ -812,19 +805,12 @@ if __name__ == "__main__":
                                         "parquet",
                                         dns_type,
                                         parquet_name)
-                try:
-                    shutil.rmtree(out_path)
-                except FileNotFoundError:
-                    # No worries if the output doesn't exist yet.
-                    pass
 
-                working_log.to_parquet(out_path,
-                                       compression="snappy",
-                                       engine="pyarrow")
+                _clean_write_parquet(working_log, out_path)
 
     if DEDUPLICATE_DNSLOGS:
-        input_path = os.path.join("scratch", "dns", "splits", "parquet")
-        output_path = os.path.join("scratch", "dns", "deduplicated_output")
+        input_path = os.path.join("scratch", "splits", "dns", "parquet")
+        output_path = os.path.join("scratch", "aggregated-dns")
         for case_kind in ["typical"]:
             specific_output = os.path.join(output_path, case_kind)
             try:
