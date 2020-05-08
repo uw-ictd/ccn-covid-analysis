@@ -470,7 +470,7 @@ def split_by_user(flowlog_path, dns_path, client):
     """Annotate flows with the fqdn they are likely communicating with
     """
     print("Generate minimized DNS frame")
-    slim_dns_frame = dask.dataframe.read_parquet("data/clean/dnslogs/typical",
+    slim_dns_frame = dask.dataframe.read_parquet("scratch/dns/aggregated/typical",
                                                  engine="fastparquet")
     print("Slim dns has {} partitions".format(slim_dns_frame.npartitions))
     slim_dns_frame = slim_dns_frame.drop(["dns_server",
@@ -497,9 +497,9 @@ def split_by_user(flowlog_path, dns_path, client):
     print("slim_length =", len(slim_dns_frame))
     print("slim partitions=", slim_dns_frame.npartitions)
 
-    _clean_write_parquet(slim_dns_frame, "scratch/dnslogs/slim_deduplicated")
+    _clean_write_parquet(slim_dns_frame, "scratch/dns/slim")
 
-    slim_dns_frame = dask.dataframe.read_parquet("scratch/dnslogs/slim_deduplicated",
+    slim_dns_frame = dask.dataframe.read_parquet("scratch/dns/slim",
                                                  engine="fastparquet",)
 
     # Partition by user.
@@ -507,9 +507,9 @@ def split_by_user(flowlog_path, dns_path, client):
     print("setting index")
     slim_dns_frame = slim_dns_frame.reset_index()
     slim_dns_frame = slim_dns_frame.set_index("user").repartition(npartitions=200)
-    _clean_write_parquet(slim_dns_frame, "scratch/dnslogs/slim_user_indexed")
+    _clean_write_parquet(slim_dns_frame, "scratch/dns/slim_user_indexed")
 
-    slim_dns_frame = dask.dataframe.read_parquet("scratch/dnslogs/slim_user_indexed",
+    slim_dns_frame = dask.dataframe.read_parquet("scratch/dns/slim_user_indexed",
                                                  engine="fastparquet",)
 
     dns_by_users = slim_dns_frame.groupby("user")
@@ -519,24 +519,24 @@ def split_by_user(flowlog_path, dns_path, client):
         print("running user", user)
         user_dns_logs = dns_by_users.get_group(user)
         _clean_write_parquet(user_dns_logs,
-                             "scratch/dnslogs/slim_per_user/" + str(user))
+                             "scratch/dns/slim_per_user/" + str(user))
 
     print("chopping flows")
-    flows = dask.dataframe.read_parquet("data/clean/flows/typical",
+    flows = dask.dataframe.read_parquet("scratch/flows/aggregated/typical",
                                         engine="fastparquet")
 
     flows = flows.reset_index()
     flows = flows.set_index("user")
-    _clean_write_parquet(flows, "scratch/flowlogs/all_indexed_by_user")
+    _clean_write_parquet(flows, "scratch/flows/aggregated_indexed_by_user")
 
-    flows = dask.dataframe.read_parquet("scratch/flowlogs/all_indexed_by_user", engine="fastparquet")
+    flows = dask.dataframe.read_parquet("scratch/flows/aggregated_indexed_by_user", engine="fastparquet")
     print("read!")
     flows = flows.repartition(npartitions=200)
     print("repartitioned!")
 
-    _clean_write_parquet(flows, "scratch/flowlogs/all_indexed_by_user_partitioned")
+    _clean_write_parquet(flows, "scratch/flows/aggregated_indexed_by_user_partitioned")
     print("wrote")
-    flows = dask.dataframe.read_parquet("scratch/flowlogs/all_indexed_by_user_partitioned",
+    flows = dask.dataframe.read_parquet("scratch/flows/aggregated_indexed_by_user_partitioned",
                                         engine="fastparquet")
     flows_by_user = flows.groupby("user")
 
@@ -546,19 +546,19 @@ def split_by_user(flowlog_path, dns_path, client):
         print("Flow for user:", user)
         user_flow_logs = flows_by_user.get_group(user)
         _clean_write_parquet(user_flow_logs,
-                             "scratch/flowlogs/per_user/" + str(user))
+                             "scratch/flows/per_user/" + str(user))
 
     print("running sorts")
-    users_in_dns_log = sorted(os.listdir("scratch/dnslogs/slim_per_user/"))
-    users_in_flow_log = sorted(os.listdir("scratch/flowlogs/per_user"))
+    users_in_dns_log = sorted(os.listdir("scratch/dns/slim_per_user/"))
+    users_in_flow_log = sorted(os.listdir("scratch/flows/per_user"))
 
     for user in users_in_dns_log:
         print("DNS user:", user)
-        frame = dask.dataframe.read_parquet("scratch/dnslogs/slim_per_user/" + str(user),
+        frame = dask.dataframe.read_parquet("scratch/dns/slim_per_user/" + str(user),
                                             engine="fastparquet")
         frame = frame.reset_index().set_index("timestamp").repartition(partition_size="64M",
                                                                        force=True)
-        _clean_write_parquet(frame, "scratch/dnslogs/sorted_per_user/" + str(user))
+        _clean_write_parquet(frame, "scratch/dns/per_user_timestamp_index/" + str(user))
 
     for user in users_in_flow_log:
         print("Flow user:", user)
@@ -566,7 +566,7 @@ def split_by_user(flowlog_path, dns_path, client):
                                             engine="fastparquet")
         frame = frame.reset_index().set_index("start").repartition(partition_size="64M",
                                                                    force=True)
-        _clean_write_parquet(frame, "scratch/flowlogs/sorted_per_user/" + str(user))
+        _clean_write_parquet(frame, "scratch/flows/per_user_start_index/" + str(user))
 
 
 def augment_user_flow_with_dns(flow_frame,
@@ -689,10 +689,12 @@ if __name__ == "__main__":
     CLEAN_TRANSACTIONS = False
     SPLIT_FLOWLOGS = False
     INGEST_FLOWLOGS = False
-    DEDUPLICATE_FLOWLOGS = True
+    DEDUPLICATE_FLOWLOGS = False
 
     INGEST_DNSLOGS = False
-    DEDUPLICATE_DNSLOGS = True
+    DEDUPLICATE_DNSLOGS = False
+
+    BUILD_PER_USER_INDEXES = True
 
     COMBINE_DNS_WITH_FLOWS = False
     RE_MERGE_FLOWS = False
@@ -756,7 +758,7 @@ if __name__ == "__main__":
 
     if DEDUPLICATE_FLOWLOGS:
         input_path = os.path.join("scratch", "splits", "flows", "parquet")
-        output_path = os.path.join("scratch", "partially-aggregated-flows")
+        output_path = os.path.join("scratch", "flows", "aggregated")
         for case_kind in ["typical", "p2p", "nouser"]:
             specific_output = os.path.join(output_path, case_kind)
             try:
@@ -810,7 +812,7 @@ if __name__ == "__main__":
 
     if DEDUPLICATE_DNSLOGS:
         input_path = os.path.join("scratch", "splits", "dns", "parquet")
-        output_path = os.path.join("scratch", "aggregated-dns")
+        output_path = os.path.join("scratch", "dns", "aggregated")
         for case_kind in ["typical"]:
             specific_output = os.path.join(output_path, case_kind)
             try:
@@ -829,9 +831,11 @@ if __name__ == "__main__":
                                  checkpoint=True,
                                  client=client)
 
-    if COMBINE_DNS_WITH_FLOWS:
-        # split_by_user(None, None, None)
+    if BUILD_PER_USER_INDEXES:
+        # Eventually maybe parameterize this better, for now it's a hack
+        split_by_user(None, None, None)
 
+    if COMBINE_DNS_WITH_FLOWS:
         dns_cache_path = "scratch/reverse_dns_cache.pickle"
         try:
             with open(dns_cache_path, mode="rb") as f:
@@ -848,8 +852,8 @@ if __name__ == "__main__":
             # Start the cache fresh
             dns_fail_cache = set()
 
-        users_in_dns_log = sorted(os.listdir("scratch/dnslogs/sorted_per_user/"))
-        users_in_flow_log = sorted(os.listdir("scratch/flowlogs/sorted_per_user/"))
+        users_in_dns_log = sorted(os.listdir("scratch/dns/per_user_timestamp_index/"))
+        users_in_flow_log = sorted(os.listdir("scratch/flows/per_user_start_index/"))
         missing_dns_users = list()
         for user in users_in_flow_log:
             if user not in users_in_dns_log:
@@ -859,11 +863,11 @@ if __name__ == "__main__":
 
             print("Doing dns to flow mapping for user:", user)
             flow_frame = dask.dataframe.read_parquet(
-                "scratch/flowlogs/sorted_per_user/" + str(user),
+                "scratch/flows/per_user_start_index/" + str(user),
                 engine="fastparquet")
 
             dns_frame = dask.dataframe.read_parquet(
-                "scratch/dnslogs/sorted_per_user/" + str(user),
+                "scratch/dns/per_user_timestamp_index/" + str(user),
                 engine="fastparquet")
 
             augmented_flow_frame = augment_user_flow_with_dns(flow_frame,
@@ -874,7 +878,7 @@ if __name__ == "__main__":
             print(augmented_flow_frame.head(10, compute=True))
             _clean_write_parquet(
                 augmented_flow_frame,
-                "scratch/flowlogs/sorted_per_user_with_fqdn/" + str(user))
+                "scratch/flows/per_user_with_fqdn_start_index/" + str(user))
 
             print("Saving reverse dns cache to:", dns_cache_path)
             with open(dns_cache_path, mode="w+b") as f:
@@ -894,10 +898,10 @@ if __name__ == "__main__":
         max_rows_per_division = 10000
         merged_frame = dask.dataframe.from_pandas(pd.DataFrame(),
                                                   chunksize=max_rows_per_division)
-        users_on_disk = sorted(os.listdir("scratch/flowlogs/sorted_per_user_with_fqdn/"))
+        users_on_disk = sorted(os.listdir("scratch/flows/per_user_with_fqdn_start_index/"))
         for user in users_on_disk:
             flow_frame = dask.dataframe.read_parquet(
-                "scratch/flowlogs/sorted_per_user_with_fqdn/" + str(user),
+                "scratch/flowlogs/per_user_with_fqdn_start_index/" + str(user),
                 engine="fastparquet")
             merged_frame = merged_frame.append(flow_frame)
 
@@ -909,11 +913,11 @@ if __name__ == "__main__":
         )
 
         print("writing")
-        _clean_write_parquet(merged_frame, "scratch/flowlogs/typical_with_fqdn/")
+        _clean_write_parquet(merged_frame, "scratch/flows/typical_with_fqdn_start_index/")
 
     if ADD_CATEGORIES:
         frame = dask.dataframe.read_parquet(
-            "scratch/flowlogs/typical_with_fqdn/",
+            "scratch/flows/typical_with_fqdn_start_index/",
             engine="fastparquet")
 
         print(frame)
@@ -923,7 +927,7 @@ if __name__ == "__main__":
             axis="columns",
             meta=("category", object))
 
-        _clean_write_parquet(frame, "scratch/flowlogs/typical_with_fqdn_category/")
+        _clean_write_parquet(frame, "scratch/flows/typical_with_fqdn_category_start_index/")
 
     client.close()
     print("Exiting hopefully cleanly...")
