@@ -708,28 +708,28 @@ if __name__ == "__main__":
 
     if SPLIT_FLOWLOGS:
         split_lzma_file("data/originals/2019-05-17-flowlog_archive.xz",
-                        "data/splits/2019-05-17-flowlog_archive-{:03d}.xz",
+                        "scratch/splits/flows/archives/2019-05-17-flowlog_archive-{:03d}.xz",
                         1000000)
 
         split_lzma_file("data/originals/2020-02-13-flowlog_archive.xz",
-                        "data/splits/2020-02-13-flowlog_archive-{:03d}.xz",
-                         1000000)
+                        "scratch/splits/flows/archives/2020-02-13-flowlog_archive-{:03d}.xz",
+                        1000000)
 
-        # split_lzma_file("data/originals/2020-05-04-flowlog_archive.xz",
-        #                 "scratch/splits/flows/archives/2020-05-04-flowlog_archive-{:03d}.xz",
-        #                 1000000)
-
+        split_lzma_file("data/originals/2020-05-04-flowlog_archive.xz",
+                        "scratch/splits/flows/archives/2020-05-04-flowlog_archive-{:03d}.xz",
+                        1000000)
 
     if INGEST_FLOWLOGS:
         # Import split files and archive to parquet
-        split_dir = os.path.join("scratch", "splits", "flows", "archives")
-        for filename in sorted(os.listdir(split_dir)):
+        split_dir = os.path.join("scratch", "splits", "flows")
+        archive_dir = os.path.join(split_dir, "archives")
+        for filename in sorted(os.listdir(archive_dir)):
             if not filename.endswith(".xz"):
                 print("Skipping:", filename)
                 continue
 
             print("Converting", filename, "to parquet")
-            frames = import_flowlog_to_dataframes(os.path.join(split_dir, filename))
+            frames = import_flowlog_to_dataframes(os.path.join(archive_dir, filename))
             for index, working_log in enumerate(frames):
                 if len(working_log) == 0:
                     continue
