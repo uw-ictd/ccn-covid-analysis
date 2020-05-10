@@ -562,7 +562,7 @@ def split_by_user(flowlog_path, dns_path, client):
 
     for user in users_in_flow_log:
         print("Flow user:", user)
-        frame = dask.dataframe.read_parquet("scratch/flowlogs/per_user/" + str(user),
+        frame = dask.dataframe.read_parquet("scratch/flows/per_user/" + str(user),
                                             engine="fastparquet")
         frame = frame.reset_index().set_index("start").repartition(partition_size="64M",
                                                                    force=True)
@@ -901,7 +901,7 @@ if __name__ == "__main__":
         users_on_disk = sorted(os.listdir("scratch/flows/per_user_with_fqdn_start_index/"))
         for user in users_on_disk:
             flow_frame = dask.dataframe.read_parquet(
-                "scratch/flowlogs/per_user_with_fqdn_start_index/" + str(user),
+                "scratch/flows/per_user_with_fqdn_start_index/" + str(user),
                 engine="fastparquet")
             merged_frame = merged_frame.append(flow_frame)
 
