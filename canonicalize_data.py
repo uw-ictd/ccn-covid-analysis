@@ -683,6 +683,25 @@ def augment_user_flow_with_dns(flow_frame,
     return out_frame
 
 
+def categorize_fqdn_from_parquet(in_path, out_path):
+    """Run categorization over the input parquet file and write to the output
+
+    Requires the input parquet file specify an `fqdn` column
+    """
+    frame = dask.dataframe.read_parquet(
+        in_path,
+        engine="fastparquet")
+
+    frame["category"] = frame.apply(
+        lambda row: bok.domains.assign_category(row["fqdn"]),
+        axis="columns",
+        meta=("category", object))
+
+    _clean_write_parquet(
+        frame,
+        out_path)
+
+
 if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
 
@@ -694,9 +713,11 @@ if __name__ == "__main__":
     INGEST_DNSLOGS = False
     DEDUPLICATE_DNSLOGS = False
 
-    BUILD_PER_USER_INDEXES = True
+    BUILD_PER_USER_INDEXES = False
 
     COMBINE_DNS_WITH_FLOWS = False
+    CATEGORIZE_USER_FLOWS = True
+
     RE_MERGE_FLOWS = False
 
     ADD_CATEGORIES = False
@@ -891,6 +912,16 @@ if __name__ == "__main__":
         print("Completed DNS augmentation")
         print("The following users had no DNS logs")
         print(missing_dns_users)
+
+    if CATEGORIZE_USER_FLOWS:
+        print("Categorizing user flows")
+        users = sorted(os.listdir("scratch/flows/per_user_with_fqdn_start_index/"))
+
+        for user in users:
+            print("Categorizing flows for:", user)
+            in_path = "scratch/flows/per_user_with_fqdn_start_index/" + str(user)
+            out_path = "scratch/flows/typical_with_fqdn_category_start_index/" + str(user)
+            categorize_fqdn_from_parquet(in_path, out_path)
 
     if RE_MERGE_FLOWS:
         # Initialize an empty dask dataframe from an empty pandas dataframe. No
