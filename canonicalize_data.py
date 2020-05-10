@@ -454,16 +454,8 @@ def consolidate_datasets(input_directory,
     print("Removed {} duplicates!".format(results[0] - results[1]))
 
 
-def _clean_write_parquet(dataframe, path, engine="fastparquet"):
-    try:
-        shutil.rmtree(path)
-    except FileNotFoundError:
-        # No worries if the output doesn't exist yet.
-        pass
-    dataframe.to_parquet(path,
-                         compression="snappy",
-                         engine=engine,
-                         compute=True)
+def _clean_write_parquet(dataframe, path, engine="fastparquet", compute=True):
+    return bok.dask_infra.clean_write_parquet(dataframe, path, engine, compute)
 
 
 def split_by_user(flowlog_path, dns_path, client):
