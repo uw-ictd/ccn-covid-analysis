@@ -28,22 +28,22 @@ def setup_dask_client():
     # ------------------------------------------------
     # Dask tuning, currently set for a 8GB RAM laptop
     # ------------------------------------------------
-    cluster = dask.distributed.LocalCluster(n_workers=2,
+    cluster = dask.distributed.LocalCluster(n_workers=3,
                                             threads_per_worker=1,
-                                            memory_limit='2GB')
+                                            memory_limit='3GB')
 
     return dask.distributed.Client(cluster)
 
 
-def clean_write_parquet(dataframe, path, engine="fastparquet"):
+def clean_write_parquet(dataframe, path, engine="fastparquet", compute=True):
     try:
         shutil.rmtree(path)
     except FileNotFoundError:
         # No worries if the output doesn't exist yet.
         pass
-    dataframe.to_parquet(path,
-                         compression="snappy",
-                         engine=engine,
-                         compute=True)
+    return dataframe.to_parquet(path,
+                                compression="snappy",
+                                engine=engine,
+                                compute=compute)
 
 
