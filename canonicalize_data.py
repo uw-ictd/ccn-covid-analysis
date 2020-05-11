@@ -926,17 +926,18 @@ if __name__ == "__main__":
         results = client.compute(computation_futures, sync=True)
 
     if RE_MERGE_FLOWS:
-        # Initialize an empty dask dataframe from an empty pandas dataframe. No
-        # native dask empty frame constructor is available.
-        max_rows_per_division = 10000
-        merged_frame = dask.dataframe.from_pandas(pd.DataFrame(),
-                                                  chunksize=max_rows_per_division)
-        users_on_disk = sorted(os.listdir("scratch/flows/per_user_with_fqdn_start_index/"))
+        merged_frame = None
+
+        users_on_disk = sorted(os.listdir("scratch/flows/typical_fqdn_category_DIV_user_INDEX_start/"))
         for user in users_on_disk:
             flow_frame = dask.dataframe.read_parquet(
-                "scratch/flows/per_user_with_fqdn_start_index/" + str(user),
+                "scratch/flows/typical_fqdn_category_DIV_user_INDEX_start/" + str(user),
                 engine="fastparquet")
-            merged_frame = merged_frame.append(flow_frame)
+
+            if merged_frame is None:
+                merged_frame = flow_frame
+            else:
+                merged_frame = merged_frame.append(flow_frame)
 
         merged_frame = merged_frame.reset_index().set_index(
             "start"
