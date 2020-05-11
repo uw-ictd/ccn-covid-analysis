@@ -28,6 +28,7 @@ murmurhash = "*"
 partd = "*"
 psutil = "*"
 xxhash = "*"
+altair-viewer = "*"
 
 [requires]
 python_version = "3"

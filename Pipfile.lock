@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "55111e29f6db579e383e7bd38ff6e62920528fe6d4de301f9fca19edc711148c"
+            "sha256": "262ae75b22994aec5141496ba553f2a0bb408929d94d89cac926f1886940a5e3"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -23,6 +23,21 @@
             ],
             "index": "pypi",
             "version": "==4.1.0"
+        },
+        "altair-data-server": {
+            "hashes": [
+                "sha256:b39205a48ab2678020fc58739cb973845879ed169cb5addddc9dcbf5a69aeb2b",
+                "sha256:bd1414d69dbfec22c804b34210491d7313e5edc7736504dfb8c405ded0e2015b"
+            ],
+            "version": "==0.4.1"
+        },
+        "altair-viewer": {
+            "hashes": [
+                "sha256:2964dbde6b7c5be723ddd9d509db4de67c9fb4c765d4e864087dc931c4524439",
+                "sha256:5e290c472b70f14b5c943d464b96ca78c7131bb5f515cdb8b031e0d0722267e5"
+            ],
+            "index": "pypi",
+            "version": "==0.3.0"
         },
         "attrs": {
             "hashes": [
@@ -537,6 +552,12 @@
                 "sha256:f784aad988f12c80aacfa5b381ec21fd3f38f851720f652b9f33facc5101cf4d"
             ],
             "version": "==7.1.2"
+        },
+        "portpicker": {
+            "hashes": [
+                "sha256:d2cdc776873635ed421315c4d22e63280042456bbfa07397817e687b142b9667"
+            ],
+            "version": "==1.3.1"
         },
         "prometheus-client": {
             "hashes": [
