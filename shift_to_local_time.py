@@ -10,6 +10,8 @@ def shift_flows_recursive(in_path, out_path, client):
     future_handles = []
     for subfile in subfiles:
         df_path = os.path.join(in_path, subfile)
+        df_out_path = os.path.join(out_path, subfile)
+
 
         df = dask.dataframe.read_parquet(df_path, engine="fastparquet")
 
@@ -18,7 +20,7 @@ def shift_flows_recursive(in_path, out_path, client):
         df["end"] = df["end"] + pd.tseries.offsets.DateOffset(hours=9)
         df = df.set_index("start")
 
-        handle = bok.dask_infra.clean_write_parquet(df, out_path, compute=False)
+        handle = bok.dask_infra.clean_write_parquet(df, df_out_path, compute=False)
         future_handles.append(handle)
 
     print("Recursive flow shift now")
