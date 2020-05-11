@@ -700,6 +700,7 @@ if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
 
     CLEAN_TRANSACTIONS = False
+
     SPLIT_FLOWLOGS = False
     INGEST_FLOWLOGS = False
     DEDUPLICATE_FLOWLOGS = False
@@ -715,10 +716,12 @@ if __name__ == "__main__":
     RE_MERGE_FLOWS = False
 
     if CLEAN_TRANSACTIONS:
-        remove_nuls_from_file("data/originals/transactions-encoded-2020-05-04.log",
-                              "data/transactions.log")
+        remove_nuls_from_file(
+            "data/original-raw-archives/transactions-encoded-2020-05-04.log",
+            "data/transactions.log")
 
         transactions = bok.parsers.parse_transactions_log("data/transactions.log")
+        transactions = dask.dataframe.from_pandas(transactions, chunksize=100000)
 
         bok.dask_infra.clean_write_parquet(transactions, "data/clean/transactions")
 
