@@ -16,7 +16,9 @@ if __name__ == "__main__":
     # Importantly, dask is lazy and doesn't actually import the whole thing,
     # but just keeps track of where the file shards live on disk.
 
-    flows = dask.dataframe.read_parquet("data/clean/flows", engine="pyarrow")
+    flows = dask.dataframe.read_parquet(
+        "data/clean/flows/typical_DIV_none_INDEX_user", engine="fastparquet")
+
     print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
     print("Processing {} flows".format(len(flows)))
     # The user column will become an index of the returned grouped frame.
@@ -33,10 +35,10 @@ if __name__ == "__main__":
     # in a jupyter notebook from the intermediate file if that's easier too.
     # user_totals.to_parquet("scratch/temp",
     #                        compression="snappy",
-    #                        engine="pyarrow")
+    #                        engine="fastparquet")
     
     # user_totals = dask.dataframe.read_parquet("scratch/temp",
-    #                                           engine="pyarrow").compute()
+    #                                           engine="fastparquet").compute()
 
     # Once user_totals has been computed and you can do things with
     # it as a normal dataframe : )
@@ -44,7 +46,7 @@ if __name__ == "__main__":
     print("user_totals is a ", type(user_totals))
 
     # Add the index back as a dataframe column
-    user_totals["user"] = user_totals.index
+    user_totals = user_totals.reset_index()
 
     # Transform to long form for altair.
     # https://altair-viz.github.io/user_guide/data.html#converting-between-long-form-and-wide-form-pandas
