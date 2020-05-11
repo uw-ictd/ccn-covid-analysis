@@ -30,3 +30,6 @@ comparison)
 log.
 
 8. Remove duplicates from the consolidated log.
+
+9. Add FQDN information where available, either from a previous DNS request by
+the user, or if not available, via a reverse DNS lookup.

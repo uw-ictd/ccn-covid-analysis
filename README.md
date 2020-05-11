@@ -84,9 +84,11 @@ tidbits:
      with a new column but does not re-add the column that was indexed
      back into the dataset (aka drops it completely!). You can re-add
      it manually though with the dictionary dataframe interface before
-     setting the new index (see canonicalize_data.py).
+     setting the new index (see canonicalize_data.py), or by calling
+     `.reset_index()` on the dataframe.
 
 5. Consider disabling swap. Dask gets confused about how much memory
    its workers are using when swap is in play, and can erroneously
    request too much memory. Having two different actors (swap + dask)
-   trying to manage when to spill memory to disk gets... chaotic.
+   trying to manage when to spill memory to disk gets... chaotic. Disabling swap
+   drastically improved stability on my development machine.
