@@ -710,11 +710,9 @@ if __name__ == "__main__":
     BUILD_PER_USER_INDEXES = False
 
     COMBINE_DNS_WITH_FLOWS = False
-    CATEGORIZE_USER_FLOWS = True
+    CATEGORIZE_USER_FLOWS = False
 
     RE_MERGE_FLOWS = False
-
-    ADD_CATEGORIES = False
 
     if CLEAN_TRANSACTIONS:
         remove_nuls_from_file("data/originals/transactions-encoded-2020-05-04.log",
