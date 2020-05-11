@@ -63,6 +63,13 @@ def shift_dns_flat_noindex(in_path, out_path):
     bok.dask_infra.clean_write_parquet(df, out_path)
 
 
+def shift_transactions_flat_noindex(in_path, out_path):
+    df = dask.dataframe.read_parquet(in_path, engine="fastparquet")
+    df["timestamp"] = df["timestamp"] + pd.tseries.offsets.DateOffset(hours=9)
+    print("Single layer timestamp shift now")
+    bok.dask_infra.clean_write_parquet(df, out_path)
+
+
 if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
     shift_flows_recursive("data/clean/flows/typical_fqdn_DIV_user_INDEX_start",
@@ -73,8 +80,12 @@ if __name__ == "__main__":
                              "data/clean/flows/typical_TZ_DIV_none_INDEX_user")
 
     shift_dns_recursive("data/clean/dns/successful_DIV_user_INDEX_timestamp",
-                        "data/clean/dns/successful_TZ_DIV_user_INDEX_timestamp")
+                        "data/clean/dns/successful_TZ_DIV_user_INDEX_timestamp",
+                        client)
 
     shift_dns_flat_noindex("data/clean/dns/successful_DIV_none_INDEX_none",
-                           "/clean/dns/successful_TZ_DIV_none_INDEX_none",)
+                           "data/clean/dns/successful_TZ_DIV_none_INDEX_none")
+
+    shift_transactions_flat_noindex("data/clean/transactions",
+                                    "data/clean/transactions_TZ")
 
