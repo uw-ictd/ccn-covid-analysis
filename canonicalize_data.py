@@ -676,7 +676,7 @@ def augment_user_flow_with_dns(flow_frame,
     return out_frame
 
 
-def categorize_fqdn_from_parquet(in_path, out_path):
+def categorize_fqdn_from_parquet(in_path, out_path, compute=True):
     """Run categorization over the input parquet file and write to the output
 
     Requires the input parquet file specify an `fqdn` column
@@ -690,9 +690,10 @@ def categorize_fqdn_from_parquet(in_path, out_path):
         axis="columns",
         meta=("category", object))
 
-    _clean_write_parquet(
+    return _clean_write_parquet(
         frame,
-        out_path)
+        out_path,
+        compute=compute)
 
 
 if __name__ == "__main__":
@@ -913,11 +914,16 @@ if __name__ == "__main__":
         print("Categorizing user flows")
         users = sorted(os.listdir("scratch/flows/per_user_with_fqdn_start_index/"))
 
+        computation_futures = []
         for user in users:
             print("Categorizing flows for:", user)
-            in_path = "scratch/flows/per_user_with_fqdn_start_index/" + str(user)
-            out_path = "scratch/flows/typical_with_fqdn_category_start_index/" + str(user)
-            categorize_fqdn_from_parquet(in_path, out_path)
+            in_path = "scratch/flows/typical_fqdn_DIV_user_INDEX_start/" + str(user)
+            out_path = "scratch/flows/typical_fqdn_category_DIV_user_INDEX_start/" + str(user)
+            handle = categorize_fqdn_from_parquet(in_path, out_path, compute=False)
+            computation_futures.append(handle)
+
+        print("Realizing futures")
+        results = client.compute(computation_futures, sync=True)
 
     if RE_MERGE_FLOWS:
         # Initialize an empty dask dataframe from an empty pandas dataframe. No
