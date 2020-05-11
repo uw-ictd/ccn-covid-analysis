@@ -3,6 +3,7 @@
 
 import bok.domains
 import bok.dask_infra
+import bok.parsers
 import csv
 import dask.config
 import dask.dataframe
@@ -715,9 +716,12 @@ if __name__ == "__main__":
     ADD_CATEGORIES = False
 
     if CLEAN_TRANSACTIONS:
-        remove_nuls_from_file("data/originals/transactions-encoded-2020-02-19.log",
-                              "data/clean/transactions.log")
-        read_transactions_to_dataframe("data/clean/transactions.log")
+        remove_nuls_from_file("data/originals/transactions-encoded-2020-05-04.log",
+                              "data/transactions.log")
+
+        transactions = bok.parsers.parse_transactions_log("data/transactions.log")
+
+        bok.dask_infra.clean_write_parquet(transactions, "data/clean/transactions")
 
     if SPLIT_FLOWLOGS:
         split_lzma_file("data/originals/2019-05-17-flowlog_archive.xz",
