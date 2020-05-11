@@ -551,7 +551,7 @@ def split_by_user(flowlog_path, dns_path, client):
                                             engine="fastparquet")
         frame = frame.reset_index().set_index("timestamp").repartition(partition_size="64M",
                                                                        force=True)
-        _clean_write_parquet(frame, "scratch/dns/per_user_timestamp_index/" + str(user))
+        _clean_write_parquet(frame, "scratch/dns/successful_DIV_user_INDEX_timestamp/" + str(user))
 
     for user in users_in_flow_log:
         print("Flow user:", user)
@@ -559,7 +559,7 @@ def split_by_user(flowlog_path, dns_path, client):
                                             engine="fastparquet")
         frame = frame.reset_index().set_index("start").repartition(partition_size="64M",
                                                                    force=True)
-        _clean_write_parquet(frame, "scratch/flows/per_user_start_index/" + str(user))
+        _clean_write_parquet(frame, "scratch/flows/typical_DIV_user_INDEX_start/" + str(user))
 
 
 def augment_user_flow_with_dns(flow_frame,
@@ -870,8 +870,8 @@ if __name__ == "__main__":
             # Start the cache fresh
             dns_fail_cache = set()
 
-        users_in_dns_log = sorted(os.listdir("scratch/dns/per_user_timestamp_index/"))
-        users_in_flow_log = sorted(os.listdir("scratch/flows/per_user_start_index/"))
+        users_in_dns_log = sorted(os.listdir("scratch/dns/successful_DIV_user_INDEX_timestamp/"))
+        users_in_flow_log = sorted(os.listdir("scratch/flows/typical_DIV_user_INDEX_start/"))
         missing_dns_users = list()
         for user in users_in_flow_log:
             if user not in users_in_dns_log:
@@ -881,11 +881,11 @@ if __name__ == "__main__":
 
             print("Doing dns to flow mapping for user:", user)
             flow_frame = dask.dataframe.read_parquet(
-                "scratch/flows/per_user_start_index/" + str(user),
+                "scratch/flows/typical_DIV_user_INDEX_start/" + str(user),
                 engine="fastparquet")
 
             dns_frame = dask.dataframe.read_parquet(
-                "scratch/dns/per_user_timestamp_index/" + str(user),
+                "scratch/dns/successful_DIV_user_INDEX_timestamp/" + str(user),
                 engine="fastparquet")
 
             augmented_flow_frame = augment_user_flow_with_dns(flow_frame,
@@ -896,7 +896,7 @@ if __name__ == "__main__":
             print(augmented_flow_frame.head(10, compute=True))
             _clean_write_parquet(
                 augmented_flow_frame,
-                "scratch/flows/per_user_with_fqdn_start_index/" + str(user))
+                "scratch/flows/typical_fqdn_DIV_user_INDEX_start/" + str(user))
 
             print("Saving reverse dns cache to:", dns_cache_path)
             with open(dns_cache_path, mode="w+b") as f:
@@ -912,7 +912,7 @@ if __name__ == "__main__":
 
     if CATEGORIZE_USER_FLOWS:
         print("Categorizing user flows")
-        users = sorted(os.listdir("scratch/flows/per_user_with_fqdn_start_index/"))
+        users = sorted(os.listdir("scratch/flows/typical_fqdn_DIV_user_INDEX_start"))
 
         computation_futures = []
         for user in users:
@@ -947,21 +947,7 @@ if __name__ == "__main__":
         )
 
         print("writing")
-        _clean_write_parquet(merged_frame, "scratch/flows/typical_with_fqdn_start_index/")
-
-    if ADD_CATEGORIES:
-        frame = dask.dataframe.read_parquet(
-            "scratch/flows/typical_with_fqdn_start_index/",
-            engine="fastparquet")
-
-        print(frame)
-
-        frame["category"] = frame.apply(
-            lambda row: bok.domains.assign_category(row["fqdn"]),
-            axis="columns",
-            meta=("category", object))
-
-        _clean_write_parquet(frame, "scratch/flows/typical_with_fqdn_category_start_index/")
+        _clean_write_parquet(merged_frame, "scratch/flows/typical_fqdn_category_DIV_none_INDEX_start/")
 
     client.close()
     print("Exiting hopefully cleanly...")
