@@ -79,4 +79,4 @@ if __name__ == "__main__":
         font='Courier',
         anchor='start',
         color='gray'
-    ).serve()
+    ).serve(port=8891, open_browser=False)
