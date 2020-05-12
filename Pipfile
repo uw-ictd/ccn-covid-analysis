@@ -29,6 +29,7 @@ partd = "*"
 psutil = "*"
 xxhash = "*"
 altair-viewer = "*"
+numba = "~=0.48.0"
 
 [requires]
 python_version = "3"
