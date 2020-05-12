@@ -14,7 +14,7 @@ import pandas as pd
 # Configs
 day_intervals = 7
 # IMPORTANT: Run get_data_range() to update these values when loading in a new dataset!
-max_date = datetime.datetime.strptime('2020-02-13 21:29:54', '%Y-%m-%d %H:%M:%S')
+max_date = datetime.datetime.strptime('2020-05-03 00:00:00', '%Y-%m-%d %H:%M:%S')
 
 def cohort_as_date_interval(x):
     cohort_start = max_date - datetime.timedelta(day_intervals * x)
@@ -95,12 +95,10 @@ if __name__ == "__main__":
     #
     # Importantly, dask is lazy and doesn't actually import the whole thing,
     # but just keeps track of where the file shards live on disk.
+    flows = dask.dataframe.read_parquet("data/clean/flows/typical_TM_DIV_none_INDEX_user", engine="fastparquet")
 
-    flows = dask.dataframe.read_parquet("data/clean/flows", engine="pyarrow")
-    length = len(flows)
     transactions = dask.dataframe.read_csv("data/clean/first_time_user_transactions.csv")
     print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
-    print("Processing {} flows".format(length))
 
     # Get the user data
     users = get_user_data(flows, transactions)
@@ -125,29 +123,7 @@ if __name__ == "__main__":
 
 # Gets the start and end of the date in the dataset. 
 def get_date_range():
-    # ------------------------------------------------
-    # Dask tuning, currently set for a 8GB RAM laptop
-    # ------------------------------------------------
-
-    # Compression sounds nice, but results in spikes on decompression
-    # that can lead to unstable RAM use and overflow.
-    dask.config.set({"dataframe.shuffle-compression": False})
-    dask.config.set({"distributed.scheduler.allowed-failures": 50})
-    dask.config.set({"distributed.scheduler.work-stealing": True})
-
-    # Aggressively write to disk but don't kill worker processes if
-    # they stray. With a small number of workers each worker killed is
-    # big loss. The OOM killer will take care of the overall system.
-    dask.config.set({"distributed.worker.memory.target": 0.2})
-    dask.config.set({"distributed.worker.memory.spill": 0.4})
-    dask.config.set({"distributed.worker.memory.pause": 0.6})
-    dask.config.set({"distributed.worker.memory.terminate": False})
-
-    # The memory limit parameter is undocumented and applies to each worker.
-    cluster = dask.distributed.LocalCluster(n_workers=2,
-                                            threads_per_worker=1,
-                                            memory_limit='2GB')
-    client = dask.distributed.Client(cluster)
+    client = bok.dask_infra.setup_dask_client()
 
     # Import the flows dataset
     #
@@ -155,9 +131,9 @@ def get_date_range():
     # but just keeps track of where the file shards live on disk.
 
     flows = dask.dataframe.read_parquet("data/clean/flows", engine="pyarrow")
-    length = len(flows)
+    #length = len(flows)
     print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
-    print("Processing {} flows".format(length))
+    #print("Processing {} flows".format(length))
 
     # Gets the max date in the flows dataset
     max_date = flows.reset_index()["start"].max()
