@@ -15,7 +15,7 @@ import bok.dask_infra
 # Configs
 day_intervals = 1
 # IMPORTANT: Run get_date_range() to update these values when loading in a new dataset!
-max_date = datetime.datetime.strptime('2020-02-13 21:29:54', '%Y-%m-%d %H:%M:%S')
+max_date = datetime.datetime.strptime('2020-05-03 00:00:00', '%Y-%m-%d %H:%M:%S')
 
 def cohort_as_date(x):
     day = max_date - datetime.timedelta(day_intervals * x)
@@ -53,10 +53,8 @@ if __name__ == "__main__":
     # Importantly, dask is lazy and doesn't actually import the whole thing,
     # but just keeps track of where the file shards live on disk.
 
-    flows = dask.dataframe.read_parquet("data/clean/flows", engine="pyarrow")
-    length = len(flows)
+    flows = dask.dataframe.read_parquet("data/clean/flows/typical_TM_DIV_none_INDEX_user", engine="fastparquet")
     print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
-    print("Processing {} flows".format(length))
 
     # Get the user data
     throughput = get_throughput_data(flows)
@@ -88,10 +86,8 @@ def get_date_range():
     # Importantly, dask is lazy and doesn't actually import the whole thing,
     # but just keeps track of where the file shards live on disk.
 
-    flows = dask.dataframe.read_parquet("data/clean/flows", engine="pyarrow")
-    length = len(flows)
+    flows = dask.dataframe.read_parquet("data/clean/flows/typical_TM_DIV_none_INDEX_user", engine="fastparquet")
     print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
-    print("Processing {} flows".format(length))
 
     # Gets the max date in the flows dataset
     max_date = flows.reset_index()["start"].max()
