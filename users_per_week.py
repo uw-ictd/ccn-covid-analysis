@@ -58,22 +58,27 @@ def get_registered_users_query(transactions):
 
     # Update the types in the dataframe
     query = transactions.astype(types)
+    query = query.set_index("start")
+    # Abuse cumsum to get a counter, since the users are already
+    # distinct and sorted.
+    query = query.assign(temp=1)
+    query["count"] = query["temp"].cumsum()
+    query = query.drop(["temp"], axis="columns")
+
+    # Compute the number of users at each week, and store in the
+    # "user" column
+    query = query.resample("1w").last()
+    query = query.drop("user", axis="columns").rename(columns={"count": "user"})
+    # For weeks that had no new users added, use the total from previous weeks.
+    query["user"] = query["user"].fillna(method="ffill")
+
+    # Get the start column back
+    query = query.reset_index()
     # Map each start to a cohort
     query = query.assign(cohort=get_cohort)
-    # Group by cohorts and get the all the users
-    query = query.groupby("cohort")["user"]
-    # Count the number of unique users per cohort
-    query = query.nunique()
-    # Reverse the array and ignore cohorts that are past the max date
-    query = query.reset_index()
-    query["cohort"] = query["cohort"] * -1
-    query = query.query("cohort <= 0")
-    query = query.set_index("cohort")
-    # Get the cumulative sum of users over time
-    query = query.cumsum()
-    # Re-reverse the dataframe
-    query = query.reset_index()
-    query["cohort"] = query["cohort"] * -1
+
+    # Ignore cohorts that are past the max date
+    query = query.query("cohort >= 0")
 
     return query
 
