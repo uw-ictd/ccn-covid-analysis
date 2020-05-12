@@ -58,6 +58,12 @@ if __name__ == "__main__":
 
     # Get the user data
     throughput = get_throughput_data(flows)
+
+    bok.dask_infra.clean_write_parquet(throughput, "scratch/graphs/throughput_per_week")
+
+    throughput = dask.dataframe.read_parquet("scratch/graphs/throughput_per_week",
+                                             engine="fastparquet")
+
     # Get the data in a form that is easily plottable
     throughput = throughput.melt(id_vars=["date"], value_vars=["bytes_up", "bytes_down", "total_bytes"], var_name="throughput_type", value_name="bytes")
     # Reset the types of the dataframe
