@@ -40,4 +40,4 @@ if __name__ == "__main__":
                     str(purchase.amount_idr),
                 ])
                 print(csv_string)
-                df.write(csv_string)
+                df.write(csv_string + "\n")
