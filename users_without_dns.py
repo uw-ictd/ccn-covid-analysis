@@ -6,7 +6,7 @@
 import os
 
 if __name__ == "__main__":
-    # Find all users with any "typical" traffic patterns
+    # Find all users with any "typical" traffic patterns but no DNS
     all_users = sorted(os.listdir("data/clean/flows/typical_fqdn_DIV_user_INDEX_start"))
     dns_users = sorted(os.listdir("data/clean/dns/successful_DIV_user_INDEX_timestamp"))
 
