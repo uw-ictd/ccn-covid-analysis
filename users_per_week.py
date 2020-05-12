@@ -37,8 +37,6 @@ def get_active_users_query(flows):
     query = query.groupby("cohort")["user"]
     # Count the number of unique users per cohort
     query = query.nunique()
-    # Rename the column names to be standardized
-    query = query.rename({0: "user"})
     # Convert to dataframe
     query = query.to_frame()
     # Get the cohort column back
