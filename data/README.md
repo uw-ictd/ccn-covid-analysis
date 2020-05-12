@@ -5,6 +5,12 @@ directory. The originals files are the raw files from Bokondini, and have some
 issues. These issues are addressed in the `canonicalize_data.py` module which
 generates the cleaned and consolidated dataset in the clean directory.
 
+Additionally, outside the canonicalize data function, there are also cleaning
+scripts to shift the data into the local timezone and trim the datasets to a
+consistent range and datatype. These scripts are not well-maintained and need to
+be run somewhat manually and interactively. First run canonicalize, then shift,
+then trim. The scripts can be found in the `cleaning` directory
+
 ## Steps taken to clean data
 
 1. Remove nil characters from the transactions log. This is likely due to nodejs

@@ -1,3 +1,6 @@
+"""Original cleaning script written my Michelle<linm23@cs.uw.edu>
+"""
+
 import pickle
 import lzma
 import pprint
