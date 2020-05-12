@@ -123,9 +123,9 @@ if __name__ == "__main__":
     }
     users = users.astype(types)
 
-    bok.dask_infra.clean_write_parquet(users, "scratch/users-per-week")
+    bok.dask_infra.clean_write_parquet(users, "scratch/graphs/users-per-week")
 
-    users = dask.dataframe.read_parquet("scratch/users-per-week", engine="fastparquet")
+    users = dask.dataframe.read_parquet("scratch/graphs/users-per-week", engine="fastparquet")
     # Compute the query
     users = users.compute()
 
