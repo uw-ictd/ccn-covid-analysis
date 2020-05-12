@@ -56,7 +56,6 @@ def trim_flows_flat_noindex(in_path, out_path):
                     "bytes_up": int,
                     "bytes_down": int,
                     "protocol": int,
-                    "ambiguous_fqdn_count": int
                     })
 
     print("Single layer flow trim now")
@@ -75,6 +74,7 @@ def trim_transactions_flat_noindex(in_path, out_path):
     df = dask.dataframe.read_parquet(in_path, engine="fastparquet")
     df = df.loc[(df["timestamp"] >= '2019-03-10 00:00') & (df["timestamp"] < '2020-05-03 00:00')]
     print("Single layer transaction trim  now")
+    df["amount_bytes"] = df["amount_bytes"].fillna(value=0)
     df = df.astype({"amount_bytes": int, "amount_idr": int})
     bok.dask_infra.clean_write_parquet(df, out_path)
 
