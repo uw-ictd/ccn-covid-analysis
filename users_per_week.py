@@ -17,8 +17,8 @@ day_intervals = 7
 max_date = datetime.datetime.strptime('2020-05-03 00:00:00', '%Y-%m-%d %H:%M:%S')
 
 def cohort_as_date_interval(x):
-    cohort_start = max_date - datetime.timedelta(day_intervals * x)
-    cohort_end = max_date - datetime.timedelta(day_intervals * x + day_intervals - 1)
+    cohort_start = max_date - datetime.timedelta(day_intervals * x + day_intervals - 1)
+    cohort_end = max_date - datetime.timedelta(day_intervals * x)
 
     return cohort_start.strftime("%Y/%m/%d") + "-" + cohort_end.strftime("%Y/%m/%d")
 
