@@ -138,7 +138,8 @@ if __name__ == "__main__":
     ).interactive().show()
     
 
-# Gets the start and end of the date in the dataset. 
+
+# Gets the start and end of the date in the dataset.
 def get_date_range():
     client = bok.dask_infra.setup_dask_client()
 
