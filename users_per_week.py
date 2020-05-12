@@ -87,7 +87,15 @@ def get_user_data(flows, transactions):
     registered_users = get_registered_users_query(transactions)
 
     # Join the active and registered users together
-    users = active_users.merge(registered_users, left_on="cohort", right_on="cohort", suffixes=('_active', '_registered'))
+    users = active_users.merge(registered_users,
+                               how="outer",
+                               left_on="cohort",
+                               right_on="cohort",
+                               suffixes=('_active', '_registered'))
+
+    # For cohorts with no active users, fill zero.
+    users["user_active"] = users["user_active"].fillna(value=0)
+
     # Map each cohort to a date
     users = users.assign(date_range=get_date)
 
