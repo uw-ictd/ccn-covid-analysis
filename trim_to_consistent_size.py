@@ -13,7 +13,7 @@ def trim_flows_recursive(in_path, out_path, client):
         df_out_path = os.path.join(out_path, subfile)
 
         df = dask.dataframe.read_parquet(df_path, engine="fastparquet")
-        df = df[(df.index >= '2019-03-10 00:00') & (df.index < '2020-05-03 00:00')]
+        df = df.loc[(df.index >= '2019-03-10 00:00') & (df.index < '2020-05-03 00:00')]
 
         handle = bok.dask_infra.clean_write_parquet(df, df_out_path, compute=False)
         future_handles.append(handle)
@@ -31,7 +31,7 @@ def trim_dns_recursive(in_path, out_path, client):
         df_out_path = os.path.join(out_path, subfile)
 
         df = dask.dataframe.read_parquet(df_path, engine="fastparquet")
-        df = df[(df.index >= '2019-03-10 00:00') & (df.index < '2020-05-03 00:00')]
+        df = df.loc[(df.index >= '2019-03-10 00:00') & (df.index < '2020-05-03 00:00')]
 
         handle = bok.dask_infra.clean_write_parquet(df, df_out_path, compute=False)
         future_handles.append(handle)
@@ -42,7 +42,7 @@ def trim_dns_recursive(in_path, out_path, client):
 
 def trim_flows_flat_noindex(in_path, out_path):
     df = dask.dataframe.read_parquet(in_path, engine="fastparquet")
-    df = df[(df["start"] >= '2019-03-10 00:00') & (df["start"] < '2020-05-03 00:00')]
+    df = df.loc[(df["start"] >= '2019-03-10 00:00') & (df["start"] < '2020-05-03 00:00')]
 
     print("Single layer flow trim now")
     print(df)
@@ -51,7 +51,7 @@ def trim_flows_flat_noindex(in_path, out_path):
 
 def trim_dns_flat(in_path, out_path):
     df = dask.dataframe.read_parquet(in_path, engine="fastparquet")
-    df = df[(df.index >= '2019-03-10 00:00') & (df.index < '2020-05-03 00:00')]
+    df = df.loc[(df.index >= '2019-03-10 00:00') & (df.index < '2020-05-03 00:00')]
 
     print("Single layer dns trim now")
     bok.dask_infra.clean_write_parquet(df, out_path)
@@ -59,7 +59,7 @@ def trim_dns_flat(in_path, out_path):
 
 def trim_transactions_flat_noindex(in_path, out_path):
     df = dask.dataframe.read_parquet(in_path, engine="fastparquet")
-    df = df[(df["timestamp"] >= '2019-03-10 00:00') & (df["timestamp"] < '2020-05-03 00:00')]
+    df = df.loc[(df["timestamp"] >= '2019-03-10 00:00') & (df["timestamp"] < '2020-05-03 00:00')]
     print("Single layer transaction trim  now")
     bok.dask_infra.clean_write_parquet(df, out_path)
 
