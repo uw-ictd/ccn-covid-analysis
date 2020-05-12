@@ -1,29 +1,43 @@
-source_file = "./data/clean/transactions.log"
-destination_file = "./data/clean/first_time_user_transactions.csv"
+"""Compute the first time a user is seen making a purchase in the network
+
+Note this could be _before_ the trimmed data start time.
+"""
+
+import dask.dataframe
+
+source_file = "data/clean/transactions_TZ"
+destination_file = "data/clean/first_time_user_transactions.csv"
 
 if __name__ == "__main__":
-    # Open transactions log
-    with open(source_file, "r") as sf:
-        # Open file to write to
-        with open(destination_file, "w") as df:
-            # Track all the users you have seen before
-            users = set()
+    frame = dask.dataframe.read_parquet(source_file,
+                                        engine="fastparquet").compute()
+    frame = frame.sort_values("timestamp")
+    print(frame)
 
-            # Write colunn headers
-            df.write("start,action,user,amount,price,\n")
+    # Open file to write to
+    with open(destination_file, "w") as df:
+        # Track all the users you have seen before
+        users = set()
 
-            # Write relevant data to file
-            for line in sf.readlines():
-                tokens = line.strip().split(" ")
+        # Write colunn headers
+        df.write("start,action,user,amount,price,\n")
 
-                # If the line represents a purchase and this user is a new user,
-                # write data to the file
-                if tokens[2] == "PURCHASE" and tokens[3] not in users:
-                    users.add(tokens[3])
-                    temp = tokens[0] + " " + tokens[1] + ","
-                    for i in range(2, len(tokens)):
-                        temp += tokens[i] + ","
-                    
-                    line = temp + "\n"
+        purchases = frame[frame.kind == "purchase"]
+        # purchases = frame
 
-                    df.write(line)
+        # Write relevant data to file
+        for purchase in purchases.itertuples():
+            # If the line represents a purchase and this user is a new user,
+            # write data to the file
+            if purchase.user not in users:
+
+                users.add(purchase.user)
+                csv_string = ",".join([
+                    str(purchase.timestamp),
+                    str(purchase.kind),
+                    str(purchase.user),
+                    str(purchase.amount_bytes),
+                    str(purchase.amount_idr),
+                ])
+                print(csv_string)
+                df.write(csv_string)
