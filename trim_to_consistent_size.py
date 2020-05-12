@@ -15,6 +15,14 @@ def trim_flows_recursive(in_path, out_path, client):
         df = dask.dataframe.read_parquet(df_path, engine="fastparquet")
         df = df.loc[(df.index >= '2019-03-10 00:00') & (df.index < '2020-05-03 00:00')]
 
+        df = df.astype({"user_port": int,
+                        "dest_port": int,
+                        "bytes_up": int,
+                        "bytes_down": int,
+                        "protocol": int,
+                        "ambiguous_fqdn_count": int
+                        })
+
         handle = bok.dask_infra.clean_write_parquet(df, df_out_path, compute=False)
         future_handles.append(handle)
 
@@ -43,9 +51,15 @@ def trim_dns_recursive(in_path, out_path, client):
 def trim_flows_flat_noindex(in_path, out_path):
     df = dask.dataframe.read_parquet(in_path, engine="fastparquet")
     df = df.loc[(df["start"] >= '2019-03-10 00:00') & (df["start"] < '2020-05-03 00:00')]
+    df = df.astype({"user_port": int,
+                    "dest_port": int,
+                    "bytes_up": int,
+                    "bytes_down": int,
+                    "protocol": int,
+                    "ambiguous_fqdn_count": int
+                    })
 
     print("Single layer flow trim now")
-    print(df)
     bok.dask_infra.clean_write_parquet(df, out_path)
 
 
@@ -61,6 +75,7 @@ def trim_transactions_flat_noindex(in_path, out_path):
     df = dask.dataframe.read_parquet(in_path, engine="fastparquet")
     df = df.loc[(df["timestamp"] >= '2019-03-10 00:00') & (df["timestamp"] < '2020-05-03 00:00')]
     print("Single layer transaction trim  now")
+    df = df.astype({"amount_bytes": int, "amount_idr": int})
     bok.dask_infra.clean_write_parquet(df, out_path)
 
 
