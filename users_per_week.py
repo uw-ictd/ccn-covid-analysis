@@ -49,7 +49,7 @@ def get_active_users_query(flows):
 def get_registered_users_query(transactions):
     # Set down the types for the dataframe
     types = {
-        'start': 'datetime64',
+        'start': 'datetime64[ns]',
         "action": "object",
         "user": "object",
         "amount": "int64",
@@ -111,6 +111,10 @@ if __name__ == "__main__":
         "num_users": "int64"
     }
     users = users.astype(types)
+
+    bok.dask_infra.clean_write_parquet(users, "scratch/users-per-week")
+
+    users = dask.dataframe.read_parquet("scratch/users-per-week", engine="fastparquet")
     # Compute the query
     users = users.compute()
 
@@ -118,7 +122,7 @@ if __name__ == "__main__":
         x="date_range",
         y="num_users",
         color="user_type",
-    ).serve()
+    ).interactive().show()
     
 
 # Gets the start and end of the date in the dataset. 
