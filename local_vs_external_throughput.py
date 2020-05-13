@@ -15,9 +15,21 @@ if __name__ == "__main__":
     flows = dask.dataframe.read_parquet(
         "data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start", engine="fastparquet")[["bytes_up", "bytes_down", "local"]]
 
-    # Resample to bins, and then group by local vs nonlocal in each bin
-    flows = flows.resample("1w").groupby("local").aggregate({"bytes_up": np.sum,
-                                                             "bytes_down": np.sum})
+
+    # Dask groupby doesn't fully support the pandas grouper
+    # https://github.com/dask/dask/issues/5195 , which is needed to do a
+    # compound groupby and resample.
+
+    # Instead remap local and nonlocal bytes to distinct columns.
+    flows["local_up"] = flows["bytes_up"]
+    flows["local_down"] = flows["bytes_down"]
+    flows["bytes_down"] = flows["bytes_down"].where(~flows["local"], other=0)
+    flows["bytes_up"] = flows["bytes_up"].where(~flows["local"], other=0)
+    flows["local_down"] = flows["local_down"].where(flows["local"], other=0)
+    flows["local_up"] = flows["local_up"].where(flows["local"], other=0)
+
+    # Resample to bins
+    flows = flows.resample("1w").sum()
 
     # Store aggregate reduction to disk
     bok.dask_infra.clean_write_parquet(flows, "scratch/graphs/local_vs_nonlocal_tput_resample_week")
@@ -29,10 +41,13 @@ if __name__ == "__main__":
     # Reset the index to a normal column for plotting
     flows = flows.reset_index()
 
+    print("post index reset")
+    print(flows)
+
     # Transform to long form for altair.
     # https://altair-viz.github.io/user_guide/data.html#converting-between-long-form-and-wide-form-pandas
-    flows = flows.melt(id_vars=["start", "local"],
-                       value_vars=["bytes_up", "bytes_down"],
+    flows = flows.melt(id_vars=["start"],
+                       value_vars=["bytes_up", "bytes_down", "local_up", "local_down"],
                        var_name="direction",
                        value_name="amount",
                        )
@@ -42,18 +57,7 @@ if __name__ == "__main__":
     chart = altair.Chart(flows).mark_line().encode(
         x=altair.X("start", title="Time", axis=altair.Axis(labels=False)),
         y=altair.Y("amount:Q", title="Amount (Bytes)"),
-        color="local",
-        column=altair.Column('direction',
-                             title="",
-                             header=altair.Header(labelOrient="bottom",
-                                                  labelAngle=-60,
-                                                  labelAnchor="middle",
-                                                  labelAlign="right",
-                                                  ),
-                             sort=altair.SortField(field="amount",
-                                                   order="descending"
-                                                   ),
-                            ),
+        color="direction",
     ).properties(
         title="Local vs Nonlocal Data"
     ).configure_title(
