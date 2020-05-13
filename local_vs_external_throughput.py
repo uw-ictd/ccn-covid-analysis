@@ -11,9 +11,18 @@ import pandas as pd
 if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
 
-    # TODO(matt9j) This doesn't have the peer to peer flows included!
     flows = dask.dataframe.read_parquet(
-        "data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start", engine="fastparquet")[["bytes_up", "bytes_down", "local"]]
+        "data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start",
+        engine="fastparquet")[["bytes_up", "bytes_down", "local"]]
+
+    peer_flows = dask.dataframe.read_parquet(
+        "data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start",
+        engine="fastparquet")[["bytes_a_to_b", "bytes_b_to_a"]]
+
+    # All peer flows are local
+    # peer_flows = peer_flows.assign(local_up=0, local_down=0, bytes_up=0, bytes_down=0)
+    peer_flows["bytes_p2p"] = peer_flows["bytes_a_to_b"] + peer_flows["bytes_b_to_a"]
+    peer_flows = peer_flows.drop(["bytes_a_to_b", "bytes_b_to_a"], axis="columns")
 
 
     # Dask groupby doesn't fully support the pandas grouper
@@ -27,6 +36,8 @@ if __name__ == "__main__":
     flows["bytes_up"] = flows["bytes_up"].where(~flows["local"], other=0)
     flows["local_down"] = flows["local_down"].where(flows["local"], other=0)
     flows["local_up"] = flows["local_up"].where(flows["local"], other=0)
+
+    flows = flows.apppend(peer_flows, interleave_partitions=True)
 
     # Resample to bins and record 0 for gaps
     flows = flows.resample("1w").sum().fillna(value=0)
