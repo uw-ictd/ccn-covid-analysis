@@ -81,6 +81,12 @@ if __name__ == "__main__":
     shift_flows_flat_noindex("data/clean/flows/typical_DIV_none_INDEX_user",
                              "data/clean/flows/typical_TZ_DIV_none_INDEX_user")
 
+    shift_flows_flat_noindex("data/clean/flows/nouser_DIV_none_INDEX_none",
+                             "data/clean/flows/nouser_TZ_DIV_none_INDEX_none")
+
+    shift_flows_flat_noindex("data/clean/flows/p2p_DIV_none_INDEX_none",
+                             "data/clean/flows/p2p_TZ_DIV_none_INDEX_none")
+
     shift_dns_recursive("data/clean/dns/successful_DIV_user_INDEX_timestamp",
                         "data/clean/dns/successful_TZ_DIV_user_INDEX_timestamp",
                         client)

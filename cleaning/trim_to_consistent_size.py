@@ -62,6 +62,20 @@ def trim_flows_flat_noindex(in_path, out_path):
     bok.dask_infra.clean_write_parquet(df, out_path)
 
 
+def trim_atypical_flows_flat_noindex(in_path, out_path):
+    df = dask.dataframe.read_parquet(in_path, engine="fastparquet")
+    df = df.loc[(df["start"] >= '2019-03-10 00:00') & (df["start"] < '2020-05-03 00:00')]
+    df = df.astype({"a_port": int,
+                    "b_port": int,
+                    "bytes_a_to_b": int,
+                    "bytes_b_to_a": int,
+                    "protocol": int,
+                    })
+
+    print("Single layer flow trim now")
+    bok.dask_infra.clean_write_parquet(df, out_path)
+
+
 def trim_dns_flat(in_path, out_path):
     df = dask.dataframe.read_parquet(in_path, engine="fastparquet")
     df = df.loc[(df.index >= '2019-03-10 00:00') & (df.index < '2020-05-03 00:00')]
@@ -87,6 +101,16 @@ if __name__ == "__main__":
 
     trim_flows_flat_noindex("data/clean/flows/typical_TZ_DIV_none_INDEX_user",
                             "data/clean/flows/typical_TM_DIV_none_INDEX_user")
+
+    trim_atypical_flows_flat_noindex(
+        "data/clean/flows/nouser_TZ_DIV_none_INDEX_none",
+        "data/clean/flows/nouser_TM_DIV_none_INDEX_none"
+    )
+
+    trim_atypical_flows_flat_noindex(
+        "data/clean/flows/p2p_TZ_DIV_none_INDEX_none",
+        "data/clean/flows/p2p_TM_DIV_none_INDEX_none"
+    )
 
     trim_dns_recursive("data/clean/dns/successful_TZ_DIV_user_INDEX_timestamp",
                        "data/clean/dns/successful_TM_DIV_user_INDEX_timestamp",
