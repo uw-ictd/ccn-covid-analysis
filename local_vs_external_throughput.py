@@ -28,21 +28,15 @@ if __name__ == "__main__":
     flows["local_down"] = flows["local_down"].where(flows["local"], other=0)
     flows["local_up"] = flows["local_up"].where(flows["local"], other=0)
 
-    # Resample to bins
-    flows = flows.resample("1w").sum()
+    # Resample to bins and record 0 for gaps
+    flows = flows.resample("1w").sum().fillna(value=0)
 
     # Store aggregate reduction to disk
     bok.dask_infra.clean_write_parquet(flows, "scratch/graphs/local_vs_nonlocal_tput_resample_week")
     flows = dask.dataframe.read_parquet("scratch/graphs/local_vs_nonlocal_tput_resample_week", engine="fastparquet").compute()
 
-    print(flows)
-    print(flows.head())
-
     # Reset the index to a normal column for plotting
     flows = flows.reset_index()
-
-    print("post index reset")
-    print(flows)
 
     # Transform to long form for altair.
     # https://altair-viz.github.io/user_guide/data.html#converting-between-long-form-and-wide-form-pandas
@@ -51,15 +45,16 @@ if __name__ == "__main__":
                        var_name="direction",
                        value_name="amount",
                        )
-    print(flows)
-    print(flows.head())
 
     chart = altair.Chart(flows).mark_line().encode(
         x=altair.X("start", title="Time", axis=altair.Axis(labels=False)),
         y=altair.Y("amount:Q", title="Amount (Bytes)"),
         color="direction",
+        shape="direction",
+        detail="direction"
     ).properties(
-        title="Local vs Nonlocal Data"
+        title="Local vs Nonlocal Data",
+        width=1000,
     ).configure_title(
         fontSize=20,
         font='Courier',
