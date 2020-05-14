@@ -43,24 +43,34 @@ def reduce_flow_gaps_to_pandas(outfile, dask_client):
     # Sort all flows by time.
     all_flows = all_flows.reset_index().set_index("start")
 
-    # Rolling compute the previous_end column
-    all_flows["previous_end"] = all_flows["end"].rolling(
-        window=2, center=False
-    ).apply(
-        lambda val: val[0]
-    )
+    # Manually iterate since rolling for datetimes is not implemented.
+    last_end = None
+    sanity_start = None
+    gaps = []
+    for index, row in enumerate(all_flows.itertuples()):
+        if (index % 10000 == 0):
+            print("Processing row {}".format(index))
 
-    print(all_flows.head())
-    print(all_flows.tail())
+        # Ensure sorted
+        if (sanity_start is not None) and (row.start < sanity_start):
+            print("INSANE")
+            print(index)
+            print(row.start)
+            print(sanity_start)
+            raise RuntimeError("Failed")
 
-    # # Resample to bins
-    # flows = flows.resample("1w").sum()
-    #
-    # # Realize the result
-    # flows_realized = flows.compute()
-    #
-    # # Store the reduced pandas dataframe for graphing to disk
-    # bok.pd_infra.clean_write_parquet(flows_realized, outfile)
+        if last_end is not None and row.start > last_end:
+            gaps.append((last_end, row.start))
+
+        last_end = row.end
+        sanity_start = row.start
+
+    print("Gaps length", len(gaps))
+    # Gaps is small so just use pandas
+    gaps_frame = pd.DataFrame(gaps, columns=["start", "end"])
+    print(gaps_frame.head())
+
+    bok.pd_infra.clean_write_parquet(gaps_frame, outfile)
 
 
 def make_plot(infile):
