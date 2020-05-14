@@ -3,6 +3,7 @@
 
 import altair
 import bok.dask_infra
+import bok.pd_infra
 import numpy as np
 import pandas as pd
 
@@ -37,13 +38,15 @@ def reduce_to_pandas(outfile, dask_client):
     # Resample to bins and record 0 for gaps
     flows = flows.resample("1w").sum().fillna(value=0)
 
-    # Store aggregate reduction to disk
-    bok.dask_infra.clean_write_parquet(
-        flows, outfile)
+    # Realize the result
+    flows_realized = flows.compute()
+
+    # Store the reduced pandas dataframe for graphing to disk
+    bok.pd_infra.clean_write_parquet(flows_realized, outfile)
 
 
 def make_plot(infile):
-    flows = bok.dask_infra.read_parquet(infile).compute()
+    flows = bok.pd_infra.read_parquet(infile)
 
     # Reset the index to a normal column for plotting
     flows = flows.reset_index()
@@ -78,6 +81,6 @@ def make_plot(infile):
 if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
     graph_temporary_file = "scratch/graphs/local_vs_nonlocal_tput_resample_week"
-    reduce_to_pandas(outfile=graph_temporary_file)
+    reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
     chart = make_plot(graph_temporary_file)
     chart.interactive().serve(port=8891, open_browser=False)
