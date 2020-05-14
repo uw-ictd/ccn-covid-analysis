@@ -43,18 +43,21 @@ def reduce_flow_gaps_to_pandas(outfile, dask_client):
     # Sort all flows by time.
     all_flows = all_flows.reset_index().set_index("start")
 
+    # Recover the start time
+    all_flows = all_flows.reset_index()
+
     # Manually iterate since rolling for datetimes is not implemented.
     last_end = None
     sanity_start = None
     gaps = []
-    for index, row in enumerate(all_flows.itertuples()):
-        if (index % 10000 == 0):
-            print("Processing row {}".format(index))
+    for i, row in enumerate(all_flows.itertuples()):
+        if (i % 10000 == 0):
+            print("Processing row {}".format(i))
 
         # Ensure sorted
         if (sanity_start is not None) and (row.start < sanity_start):
             print("INSANE")
-            print(index)
+            print(i)
             print(row.start)
             print(sanity_start)
             raise RuntimeError("Failed")
