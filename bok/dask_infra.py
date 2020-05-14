@@ -41,7 +41,7 @@ def clean_write_parquet(dataframe, path, engine="fastparquet", compute=True):
     """
 
     # Ensure we are writing dask dataframes, not accidentally pandas!
-    if not isinstance(dask.dataframe.DataFrame, dataframe):
+    if not isinstance(dataframe, dask.dataframe.DataFrame):
         raise ValueError(
             "Attempted to write dask dataframe, but got a {}".format(
                 str(type(dataframe))

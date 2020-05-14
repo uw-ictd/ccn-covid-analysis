@@ -10,7 +10,7 @@ def clean_write_parquet(dataframe, path):
     """
 
     # Ensure we are writing pandas dataframes, not accidentally dask!
-    if not isinstance(pd.DataFrame, dataframe):
+    if not isinstance(dataframe, pd.DataFrame):
         raise ValueError(
             "Attempted to write dask dataframe, but got a {}".format(
                 str(type(dataframe))
