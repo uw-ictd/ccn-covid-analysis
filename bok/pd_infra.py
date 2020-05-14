@@ -2,7 +2,7 @@
 """
 
 import pandas as pd
-import shutil
+import os
 
 
 def clean_write_parquet(dataframe, path):
@@ -20,7 +20,7 @@ def clean_write_parquet(dataframe, path):
     # Clear the dest directory to prevent partial mixing of files from an old
     # archive if the number of partitions has changed.
     try:
-        shutil.rmtree(path)
+        os.remove(path)
     except FileNotFoundError:
         # No worries if the output doesn't exist yet.
         pass
