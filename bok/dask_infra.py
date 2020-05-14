@@ -3,6 +3,7 @@
 
 import dask.config
 import dask.distributed
+import dask.dataframe
 import shutil
 
 
@@ -36,14 +37,33 @@ def setup_dask_client():
 
 
 def clean_write_parquet(dataframe, path, engine="fastparquet", compute=True):
+    """Write a parquet file with common options standardized in the project
+    """
+
+    # Ensure we are writing dask dataframes, not accidentally pandas!
+    if not isinstance(dask.dataframe.DataFrame, dataframe):
+        raise ValueError(
+            "Attempted to write dask dataframe, but got a {}".format(
+                str(type(dataframe))
+            )
+        )
+
+    # Clear the dest directory to prevent partial mixing of files from an old
+    # archive if the number of partitions has changed.
     try:
         shutil.rmtree(path)
     except FileNotFoundError:
         # No worries if the output doesn't exist yet.
         pass
+
+    # Do the write with the given options.
     return dataframe.to_parquet(path,
                                 compression="snappy",
                                 engine=engine,
                                 compute=compute)
 
 
+def read_parquet(path):
+    """Read a parquet file with common options standardized in the project
+    """
+    return dask.dataframe.read_parquet(path, engine="fastparquet")
