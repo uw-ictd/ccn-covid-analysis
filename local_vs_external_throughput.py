@@ -35,8 +35,8 @@ def reduce_to_pandas(outfile, dask_client):
 
     flows = flows.append(peer_flows, interleave_partitions=True)
 
-    # Resample to bins and record 0 for gaps
-    flows = flows.resample("1w").sum().fillna(value=0)
+    # Resample to bins
+    flows = flows.resample("1w").sum()
 
     # Realize the result
     flows_realized = flows.compute()
@@ -47,6 +47,9 @@ def reduce_to_pandas(outfile, dask_client):
 
 def make_plot(infile):
     flows = bok.pd_infra.read_parquet(infile)
+
+    # Record 0 for gaps
+    flows = flows.fillna(value=0)
 
     # Reset the index to a normal column for plotting
     flows = flows.reset_index()
