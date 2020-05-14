@@ -1,34 +1,30 @@
-""" An example to show how to compute values over the whole dataset with dask
+""" Compute local vs external throughput, binned by a configurable time interval
 """
 
 import altair
 import bok.dask_infra
-import dask.dataframe
-import dask.distributed
 import numpy as np
 import pandas as pd
 
 if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
 
-    flows = dask.dataframe.read_parquet(
-        "data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start",
-        engine="fastparquet")[["bytes_up", "bytes_down", "local"]]
+    flows = bok.dask_infra.read_parquet(
+        "data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start"
+    )[["bytes_up", "bytes_down", "local"]]
 
-    peer_flows = dask.dataframe.read_parquet(
-        "data/clean/flows/p2p_TM_DIV_none_INDEX_start",
-        engine="fastparquet")[["bytes_a_to_b", "bytes_b_to_a"]]
+    peer_flows = bok.dask_infra.read_parquet(
+        "data/clean/flows/p2p_TM_DIV_none_INDEX_start"
+    )[["bytes_a_to_b", "bytes_b_to_a"]]
 
     # All peer flows are local
-    # peer_flows = peer_flows.assign(local_up=0, local_down=0, bytes_up=0, bytes_down=0)
     peer_flows["bytes_p2p"] = peer_flows["bytes_a_to_b"] + peer_flows["bytes_b_to_a"]
     peer_flows = peer_flows.drop(["bytes_a_to_b", "bytes_b_to_a"], axis="columns")
-
 
     # Dask groupby doesn't fully support the pandas grouper
     # https://github.com/dask/dask/issues/5195 , which is needed to do a
     # compound groupby and resample.
-
+    #
     # Instead remap local and nonlocal bytes to distinct columns.
     flows["local_up"] = flows["bytes_up"]
     flows["local_down"] = flows["bytes_down"]
@@ -43,8 +39,10 @@ if __name__ == "__main__":
     flows = flows.resample("1w").sum().fillna(value=0)
 
     # Store aggregate reduction to disk
-    bok.dask_infra.clean_write_parquet(flows, "scratch/graphs/local_vs_nonlocal_tput_resample_week")
-    flows = dask.dataframe.read_parquet("scratch/graphs/local_vs_nonlocal_tput_resample_week", engine="fastparquet").compute()
+    bok.dask_infra.clean_write_parquet(
+        flows, "scratch/graphs/local_vs_nonlocal_tput_resample_week")
+    flows = bok.dask_infra.read_parquet(
+        "scratch/graphs/local_vs_nonlocal_tput_resample_week").compute()
 
     # Reset the index to a normal column for plotting
     flows = flows.reset_index()
