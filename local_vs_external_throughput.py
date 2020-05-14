@@ -6,9 +6,8 @@ import bok.dask_infra
 import numpy as np
 import pandas as pd
 
-if __name__ == "__main__":
-    client = bok.dask_infra.setup_dask_client()
 
+def reduce_to_pandas(outfile, dask_client):
     flows = bok.dask_infra.read_parquet(
         "data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start"
     )[["bytes_up", "bytes_down", "local"]]
@@ -40,9 +39,11 @@ if __name__ == "__main__":
 
     # Store aggregate reduction to disk
     bok.dask_infra.clean_write_parquet(
-        flows, "scratch/graphs/local_vs_nonlocal_tput_resample_week")
-    flows = bok.dask_infra.read_parquet(
-        "scratch/graphs/local_vs_nonlocal_tput_resample_week").compute()
+        flows, outfile)
+
+
+def make_plot(infile):
+    flows = bok.dask_infra.read_parquet(infile).compute()
 
     # Reset the index to a normal column for plotting
     flows = flows.reset_index()
@@ -55,7 +56,7 @@ if __name__ == "__main__":
                        value_name="amount",
                        )
 
-    chart = altair.Chart(flows).mark_line().encode(
+    plot = altair.Chart(flows).mark_line().encode(
         x=altair.X("start", title="Time", axis=altair.Axis(labels=False)),
         y=altair.Y("amount:Q", title="Amount (Bytes)"),
         color="direction",
@@ -69,4 +70,14 @@ if __name__ == "__main__":
         font='Courier',
         anchor='start',
         color='gray'
-    ).interactive().serve(port=8891, open_browser=False)
+    )
+
+    return plot
+
+
+if __name__ == "__main__":
+    client = bok.dask_infra.setup_dask_client()
+    graph_temporary_file = "scratch/graphs/local_vs_nonlocal_tput_resample_week"
+    reduce_to_pandas(outfile=graph_temporary_file)
+    chart = make_plot(graph_temporary_file)
+    chart.interactive().serve(port=8891, open_browser=False)
