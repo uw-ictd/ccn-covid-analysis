@@ -16,7 +16,7 @@ if __name__ == "__main__":
         engine="fastparquet")[["bytes_up", "bytes_down", "local"]]
 
     peer_flows = dask.dataframe.read_parquet(
-        "data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start",
+        "data/clean/flows/p2p_TM_DIV_none_INDEX_start",
         engine="fastparquet")[["bytes_a_to_b", "bytes_b_to_a"]]
 
     # All peer flows are local
@@ -37,7 +37,7 @@ if __name__ == "__main__":
     flows["local_down"] = flows["local_down"].where(flows["local"], other=0)
     flows["local_up"] = flows["local_up"].where(flows["local"], other=0)
 
-    flows = flows.apppend(peer_flows, interleave_partitions=True)
+    flows = flows.append(peer_flows, interleave_partitions=True)
 
     # Resample to bins and record 0 for gaps
     flows = flows.resample("1w").sum().fillna(value=0)
@@ -52,7 +52,7 @@ if __name__ == "__main__":
     # Transform to long form for altair.
     # https://altair-viz.github.io/user_guide/data.html#converting-between-long-form-and-wide-form-pandas
     flows = flows.melt(id_vars=["start"],
-                       value_vars=["bytes_up", "bytes_down", "local_up", "local_down"],
+                       value_vars=["bytes_up", "bytes_down", "local_up", "local_down", "bytes_p2p"],
                        var_name="direction",
                        value_name="amount",
                        )
@@ -71,4 +71,4 @@ if __name__ == "__main__":
         font='Courier',
         anchor='start',
         color='gray'
-    ).serve(port=8891, open_browser=False)
+    ).interactive().serve(port=8891, open_browser=False)
