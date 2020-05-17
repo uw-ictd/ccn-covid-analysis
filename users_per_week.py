@@ -129,12 +129,34 @@ if __name__ == "__main__":
     # Compute the query
     users = users.compute()
 
+    users = users.set_index("date_range").sort_values("date_range")
+    users = users.reset_index()
+    users = users.loc[users.index > 19]
+
+    def rename_user_type(user_type):
+        if user_type == "user_active":
+            return "Active"
+        else:
+            return "Registered"
+
+    users["pretty_type"] = users["user_type"].apply(rename_user_type)
+
     altair.Chart(users).mark_line().encode(
-        x="date_range",
-        y="num_users",
-        color="user_type",
-    ).interactive().show()
-    
+        x=altair.X("date_range:O",
+                   title="Date (Binned by Week)",
+                   axis=altair.Axis(
+                       labelSeparation=5,
+                       labelOverlap="parity",
+                   ),
+                   ),
+        y=altair.Y("num_users",
+                   title="User Count",
+                   ),
+        color=altair.Color("pretty_type",
+                           title="",
+                           sort=["Registered", "Active"]
+                           ),
+    ).properties(width=500).save("renders/users_per_week.png", scale_factor=2)
 
 
 # Gets the start and end of the date in the dataset.
