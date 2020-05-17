@@ -97,6 +97,6 @@ def make_plot(infile):
 if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
     graph_temporary_file = "scratch/graphs/local_vs_nonlocal_tput_resample_week"
-    # reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
+    reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
     chart = make_plot(graph_temporary_file)
     chart.save("renders/local_traffic.png", scale_factor=2)
