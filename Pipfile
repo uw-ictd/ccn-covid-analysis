@@ -5,6 +5,7 @@ verify_ssl = true
 
 [dev-packages]
 bokeh = "*"
+altair-saver = "*"
 
 [packages]
 pandas = "*"
@@ -29,7 +30,7 @@ partd = "*"
 psutil = "*"
 xxhash = "*"
 altair-viewer = "*"
-numba = "~=0.48.0"
+numba = "*"
 
 [requires]
 python_version = "3"
