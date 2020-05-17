@@ -24,3 +24,6 @@ scratch/
 
 # Ignore dask disk overflow space
 dask-worker-space/
+
+# Rendered PNG and PDF Graphs
+renders/
