@@ -54,11 +54,6 @@ def get_throughput_data(flows):
 if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
 
-    # Import the flows dataset
-    #
-    # Importantly, dask is lazy and doesn't actually import the whole thing,
-    # but just keeps track of where the file shards live on disk.
-
     flows = dask.dataframe.read_parquet("data/clean/flows/typical_TM_DIV_none_INDEX_user", engine="fastparquet")
     print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
 
@@ -71,7 +66,15 @@ if __name__ == "__main__":
                                              engine="fastparquet")
 
     # Get the data in a form that is easily plottable
-    throughput = throughput.melt(id_vars=["date"], value_vars=["bytes_up", "bytes_down", "total_bytes"], var_name="throughput_type", value_name="bytes")
+    throughput = throughput.rename(columns={"bytes_up": "Up",
+                                            "bytes_down": "Down",
+                                            "total_bytes": "Total",
+                                            })
+    throughput = throughput.melt(id_vars=["date"],
+                                 value_vars=["Up", "Down", "Total"],
+                                 var_name="throughput_type",
+                                 value_name="bytes")
+
     # Reset the types of the dataframe
     types = {
         "date": "object",
@@ -82,11 +85,28 @@ if __name__ == "__main__":
     # Compute the query
     throughput = throughput.compute()
 
+    # Fix Plotting
+    throughput["GB"] = throughput["bytes"] / (1000**3)
+
     altair.Chart(throughput).mark_line().encode(
-        x="date",
-        y="bytes",
-        color="throughput_type",
-    ).serve()
+        x=altair.X("date:O",
+                   title="Week",
+                   axis=altair.Axis(
+                       labelSeparation=5,
+                       labelOverlap="parity",
+                   ),
+                   ),
+        y=altair.Y("GB:Q",
+                   title="GB Total Per Week"
+                   ),
+        color=altair.Color("throughput_type",
+                           sort=["Total", "Down", "Up"]
+                           ),
+    ).properties(
+        width=500
+    ).save(
+        "renders/throughput_per_week.png", scale_factor=2
+    )
 
 
 # Gets the start and end of the date in the dataset.
