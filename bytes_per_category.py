@@ -10,7 +10,7 @@ import bok.pd_infra
 
 def reduce_to_pandas(outfile, dask_client):
     flows = bok.dask_infra.read_parquet(
-        "data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start")[["category", "bytes_up", "bytes_down"]]
+        "data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start")[["category", "bytes_up", "bytes_down", "fqdn"]]
 
     # Compress to days
     flows = flows.reset_index()
@@ -21,7 +21,7 @@ def reduce_to_pandas(outfile, dask_client):
     flows["category"] = flows["category"].fillna("Other")
 
     # Do the grouping
-    flows = flows.groupby(["start_bin", "category"]).sum()
+    flows = flows.groupby(["start_bin", "category", "fqdn"]).sum()
     flows = flows.compute()
 
     bok.pd_infra.clean_write_parquet(flows, outfile)
@@ -89,5 +89,5 @@ def make_plot(infile):
 if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
     graph_temporary_file = "scratch/graphs/bytes_per_category"
-    # reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
+    reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
     chart = make_plot(graph_temporary_file)
