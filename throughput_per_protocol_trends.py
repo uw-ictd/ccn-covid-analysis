@@ -23,12 +23,109 @@ def reduce_to_pandas(outfile, dask_client):
 
 
 def make_plot(infile):
-    raise NotImplementedError("No graph 4 u")
+    grouped_flows = bok.pd_infra.read_parquet(infile)
+    grouped_flows = grouped_flows.reset_index()
+    grouped_flows["bytes_total"] = grouped_flows["bytes_up"] + grouped_flows["bytes_down"]
+
+    # Map down to a smaller number of protocol names, including "other".
+    grouped_flows["name"] = grouped_flows.apply(
+        lambda row: _assign_protcol_plain_name(row.protocol,
+                                               row.dest_port),
+        axis="columns"
+    )
+
+    test = grouped_flows
+    test = grouped_flows.loc[(grouped_flows["protocol"]==17) & (grouped_flows["name"] == "Other UDP")].groupby("dest_port").sum()
+
+    print(test.sort_values("bytes_total"))
+
+    # Consolidate by week instead of by day
+    grouped_flows = grouped_flows[["start_bin", "bytes_total", "name"]].groupby([pd.Grouper(key="start_bin", freq="W-MON"), "name"]).sum()
+
+    grouped_flows = grouped_flows.reset_index()
+
+    print(grouped_flows)
+
+    grouped_flows["GB"] = grouped_flows["bytes_total"] / (1000**3)
+    plot = alt.Chart(grouped_flows).mark_area().encode(
+        x=alt.X("start_bin:T",
+                title="Time",
+                axis=alt.Axis(labels=True),
+                ),
+        y=alt.Y("sum(GB):Q",
+                title="Fraction of Traffic Per Week(GB)",
+                stack="normalize",
+                ),
+        # shape="direction",
+        color="name",
+        detail="name",
+    ).properties(
+        # title="Local Service Use",
+        width=500,
+    ).save("renders/throughput_per_protocol_trends_normalized.png",
+           scale_factor=2
+           )
+
+    plot = alt.Chart(grouped_flows).mark_area().encode(
+        x=alt.X("start_bin:T",
+                title="Time",
+                axis=alt.Axis(labels=True),
+                ),
+        y=alt.Y("sum(GB):Q",
+                title="Total Traffic Per Week(GB)",
+                ),
+        # shape="direction",
+        color="name",
+        detail="name",
+    ).properties(
+        # title="Local Service Use",
+        width=500,
+    ).save("renders/throughput_per_protocol_trends.png",
+           scale_factor=2
+           )
+
+    return plot
+
+
+def _assign_protcol_plain_name(proto, port):
+    if proto == 6:
+        if port == 22:
+            return "SSH"
+        if port == 25:
+            return "SMTP"
+        if port == 53:
+            return "DNS"
+        if port == 80:
+            return "HTTP"
+        if port == 143:
+            return "IMAP"
+        if port == 220:
+            return "IMAP"
+        if port == 443:
+            return "HTTPS"
+        if port == 993:
+            return "IMAP"
+        return "Other TCP"
+    elif proto == 17:
+        if port == 53:
+            return "DNS"
+        if port == 80:
+            return "HTTP/3 (QUIC)"
+        if port == 123:
+            return "NTP"
+        if port == 143:
+            return "IMAP"
+        if port == 443:
+            return "HTTP/3 (QUIC)"
+        if port == 3478:
+            return "STUN"
+        return "Other UDP"
+
+    return "Other"
 
 
 if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
     graph_temporary_file = "scratch/graphs/throughput_per_protocol_trends"
-    reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
+    # reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
     chart = make_plot(graph_temporary_file)
-    chart.interactive().serve(port=8891, open_browser=False)
