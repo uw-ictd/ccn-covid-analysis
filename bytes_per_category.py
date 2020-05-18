@@ -5,12 +5,28 @@ import altair as alt
 import pandas as pd
 
 import bok.dask_infra
+import bok.domains
 import bok.pd_infra
+
+
+def rerun_categorization(in_path, out_path):
+    """Run categorization over the input parquet file and write to the output
+
+    Requires the input parquet file specify an `fqdn` column
+    """
+    frame = bok.dask_infra.read_parquet(in_path)
+
+    frame["category"] = frame.apply(
+        lambda row: bok.domains.assign_category(row["fqdn"]),
+        axis="columns",
+        meta=("category", object))
+
+    return bok.dask_infra.clean_write_parquet(frame, out_path)
 
 
 def reduce_to_pandas(outfile, dask_client):
     flows = bok.dask_infra.read_parquet(
-        "data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start")[["category", "bytes_up", "bytes_down", "fqdn", "fqdn_source"]]
+        "data/clean/flows/typical_fqdn_category2_local_TM_DIV_none_INDEX_start")[["category", "bytes_up", "bytes_down", "fqdn"]]
 
     # Compress to days
     flows = flows.reset_index()
@@ -21,7 +37,7 @@ def reduce_to_pandas(outfile, dask_client):
     flows["category"] = flows["category"].fillna("Other")
 
     # Do the grouping
-    flows = flows.groupby(["start_bin", "category", "fqdn", "fqdn_source"]).sum()
+    flows = flows.groupby(["start_bin", "category", "fqdn"]).sum()
     flows = flows.compute()
 
     bok.pd_infra.clean_write_parquet(flows, outfile)
@@ -32,9 +48,9 @@ def make_plot(infile):
     grouped_flows = grouped_flows.reset_index()
     grouped_flows["bytes_total"] = grouped_flows["bytes_up"] + grouped_flows["bytes_down"]
 
-    test = grouped_flows.loc[grouped_flows["category"] == "Other"].groupby(["fqdn", "fqdn_source"]).sum()
+    test = grouped_flows.loc[grouped_flows["category"] == "Other"].groupby(["fqdn"]).sum()
 
-    print(test.sort_values("bytes_total"))
+    print(test.sort_values("bytes_total").tail(30))
 
     # Consolidate by week instead of by day
     grouped_flows = grouped_flows[["start_bin", "bytes_total", "category"]].groupby([pd.Grouper(key="start_bin", freq="W-MON"), "category"]).sum()
@@ -88,5 +104,7 @@ def make_plot(infile):
 if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
     graph_temporary_file = "scratch/graphs/bytes_per_category"
+    rerun_categorization("data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start",
+                         "data/clean/flows/typical_fqdn_category2_local_TM_DIV_none_INDEX_start")
     reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
     chart = make_plot(graph_temporary_file)
