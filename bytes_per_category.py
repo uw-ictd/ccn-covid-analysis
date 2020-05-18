@@ -34,7 +34,7 @@ def reduce_to_pandas(outfile, dask_client):
     flows = flows.set_index("start_bin")
 
     # Groupby will drop None category values, so manually reassign to other
-    flows["category"] = flows["category"].fillna("Other")
+    flows["category"] = flows["category"].fillna("No DNS")
 
     # Do the grouping
     flows = flows.groupby(["start_bin", "category", "fqdn"]).sum()
