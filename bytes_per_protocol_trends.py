@@ -29,8 +29,8 @@ def make_plot(infile):
 
     # Map down to a smaller number of protocol names, including "other".
     grouped_flows["name"] = grouped_flows.apply(
-        lambda row: _assign_protcol_plain_name(row.protocol,
-                                               row.dest_port),
+        lambda row: _assign_protocol_plain_name(row.protocol,
+                                                row.dest_port),
         axis="columns"
     )
 
@@ -87,7 +87,7 @@ def make_plot(infile):
     return plot
 
 
-def _assign_protcol_plain_name(proto, port):
+def _assign_protocol_plain_name(proto, port):
     if proto == 6:
         if port == 22:
             return "SSH"
@@ -127,5 +127,5 @@ def _assign_protcol_plain_name(proto, port):
 if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
     graph_temporary_file = "scratch/graphs/bytes_per_protocol_trends"
-    # reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
+    reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
     chart = make_plot(graph_temporary_file)
