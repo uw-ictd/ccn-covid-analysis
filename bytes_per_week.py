@@ -60,9 +60,9 @@ if __name__ == "__main__":
     # Get the user data
     throughput = get_throughput_data(flows)
 
-    bok.dask_infra.clean_write_parquet(throughput, "scratch/graphs/throughput_per_week")
+    bok.dask_infra.clean_write_parquet(throughput, "scratch/graphs/bytes_per_week")
 
-    throughput = dask.dataframe.read_parquet("scratch/graphs/throughput_per_week",
+    throughput = dask.dataframe.read_parquet("scratch/graphs/bytes_per_week",
                                              engine="fastparquet")
 
     # Get the data in a form that is easily plottable
@@ -105,7 +105,7 @@ if __name__ == "__main__":
     ).properties(
         width=500
     ).save(
-        "renders/throughput_per_week.png", scale_factor=2
+        "renders/bytes_per_week.png", scale_factor=2
     )
 
 

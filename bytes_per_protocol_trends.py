@@ -126,6 +126,6 @@ def _assign_protcol_plain_name(proto, port):
 
 if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
-    graph_temporary_file = "scratch/graphs/throughput_per_protocol_trends"
+    graph_temporary_file = "scratch/graphs/bytes_per_protocol_trends"
     # reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
     chart = make_plot(graph_temporary_file)
