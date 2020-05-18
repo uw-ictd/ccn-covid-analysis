@@ -10,7 +10,7 @@ import bok.pd_infra
 
 def reduce_to_pandas(outfile, dask_client):
     flows = bok.dask_infra.read_parquet(
-        "data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start")[["category", "bytes_up", "bytes_down", "fqdn"]]
+        "data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start")[["category", "bytes_up", "bytes_down", "fqdn", "fqdn_source"]]
 
     # Compress to days
     flows = flows.reset_index()
@@ -21,7 +21,7 @@ def reduce_to_pandas(outfile, dask_client):
     flows["category"] = flows["category"].fillna("Other")
 
     # Do the grouping
-    flows = flows.groupby(["start_bin", "category", "fqdn"]).sum()
+    flows = flows.groupby(["start_bin", "category", "fqdn", "fqdn_source"]).sum()
     flows = flows.compute()
 
     bok.pd_infra.clean_write_parquet(flows, outfile)
@@ -32,10 +32,9 @@ def make_plot(infile):
     grouped_flows = grouped_flows.reset_index()
     grouped_flows["bytes_total"] = grouped_flows["bytes_up"] + grouped_flows["bytes_down"]
 
-    # test = grouped_flows
-    # test = grouped_flows.loc[grouped_flows["category"] == None].groupby("fqdn").sum()
+    test = grouped_flows.loc[grouped_flows["category"] == "Other"].groupby(["fqdn", "fqdn_source"]).sum()
 
-    # print(test.sort_values("bytes_total"))
+    print(test.sort_values("bytes_total"))
 
     # Consolidate by week instead of by day
     grouped_flows = grouped_flows[["start_bin", "bytes_total", "category"]].groupby([pd.Grouper(key="start_bin", freq="W-MON"), "category"]).sum()
@@ -61,7 +60,7 @@ def make_plot(infile):
     ).properties(
         # title="Local Service Use",
         width=500,
-    ).interactive().show()
+    ).interactive()
 
     # .save("renders/bytes_per_category.png",
     #    scale_factor=2
