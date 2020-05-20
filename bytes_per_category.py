@@ -17,14 +17,22 @@ def rerun_categorization(in_path, out_path):
     frame = bok.dask_infra.read_parquet(in_path)
     processor = bok.domains.FqdnProcessor()
 
-    def repack_result(row):
-        a, b = processor.process_fqdn(row["fqdn"])
-        return [a, b]
+    frame["org_category"] = frame.apply(
+        lambda row: processor.process_fqdn(row["fqdn"]),
+        axis="columns",
+        meta=("org_category", object))
+
+    frame["org"] = frame.apply(
+        lambda row: row["org_category"][0],
+        axis="columns",
+        meta=("org", object))
 
     frame["category"] = frame.apply(
-        repack_result,
+        lambda row: row["org_category"][1],
         axis="columns",
         meta=("category", object))
+
+    frame = frame.drop("org_category", axis=1)
 
     print(frame)
 
