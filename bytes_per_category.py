@@ -15,11 +15,18 @@ def rerun_categorization(in_path, out_path):
     Requires the input parquet file specify an `fqdn` column
     """
     frame = bok.dask_infra.read_parquet(in_path)
+    processor = bok.domains.FqdnProcessor()
+
+    def repack_result(row):
+        a, b = processor.process_fqdn(row["fqdn"])
+        return [a, b]
 
     frame["category"] = frame.apply(
-        lambda row: bok.domains.assign_category(row["fqdn"]),
+        repack_result,
         axis="columns",
         meta=("category", object))
+
+    print(frame)
 
     return bok.dask_infra.clean_write_parquet(frame, out_path)
 
@@ -50,7 +57,9 @@ def make_plot(infile):
 
     test = grouped_flows.loc[grouped_flows["category"] == "Other"].groupby(["fqdn"]).sum()
 
-    print(test.sort_values("bytes_total").tail(30))
+    pd.set_option('display.max_rows', None)
+    print(test.sort_values("bytes_total").tail(200))
+    pd.set_option('display.max_rows', 30)
 
     # Consolidate by week instead of by day
     grouped_flows = grouped_flows[["start_bin", "bytes_total", "category"]].groupby([pd.Grouper(key="start_bin", freq="W-MON"), "category"]).sum()
@@ -76,7 +85,7 @@ def make_plot(infile):
     ).properties(
         # title="Local Service Use",
         width=500,
-    ).interactive()
+    ).interactive().show()
 
     # .save("renders/bytes_per_category.png",
     #    scale_factor=2
