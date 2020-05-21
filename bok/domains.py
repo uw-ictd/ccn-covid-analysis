@@ -12,7 +12,7 @@ GOOGLE_REGEXES = {
     r'^.*googlevideo\.com$': "Video",
     r'^android\.googleapis\.com$': "Android API",
     r'^dl\.google\.com$': "Software Update",
-    r'^googleads.*\.doubleclick\.net$': "Ad Network",
+    r'^.*\.doubleclick\.net$': "Ad Network",
     r'^mtalk\.google\.com$': "Messaging",
     r'^geomobileservices.*\.googleapis\.com$': "Location API",
     r'^semanticlocation.*\.googleapis\.com$': "Location API",
@@ -29,7 +29,7 @@ GOOGLE_REGEXES = {
     # r'^fonts\.gstatic\.com': "Static",
     r'^ggpht\.com$': "SDK",  # HTTPS everywhere lists it as related to google code and google user content.
     r'^.*app-measurement\.com$': "API",  # Firebase Stats
-    r'^.*gvt1\.com$': "Mixed CDN",  # Video transcoding? and/or Chrome?
+    r'^.*gvt[0-9]*\.com$': "Mixed CDN",  # Video transcoding? and/or Chrome?
     r'^yt3\.ggpht\.com$': "Video",  # Youtube image proxy
     r'^.*googleadservices\.com$': "Ad Network",
     r'^.*googlesyndication\.com$': "Ad Network",
@@ -44,12 +44,28 @@ GOOGLE_REGEXES = {
     r'^chromefeedcontentsuggestions-pa.googleapis.com$': "API",
     r'^mail\.google\.com$': "Messaging",
     r'^inbox\.google\.com$': "Messaging",
+    r'^.*gmail\.com$': "Messaging",
     r'^.*crashlytics\.com$': "SDK",  # Firebase
     r'^phonedeviceverification-pa\.googleapis\.com$': "API",
     r'^photos\.googleapis\.com$': "Content Upload",
     r'^cryptauthenrollment\.googleapis\.com$': "API",
-
-
+    r'^proxy\.googlezip\.net$': "Files",
+    r'^safebrowsing\.googleapis\.com$': "API",
+    r'^mdh-pa\.googleapis\.com$': "API",
+    r'^mobilenetworkscoring-pa\.googleapis\.com$': "API",
+    r'.*2mdn\.net': "Ad Network",  # Doubleclick
+    r'^adservice\.google\.com$': "Ad Network",
+    r'^firebaseremoteconfig\.googleapis\.com$': "API",
+    r'^compress\.googlezip\.net$': "Content Upload",
+    r'^android-safebrowsing\.google\.com$': "API",
+    r'^.*googletagservices\.com': "Ad Network",  # Tracking Pixels
+    r'^play\.google\.com$': "Android",
+    r'^fonts\.googleapis\.com$': "API",
+    r'^photosdata-pa\.googleapis\.com$': "Content Upload",  # Most traffic is upstream here
+    r'^.*content-storage-upload\.googleapis\.com$': "Content Upload",  # Most traffic is upstream
+    r'^dns\.google\.com$': "API",
+    r'.*analytics.*': "Ad Network",
+    r'.*adservice.*': "Ad Network",  # Seen with a variety of extensions and country codes
 }
 
 FACEBOOK_REGEXES = {
@@ -81,7 +97,10 @@ FACEBOOK_REGEXES = {
     r'^.*video.*\.facebook\.com$': "Video",
     r'^instagram.*\.fbcdn\.net': "Photos",
     r'^whatsapp.*\.fbcdn\.net$': "Messaging",
-    r'^.*upload.*.\fbcdn\.com$': "Content Upload"
+    r'^.*upload.*.\fbcdn\.com$': "Content Upload",
+    r'^.*upload.*.\fbcdn\.net$': "Content Upload",
+    r'^facebook\.com$': "Main Site",
+
 
 }
 
@@ -124,7 +143,7 @@ class FqdnProcessor(object):
     def process_fqdn(self, fqdn):
         """Process an input domain name, returning an org and category tuple
         """
-        if 'google' in fqdn or 'gmail' in fqdn or 'ytimg' in fqdn or 'youtube' in fqdn or "gstatic.com" in fqdn or "ggpht.com" in fqdn or "app-measurement.com" in fqdn or "gvt1.com" in fqdn or "ampproject" in fqdn or "crashlytics.com" in fqdn:
+        if 'google' in fqdn or 'gmail' in fqdn or 'ytimg' in fqdn or 'youtube' in fqdn or "gstatic.com" in fqdn or "ggpht.com" in fqdn or "app-measurement.com" in fqdn or "gvt1.com" in fqdn or "ampproject" in fqdn or "crashlytics.com" in fqdn or "2mdn.net" in fqdn:
             return "Google", self._process_google_category(fqdn)
         elif 'fbcdn' in fqdn or 'facebook' in fqdn or 'fbsbx' in fqdn or "fb.com" in fqdn or "accountkit.com" in fqdn:
             return "Facebook", self._process_facebook_category(fqdn)
@@ -218,13 +237,16 @@ class FqdnProcessor(object):
         if "dl.delivery.mp.microsoft.com" in fqdn:
             return "Microsoft", "Updates"
 
+        if "officecdn.microsoft.com.edgesuite.net" in fqdn:
+            return "Microsoft", "Updates"
+
         if "download.microsoft.com" in fqdn:
             return "Microsoft", "Updates"
 
         if "tokopedia.net" in fqdn:
             return "Tokopedia", "Shopping"
 
-        if "9appsdownloading.com" in fqdn:
+        if "9appsdownloading.com" in fqdn or "9appsinstall.com" in fqdn:
             return "UC Browser", "Software Update"
 
         if "ucweb.com" in fqdn:
@@ -233,8 +255,8 @@ class FqdnProcessor(object):
         if "liftoff.io" in fqdn:
             return "Liftoff", "Ad Network"
 
-        if "avatar.96nmdqufhz.com" in fqdn:  # Appears to be a gambling site tracker?
-            return "Other", "Games"
+        if "avatar." in fqdn and ".com" in fqdn:  # Appears to be a gambling site tracker? Middle subdomain is usually random
+            return "Other", "Ad Network"
 
         if "v-mate.mobi" in fqdn:  # https://techcrunch.com/2019/05/30/alibaba-vmate-100m-india/
             return "VMate", "Video"
@@ -242,13 +264,13 @@ class FqdnProcessor(object):
         if "emome-ip.hinet.net" in fqdn:
             return "HiNet", "IAAS"
 
-        if "like.video" in fqdn or "bigo.sg" in fqdn:
+        if "like.video" in fqdn or "bigo.sg" in fqdn or "likeevideo.com" in fqdn:
             return "Likee", "Video"
 
         if "hlssrv.com" in fqdn:
             return "HLSPlay", "Video"
 
-        if "opera-mini.net" in fqdn or "operacdn.com" in fqdn:
+        if "opera-mini.net" in fqdn or "operacdn.com" in fqdn or "transcoder.opera.com":
             return "Opera Mini", "Compressed Web"
 
         if "im-gb.com" in fqdn:  # Looks like an indo specific basic HTML news aggregator?!?
@@ -290,7 +312,7 @@ class FqdnProcessor(object):
         if "ivideosmart.com" in fqdn:
             return "iVideoSmart", "Ad Network"
 
-        if "mangatoon.100sta.com" in fqdn:
+        if "mangatoon.100sta.com" in fqdn or "mangatoon.mobi":
             return "Mangatoon", "Photos"
 
         if "ushareit.com" in fqdn:  # Chinese file sharing app
@@ -305,17 +327,109 @@ class FqdnProcessor(object):
         if "definitionupdates.microsoft.com" in fqdn:
             return "Microsoft", "Antivirus"
 
-        if "media.tenor.co" in fqdn:
+        if "mcafee.com" in fqdn:
+            return "McAfee", "Antivirus"
+
+        if "tenor.co" in fqdn:
             return "Tenor", "Photos"
+
+        if "giphy.com" in fqdn:
+            return "Giphy", "Photos"
+
+        if "qq.com" in fqdn or "myqcloud.com" in fqdn:
+            return "QQ", "Messaging"
 
         if "like-video.com" in fqdn:
             return "like-video", "IAAS"
 
-        if "www11.idnview.com" in fqdn:
+        if "idnview.com" in fqdn:  # Many prefixes... www3, www11, www9, etc.
             return "Idn View", "Video"
 
         if "joox.com" in fqdn:
             return "Joox", "Music"
 
-        return "Other", "Other"
+        if "baca.co.id" in fqdn:
+            return "Baca", "News"
 
+        if "weathercn.com" in fqdn:
+            return "Weather CN", "News"
+
+        if "vungle.com" in fqdn:
+            return "Vungle", "Ad Network"
+
+        if "iprimus.net.au" in fqdn:
+            return "iPrimus", "IAAS"
+
+        if "cdnsyy.com" in fqdn:
+            return "cdn syy", "Mixed CDN"
+
+        if "hl-img.peco.uodoo.com" in fqdn:
+            return "Uodoo", "Photos"
+
+        if "applovin.com" in fqdn:
+            return "AppLovin", "Ad Network"
+
+        if "shareitgames.com" in fqdn:
+            return "ShareIt Games", "Games"
+
+        if "adjust.com" in fqdn:
+            return "AdJust", "Ad Network"
+
+        if "waptrick.org" in fqdn:  # Mobile first news, music, content aggregator
+            return "WapTrick", "Main Site"
+
+        if "idtribun.com" in fqdn:  # Gambling and sports
+            return "Idtribun", "Games"
+
+        if "topwin-movie-maker.com" in fqdn:
+            return "Topwin", "Video"
+
+        if "idkasino.com" in fqdn:
+            return "ID Kasino", "Games"
+
+        if "adsmoloco.com" in fqdn:
+            return "Moloco", "Ad Network"
+
+        if "menangtoto.pw" in fqdn:  # Gambling and casino games
+            return "Menangtoto", "Games"
+
+        if "ev.rdtcdn.com" in fqdn:
+            return "RdtCDN", "Mixed CDN"
+
+        if "boy18tube.com" in fqdn:
+            return "Boy 18", "Adult Video"
+
+        if "cdncollection.com" in fqdn:  # CDN associated with gambling sites
+            return "CDN Collection", "Games"
+
+        if "mopub.com" in fqdn or "snipermob.com" in fqdn:
+            return "MoPub", "Ad Network"
+
+        if "vidmate.net" in fqdn or "vidmatefilm.org" in fqdn:
+            return "Vidmate", "Video"
+
+        if "cdn.mozilla.net" in fqdn:
+            return "Mozilla", "Updates"
+
+        if "pkvn.mobi" in fqdn:  # Poker
+            return "Pkvn", "Games"
+
+        if "ssacdn.com" in fqdn:
+            return "Supersonic Games", "Games"
+
+        if "pinimg.com" in fqdn or "pinterest" in fqdn:
+            return "Pinterest", "Photos"
+
+        if "carageo.com" in fqdn:
+            return "CaraGeo", "Files"
+
+        if "majorgeeks.com" in fqdn:  # Free software downloads
+            return "MajorGeeks", "Software"
+
+        if "slatic.net" in fqdn:  # Seems to host pictures of physical goods?
+            return "Slatic", "Shopping"
+
+        if "download.mediatek.com" in fqdn:
+            return "Mediatek", "Updates"
+
+        return "Other", "Other"
