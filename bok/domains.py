@@ -84,9 +84,9 @@ FACEBOOK_REGEXES = {
     r'^.*video.*\.fbcdn\.net$': "Video",
     r'^static.*\.fbcdn\.net$': "Static",
     r'^static.*\.facebook\.com$': "Static",
-    r'^.*scontent.*\.fbcdn\.net$': "Photos",
-    r'^lookaside.*\.facebook\.com$': "Photos",
-    r'^platform-lookaside.*\.fbsbx\.com$': "Photos",
+    r'^.*scontent.*\.fbcdn\.net$': "Non-video Content",
+    r'^lookaside.*\.facebook\.com$': "Non-video Content",
+    r'^platform-lookaside.*\.fbsbx\.com$': "Non-video Content",
     r'^external.*\.fbcdn\.net$': "Mixed CDN",
     r'^lithium.*\.facebook\.com$': "Ad Network",
     r'^.*api\.facebook\.com$': "API",
@@ -106,11 +106,11 @@ FACEBOOK_REGEXES = {
     r'^m\.facebook\.com$': "Main Site",
     r'^mobile\.facebook\.com$': "Main Site",
     r'^portal\.fb\.com$': "API",
-    r'^.*accountkit\.com$': "Embedded SDK",
+    r'^.*accountkit\.com$': "Authentication",
     r'^.*edge-chat\.facebook\.com$': "Messaging",
     r'^.*video.*\.facebook\.com$': "Video",
-    r'^instagram.*\.fbcdn\.net': "Photos",
-    r'^instagram.*\.facebook\.com': "Photos",
+    r'^instagram.*\.fbcdn\.net': "Non-video Content",
+    r'^instagram.*\.facebook\.com': "Non-video Content",
     r'^whatsapp.*\.fbcdn\.net$': "Messaging",
     r'^.*whatsapp.*\.facebook\.com$': "Messaging",
     r'^.*upload.*\.fbcdn\.com$': "Content Upload",
@@ -180,10 +180,10 @@ class FqdnProcessor(object):
             return "twitter", "Messaging"
 
         if 'instagram' in fqdn:
-            return "Instagram", "Mixed"
+            return "Instagram", "Non-video Content"
 
         if 'wikipedia' in fqdn:
-            return "Wikipedia", "Mixed"
+            return "Wikipedia", "Non-video Content"
 
         if 'akamai' in fqdn:
             return "Akamai", "Mixed CDN"
@@ -295,7 +295,7 @@ class FqdnProcessor(object):
         if "hlssrv.com" in fqdn:
             return "HLSPlay", "Video"
 
-        if "opera-mini.net" in fqdn or "operacdn.com" in fqdn or "transcoder.opera.com":
+        if "opera-mini.net" in fqdn or "operacdn.com" in fqdn or "transcoder.opera.com" in fqdn:
             return "Opera Mini", "Compressed Web"
 
         if "im-gb.com" in fqdn:  # Looks like an indo specific basic HTML news aggregator?!?
@@ -356,10 +356,10 @@ class FqdnProcessor(object):
             return "McAfee", "Antivirus"
 
         if "tenor.co" in fqdn:
-            return "Tenor", "Photos"
+            return "Tenor", "Non-video Content"
 
         if "giphy.com" in fqdn:
-            return "Giphy", "Photos"
+            return "Giphy", "Non-video Content"
 
         if "qq.com" in fqdn or "myqcloud.com" in fqdn:
             return "QQ", "Messaging"
@@ -367,8 +367,8 @@ class FqdnProcessor(object):
         if "idnview.com" in fqdn:  # Many prefixes... www3, www11, www9, etc.
             return "Idn View", "Video"
 
-        if "joox.com" in fqdn:
-            return "Joox", "Music"
+        if "joox.com" in fqdn:  # Music streaming
+            return "Joox", "Non-video Content"
 
         if "baca.co.id" in fqdn:  # News
             return "Baca", "Non-video Content"
