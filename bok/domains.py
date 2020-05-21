@@ -144,7 +144,7 @@ class FqdnProcessor(object):
             return self.google_re[match_regex.pattern]
         else:
             # Catch other small APIs after processing the main list
-            if re.match(r'.*googleapis\.com') is not None:
+            if re.match(r'.*googleapis\.com', fqdn) is not None:
                 return "API"
 
             return "Other"
