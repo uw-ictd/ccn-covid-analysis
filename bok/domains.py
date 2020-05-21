@@ -13,17 +13,17 @@ GOOGLE_REGEXES = {
     r'^android\.googleapis\.com$': "Software or Updates",
     r'^dl\.google\.com$': "Software or Updates",
     r'^.*\.doubleclick\.net$': "Ad Network",
-    r'^.*mtalk\.google\.com$': "Messaging",
+    r'^.*mtalk.*\.google\.com$': "Messaging",
     r'^geomobileservices.*\.googleapis\.com$': "Location API",
     r'^semanticlocation.*\.googleapis\.com$': "Location API",
     r'^cloudconfig\.googleapis\.com$': "API",
     r'^playatoms-pa\.googleapis\.com$': "Software or Updates",  # Related to google play store and play api
-    r'^accounts\.google\.com$': "Authentication",
+    r'^accounts\.google\..*$': "Authentication",
     r'^people-pa\.googleapis\.com$': "API",
     r'^instantmessaging-pa\.googleapis\.com$': "Messaging",
     r'^.*ytimg.*$': "Video",
     r'^.*youtube.*$': "Video",
-    r'^clients.*\.google\.com$': "Authentication",
+    r'^clients.*\.google\..*$': "Authentication",
     r'^.*gstatic\.com': "Static",
     # r'^connectivitycheck\.gstatic\.com$': "Device Services",
     # r'^fonts\.gstatic\.com': "Static",
@@ -35,6 +35,7 @@ GOOGLE_REGEXES = {
     r'^footprints-pa\.googleapis\.com$': "API",
     r'^datasaver\.googleapis\.com$': "Compressed Web",
     r'^.*ampproject\.org$': "Compressed Web",
+    r'^.*ampproject\.net$': "Compressed Web",
     r'^googleweblight\.com$': "Compressed Web",
     r'^litepages\.googlezip\.net$': "Compressed Web",
     r'^ampcid\.google\..*$': "Compressed Web",  # Seems to be country specific amp helpers?
@@ -65,20 +66,22 @@ GOOGLE_REGEXES = {
     r'^fonts\.googleapis\.com$': "API",
     r'^photosdata-pa\.googleapis\.com$': "Content Upload",  # Most traffic is upstream here
     r'^.*content-storage-upload\.googleapis\.com$': "Content Upload",  # Most traffic is upstream
-    r'^dns\.google$': "API",
+    r'^dns\.google.*$': "API",
     r'.*analytics.*': "Ad Network",
     r'.*adservice.*': "Ad Network",  # Seen with a variety of extensions and country codes
     r'^maps\.googleapis\.com$': "Location API",
     r'^drive\.google\.com$': "Files",
     r'^mobilemaps-pa\.googleapis\.com$': "Location API",
-    r'^id\.google\.com$': "Authentication",  # Not an indonesian specific site, api front end
-    r'^google\.com$': "Main Site",
+    r'^id\.google\..*$': "Authentication",  # Not an indonesian specific site, api front end
+    r'^google\..*$': "Main Site",
     r'^apis.google.com$': "API",
     r'^suggestqueries\.google\.com$': "API",  # Search completion
+    r'^video\.google\..*$': "Video"
+    r'^hangouts\.google\..*$'
 }
 
 FACEBOOK_REGEXES = {
-    r'^video.*\.fbcdn\.net$': "Video",
+    r'^.*video.*\.fbcdn\.net$': "Video",
     r'^static.*\.fbcdn\.net$': "Static",
     r'^static.*\.facebook\.com$': "Static",
     r'^.*scontent.*\.fbcdn\.net$': "Photos",
@@ -334,7 +337,7 @@ class FqdnProcessor(object):
         if "ivideosmart.com" in fqdn:
             return "iVideoSmart", "Ad Network"
 
-        if "mangatoon.100sta.com" in fqdn or "mangatoon.mobi":
+        if "mangatoon.100sta.com" in fqdn or "mangatoon.mobi" in fqdn:
             return "Mangatoon", "Non-video Content"
 
         if "ushareit.com" in fqdn:  # Chinese file sharing app
