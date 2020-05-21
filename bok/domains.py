@@ -31,7 +31,6 @@ GOOGLE_REGEXES = {
     r'^.*app-measurement\.com$': "API",  # Firebase Stats
     r'^.*gvt[0-9]*\.com$': "Mixed CDN",  # Video transcoding? and/or Chrome?
     r'^yt3\.ggpht\.com$': "Video",  # Youtube image proxy
-    r'^.*googleadservices\.com$': "Ad Network",
     r'^.*googlesyndication\.com$': "Ad Network",
     r'^footprints-pa\.googleapis\.com$': "API",
     r'^datasaver\.googleapis\.com$': "Compressed Web",
@@ -54,7 +53,6 @@ GOOGLE_REGEXES = {
     r'^mdh-pa\.googleapis\.com$': "API",
     r'^mobilenetworkscoring-pa\.googleapis\.com$': "API",
     r'.*2mdn\.net': "Ad Network",  # Doubleclick
-    r'^adservice\.google\.com$': "Ad Network",
     r'^firebaseremoteconfig\.googleapis\.com$': "API",
     r'^compress\.googlezip\.net$': "Content Upload",
     r'^android-safebrowsing\.google\.com$': "API",
