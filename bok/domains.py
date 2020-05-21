@@ -25,8 +25,8 @@ GOOGLE_REGEXES = {
     r'^.*youtube.*$': "Video",
     r'^clients.*\.google\.com$': "Authentication",
     r'^.*gstatic\.com': "Static",
-    r'^connectivitycheck\.gstatic\.com$': "Device Services",
-    r'^fonts\.gstatic\.com': "Static",
+    # r'^connectivitycheck\.gstatic\.com$': "Device Services",
+    # r'^fonts\.gstatic\.com': "Static",
     r'^ggpht\.com$': "SDK",  # HTTPS everywhere lists it as related to google code and google user content.
     r'^.*app-measurement\.com$': "API",  # Firebase Stats
     r'^.*gvt1\.com$': "Mixed CDN",  # Video transcoding? and/or Chrome?
