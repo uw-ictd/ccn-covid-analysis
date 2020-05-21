@@ -4,20 +4,20 @@
 import re
 
 GOOGLE_REGEXES = {
-    r'^www\.google\.com$': "Main Site",
-    r'^android\.clients\.google\.com$': "Android",
+    r'^www\.google\..*$': "Main Site",  # co.id, com.au, .com, .no, .cn etc.
+    r'^android\.clients\.google\.com$': "Software or Updates",
     r'^www\.googleapis\.com$': "API",
-    r'^play\.googleapis\.com$': "Play API",
-    r'^(?:(?!ytimg).)*googleusercontent\.com$': "Cache",
+    r'^play\.googleapis\.com$': "Software or Updates",
+    r'^(?:(?!ytimg).)*googleusercontent\.com$': "Non-video Content",
     r'^.*googlevideo\.com$': "Video",
-    r'^android\.googleapis\.com$': "Android API",
-    r'^dl\.google\.com$': "Software Update",
+    r'^android\.googleapis\.com$': "Software or Updates",
+    r'^dl\.google\.com$': "Software or Updates",
     r'^.*\.doubleclick\.net$': "Ad Network",
-    r'^mtalk\.google\.com$': "Messaging",
+    r'^.*mtalk\.google\.com$': "Messaging",
     r'^geomobileservices.*\.googleapis\.com$': "Location API",
     r'^semanticlocation.*\.googleapis\.com$': "Location API",
     r'^cloudconfig\.googleapis\.com$': "API",
-    r'^playatoms-pa\.googleapis\.com$': "API",
+    r'^playatoms-pa\.googleapis\.com$': "Software or Updates",  # Related to google play store and play api
     r'^accounts\.google\.com$': "Authentication",
     r'^people-pa\.googleapis\.com$': "API",
     r'^instantmessaging-pa\.googleapis\.com$': "Messaging",
@@ -27,27 +27,30 @@ GOOGLE_REGEXES = {
     r'^.*gstatic\.com': "Static",
     # r'^connectivitycheck\.gstatic\.com$': "Device Services",
     # r'^fonts\.gstatic\.com': "Static",
-    r'^ggpht\.com$': "SDK",  # HTTPS everywhere lists it as related to google code and google user content.
+    r'^(?:(?!yt).)*ggpht\.com$': "Non-video Content",  # HTTPS everywhere lists it as related to google code and google user content.
+    r'^yt.*\.ggpht\.com$': "Video",  # Youtube image proxy
     r'^.*app-measurement\.com$': "API",  # Firebase Stats
     r'^.*gvt[0-9]*\.com$': "Mixed CDN",  # Video transcoding? and/or Chrome?
-    r'^yt3\.ggpht\.com$': "Video",  # Youtube image proxy
     r'^.*googlesyndication\.com$': "Ad Network",
     r'^footprints-pa\.googleapis\.com$': "API",
     r'^datasaver\.googleapis\.com$': "Compressed Web",
-    r'^cdn\.ampproject\.org$': "Compressed Web",
-    r'^update\.googleapis\.com$': "Update",
+    r'^.*ampproject\.org$': "Compressed Web",
+    r'^googleweblight\.com$': "Compressed Web",
+    r'^litepages\.googlezip\.net$': "Compressed Web",
+    r'^ampcid\.google\..*$': "Compressed Web",  # Seems to be country specific amp helpers?
+    r'^update\.googleapis\.com$': "Software or Updates",
     r'^clientservices\.googleapis\.com$': "API",
     r'^voledevice-pa\.googleapis\.com$': "API",
-    r'^backup\.googleapis\.com$': "API",
-    r'^translate\.googleapis\.com$': "API",
+    r'^backup\.googleapis\.com$': "Files",  # User device backup...
+    r'^.*translate.*\.com$': "Translation",  # Some at google apis, some at google.com
     r'^chromefeedcontentsuggestions-pa.googleapis.com$': "API",
     r'^mail\.google\.com$': "Messaging",
     r'^inbox\.google\.com$': "Messaging",
     r'^.*gmail\.com$': "Messaging",
-    r'^.*crashlytics\.com$': "SDK",  # Firebase
+    r'^.*crashlytics\.com$': "API",  # Firebase
     r'^phonedeviceverification-pa\.googleapis\.com$': "API",
     r'^photos\.googleapis\.com$': "Content Upload",
-    r'^cryptauthenrollment\.googleapis\.com$': "API",
+    r'^cryptauthenrollment\.googleapis\.com$': "Authentication",
     r'^proxy\.googlezip\.net$': "Files",
     r'^safebrowsing\.googleapis\.com$': "API",
     r'^mdh-pa\.googleapis\.com$': "API",
@@ -57,13 +60,21 @@ GOOGLE_REGEXES = {
     r'^compress\.googlezip\.net$': "Content Upload",
     r'^android-safebrowsing\.google\.com$': "API",
     r'^.*googletagservices\.com': "Ad Network",  # Tracking Pixels
-    r'^play\.google\.com$': "Android",
+    r'^.*googletagmanager\.com$': "Ad Network",
+    r'^play\.google\.com$': "Software or Updates",
     r'^fonts\.googleapis\.com$': "API",
     r'^photosdata-pa\.googleapis\.com$': "Content Upload",  # Most traffic is upstream here
     r'^.*content-storage-upload\.googleapis\.com$': "Content Upload",  # Most traffic is upstream
-    r'^dns\.google\.com$': "API",
+    r'^dns\.google$': "API",
     r'.*analytics.*': "Ad Network",
     r'.*adservice.*': "Ad Network",  # Seen with a variety of extensions and country codes
+    r'^maps\.googleapis\.com$': "Location API",
+    r'^drive\.google\.com$': "Files",
+    r'^mobilemaps-pa\.googleapis\.com$': "Location API",
+    r'^id\.google\.com$': "Authentication",  # Not an indonesian specific site, api front end
+    r'^google\.com$': "Main Site",
+    r'^apis.google.com$': "API",
+    r'^suggestqueries\.google\.com$': "API",  # Search completion
 }
 
 FACEBOOK_REGEXES = {
@@ -78,28 +89,37 @@ FACEBOOK_REGEXES = {
     r'^.*api\.facebook\.com$': "API",
     r'^.*graph\.facebook\.com$': "API",
     r'^edgeray.*\.facebook\.com$': "Mixed CDN",
-    r'^connect\.facebook\.net$': "Embedded SDK",  # Partner site embeddable sdk
-    r'^edge-mqtt\.facebook\.com$': "Messaging",
+    r'^connect\.facebook\.net$': "Authentication",  # Partner site embeddable sdk
+    r'^connect\.facebook\.com$': "Authentication",  # Partner site embeddable sdk
+    r'^.*edge-mqtt.*\.facebook\.com$': "Messaging",
     r"^mqtt.*\.facebook\.com$": "Messaging",
-    r'^snaptu.*\.facebook\.com$': "Lite SDK",  # Acquired for FB-Lite
-    r'^rupload.facebook.com$': "Content Upload",
+    r'^snaptu.*\.facebook\.com$': "Compressed Web",  # Staptu acquired to bootstrap FB-Lite
+    r'^edge-snaptu.*\.facebook\.com$': "Compressed Web",
     r'^edge-turnservice.*\.facebook\.com$': "Mixed CDN",
     r'^.*www\.facebook\.com$': "Main Site",
     r'^web\.facebook\.com$': "Main Site",
     r'^an\.facebook\.com$': "Ad Network",
     r'^cdn.fbsbx.com$': "Mixed CDN",
     r'^m\.facebook\.com$': "Main Site",
+    r'^mobile\.facebook\.com$': "Main Site",
     r'^portal\.fb\.com$': "API",
     r'^.*accountkit\.com$': "Embedded SDK",
-    r'^edge-chat\.facebook\.com$': "Messaging",
+    r'^.*edge-chat\.facebook\.com$': "Messaging",
     r'^.*video.*\.facebook\.com$': "Video",
     r'^instagram.*\.fbcdn\.net': "Photos",
+    r'^instagram.*\.facebook\.com': "Photos",
     r'^whatsapp.*\.fbcdn\.net$': "Messaging",
-    r'^.*upload.*.\fbcdn\.com$': "Content Upload",
-    r'^.*upload.*.\fbcdn\.net$': "Content Upload",
+    r'^.*whatsapp.*\.facebook\.com$': "Messaging",
+    r'^.*upload.*\.fbcdn\.com$': "Content Upload",
+    r'^.*upload.*\.fbcdn\.net$': "Content Upload",
     r'^facebook\.com$': "Main Site",
-
-
+    r'^edge-star.*\.facebook\.com$': "Mixed CDN",
+    r'^.*upload.*\.facebook\.com$': "Content Upload",
+    # r'^fblive-upload\.facebook\.com': "Content Upload",
+    # r'^rupload.facebook.com$': "Content Upload",
+    r'^z-m-static.*\.fbcdn\.net$': "Static",
+    r'^z-m-external.*\.fbcdn\.net$': "Mixed CDN",
+    r'^fbsbx\.com$': "Mixed CDN",
 }
 
 
@@ -123,6 +143,10 @@ class FqdnProcessor(object):
         if match_regex is not None:
             return self.google_re[match_regex.pattern]
         else:
+            # Catch other small APIs after processing the main list
+            if re.match(r'.*googleapis\.com') is not None:
+                return "API"
+
             return "Other"
 
     def _process_facebook_category(self, fqdn):
@@ -182,7 +206,7 @@ class FqdnProcessor(object):
         if "xvideos-cdn.com" in fqdn or "xvideos.com" in fqdn:
             return "xvideos", "Adult Video"
 
-        if "xnxx-cdn.com" in fqdn:
+        if "xnxx-cdn.com" in fqdn or "xnxx.com" in fqdn:
             return "xnxx", "Adult Video"
 
         if "trggames.com" in fqdn:
@@ -193,16 +217,16 @@ class FqdnProcessor(object):
 
         if "coloros.com" in fqdn:
             # Oppo fork of android
-            return "Oppo", "Device Services"
+            return "Oppo", "Software or Updates"
 
         if "oppomobile.com" in fqdn:
-            return "Oppo", "Device Services"
+            return "Oppo", "Software or Updates"
 
         if "igamecj.com" in fqdn:  # Appears to be a PUBG pirate download
             return "Other", "Games"
 
         if "vivoglobal.com" in fqdn:
-            return "Vivo", "Device Services"
+            return "Vivo", "Software or Updates"
 
         if "tudoo.mobi" in fqdn:
             return "Tudoo", "Video"
@@ -227,25 +251,25 @@ class FqdnProcessor(object):
 
         if "samsungdm.com" in fqdn:
             # Software updates
-            return "Samsung", "Device Services"
+            return "Samsung", "Software or Updates"
 
         if "windowsupdate.com" in fqdn:
-            return "Microsoft", "Device Services"
+            return "Microsoft", "Software or Updates"
 
         if "dl.delivery.mp.microsoft.com" in fqdn:
-            return "Microsoft", "Updates"
+            return "Microsoft", "Software or Updates"
 
         if "officecdn.microsoft.com.edgesuite.net" in fqdn:
-            return "Microsoft", "Updates"
+            return "Microsoft", "Software or Updates"
 
         if "download.microsoft.com" in fqdn:
-            return "Microsoft", "Updates"
+            return "Microsoft", "Software or Updates"
 
         if "tokopedia.net" in fqdn:
             return "Tokopedia", "Shopping"
 
         if "9appsdownloading.com" in fqdn or "9appsinstall.com" in fqdn:
-            return "UC Browser", "Software Update"
+            return "UC Browser", "Software or Updates"
 
         if "ucweb.com" in fqdn:
             return "UC Browser", "Compressed Web"
@@ -262,7 +286,7 @@ class FqdnProcessor(object):
         if "emome-ip.hinet.net" in fqdn:
             return "HiNet", "IAAS"
 
-        if "like.video" in fqdn or "bigo.sg" in fqdn or "likeevideo.com" in fqdn:
+        if "like.video" in fqdn or "bigo.sg" in fqdn or "likeevideo.com" in fqdn or "like-video.com" in fqdn:
             return "Likee", "Video"
 
         if "hlssrv.com" in fqdn:
@@ -296,10 +320,10 @@ class FqdnProcessor(object):
             return "Unity Ads", "Ad Network"
 
         if "az-dn.gw.samsungapps.com" in fqdn:
-            return "Samsung", "Device Services"
+            return "Samsung", "Software or Updates"
 
         if "hiido.com" in fqdn:  # Chinese file sharing app
-            return "Hiido", "Mixed"
+            return "Hiido", "Files"
 
         if "cf.shopee.co.id" in fqdn or "shopeemobile.com" in fqdn:
             return "Shopee", "Shopping"
@@ -311,10 +335,10 @@ class FqdnProcessor(object):
             return "iVideoSmart", "Ad Network"
 
         if "mangatoon.100sta.com" in fqdn or "mangatoon.mobi":
-            return "Mangatoon", "Photos"
+            return "Mangatoon", "Non-video Content"
 
         if "ushareit.com" in fqdn:  # Chinese file sharing app
-            return "UshareIt", "Mixed"
+            return "UshareIt", "Files"
 
         if "au.ff.avast.com" in fqdn:
             return "Avast", "Antivirus"
@@ -337,20 +361,17 @@ class FqdnProcessor(object):
         if "qq.com" in fqdn or "myqcloud.com" in fqdn:
             return "QQ", "Messaging"
 
-        if "like-video.com" in fqdn:
-            return "like-video", "IAAS"
-
         if "idnview.com" in fqdn:  # Many prefixes... www3, www11, www9, etc.
             return "Idn View", "Video"
 
         if "joox.com" in fqdn:
             return "Joox", "Music"
 
-        if "baca.co.id" in fqdn:
-            return "Baca", "News"
+        if "baca.co.id" in fqdn:  # News
+            return "Baca", "Non-video Content"
 
-        if "weathercn.com" in fqdn:
-            return "Weather CN", "News"
+        if "weathercn.com" in fqdn:  # Weather
+            return "Weather CN", "Non-video Content"
 
         if "vungle.com" in fqdn:
             return "Vungle", "Ad Network"
@@ -362,7 +383,7 @@ class FqdnProcessor(object):
             return "cdn syy", "Mixed CDN"
 
         if "hl-img.peco.uodoo.com" in fqdn:
-            return "Uodoo", "Photos"
+            return "Uodoo", "Non-video Content"
 
         if "applovin.com" in fqdn:
             return "AppLovin", "Ad Network"
@@ -374,7 +395,7 @@ class FqdnProcessor(object):
             return "AdJust", "Ad Network"
 
         if "waptrick.org" in fqdn:  # Mobile first news, music, content aggregator
-            return "WapTrick", "Main Site"
+            return "WapTrick", "Non-video Content"
 
         if "idtribun.com" in fqdn:  # Gambling and sports
             return "Idtribun", "Games"
@@ -407,7 +428,7 @@ class FqdnProcessor(object):
             return "Vidmate", "Video"
 
         if "cdn.mozilla.net" in fqdn:
-            return "Mozilla", "Updates"
+            return "Mozilla", "Software or Updates"
 
         if "pkvn.mobi" in fqdn:  # Poker
             return "Pkvn", "Games"
@@ -415,19 +436,19 @@ class FqdnProcessor(object):
         if "ssacdn.com" in fqdn:
             return "Supersonic Games", "Games"
 
-        if "pinimg.com" in fqdn or "pinterest" in fqdn:
-            return "Pinterest", "Photos"
+        if "pinimg.com" in fqdn or "pinterest" in fqdn:  # Photos
+            return "Pinterest", "Non-video Content"
 
-        if "carageo.com" in fqdn:
+        if "carageo.com" in fqdn:  # File sharing
             return "CaraGeo", "Files"
 
         if "majorgeeks.com" in fqdn:  # Free software downloads
-            return "MajorGeeks", "Software"
+            return "MajorGeeks", "Software or Updates"
 
         if "slatic.net" in fqdn:  # Seems to host pictures of physical goods?
-            return "Slatic", "Shopping"
+            return "Slatic", "Non-video Content"
 
         if "download.mediatek.com" in fqdn:
-            return "Mediatek", "Updates"
+            return "Mediatek", "Software or Updates"
 
         return "Other", "Other"
