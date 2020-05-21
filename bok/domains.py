@@ -8,7 +8,7 @@ GOOGLE_REGEXES = {
     r'^android\.clients\.google\.com$': "Android",
     r'^www\.googleapis\.com$': "API",
     r'^play\.googleapis\.com$': "Play API",
-    r'^.*googleusercontent\.com$': "Cache",
+    r'^(?:(?!ytimg).)*googleusercontent\.com$': "Cache",
     r'^.*googlevideo\.com$': "Video",
     r'^android\.googleapis\.com$': "Android API",
     r'^dl\.google\.com$': "Software Update",
