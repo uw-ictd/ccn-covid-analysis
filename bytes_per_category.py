@@ -93,7 +93,8 @@ def make_plot(infile):
     ).properties(
         # title="Local Service Use",
         width=500,
-    ).interactive().show()
+    )
+    # .interactive().show()
 
     # .save("renders/bytes_per_category.png",
     #    scale_factor=2

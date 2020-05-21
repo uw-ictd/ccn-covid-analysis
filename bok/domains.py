@@ -24,18 +24,39 @@ GOOGLE_REGEXES = {
     r'^.*ytimg.*$': "Video",
     r'^.*youtube.*$': "Video",
     r'^clients.*\.google\.com$': "Authentication",
-    r'^gstatic\.com': "Static",
+    r'^.*gstatic\.com': "Static",
     r'^connectivitycheck\.gstatic\.com$': "Device Services",
     r'^fonts\.gstatic\.com': "Static",
     r'^ggpht\.com$': "SDK",  # HTTPS everywhere lists it as related to google code and google user content.
-    r'^app-measurement\.com$': "API",  # Firebase Stats
-    r'gvt1\.com': "Device Services"  # Chrome Updates
+    r'^.*app-measurement\.com$': "API",  # Firebase Stats
+    r'^.*gvt1\.com$': "Mixed CDN",  # Video transcoding? and/or Chrome?
+    r'^yt3\.ggpht\.com$': "Video",  # Youtube image proxy
+    r'^.*googleadservices\.com$': "Ad Network",
+    r'^.*googlesyndication\.com$': "Ad Network",
+    r'^footprints-pa\.googleapis\.com$': "API",
+    r'^datasaver\.googleapis\.com$': "Compressed Web",
+    r'^cdn\.ampproject\.org$': "Compressed Web",
+    r'^update\.googleapis\.com$': "Update",
+    r'^clientservices\.googleapis\.com$': "API",
+    r'^voledevice-pa\.googleapis\.com$': "API",
+    r'^backup\.googleapis\.com$': "API",
+    r'^translate\.googleapis\.com$': "API",
+    r'^chromefeedcontentsuggestions-pa.googleapis.com$': "API",
+    r'^mail\.google\.com$': "Messaging",
+    r'^inbox\.google\.com$': "Messaging",
+    r'^.*crashlytics\.com$': "SDK",  # Firebase
+    r'^phonedeviceverification-pa\.googleapis\.com$': "API",
+    r'^photos\.googleapis\.com$': "Content Upload",
+    r'^cryptauthenrollment\.googleapis\.com$': "API",
+
+
 }
 
 FACEBOOK_REGEXES = {
     r'^video.*\.fbcdn\.net$': "Video",
     r'^static.*\.fbcdn\.net$': "Static",
-    r'^scontent.*\.fbcdn\.net$': "Photos",
+    r'^static.*\.facebook\.com$': "Static",
+    r'^.*scontent.*\.fbcdn\.net$': "Photos",
     r'^lookaside.*\.facebook\.com$': "Photos",
     r'^platform-lookaside.*\.fbsbx\.com$': "Photos",
     r'^external.*\.fbcdn\.net$': "Mixed CDN",
@@ -45,21 +66,25 @@ FACEBOOK_REGEXES = {
     r'^edgeray.*\.facebook\.com$': "Mixed CDN",
     r'^connect\.facebook\.net$': "Embedded SDK",  # Partner site embeddable sdk
     r'^edge-mqtt\.facebook\.com$': "Messaging",
-    r'^snaptu-mini\.facebook\.com$': "Lite SDK",  # Acquired for FB-Lite
+    r"^mqtt.*\.facebook\.com$": "Messaging",
+    r'^snaptu.*\.facebook\.com$': "Lite SDK",  # Acquired for FB-Lite
     r'^rupload.facebook.com$': "Content Upload",
     r'^edge-turnservice.*\.facebook\.com$': "Mixed CDN",
-    r'^www\.facebook\.com$': "Main Site",
-    r'^web\.facebook\.com $': "Main Site",
+    r'^.*www\.facebook\.com$': "Main Site",
+    r'^web\.facebook\.com$': "Main Site",
     r'^an\.facebook\.com$': "Ad Network",
     r'^cdn.fbsbx.com$': "Mixed CDN",
     r'^m\.facebook\.com$': "Main Site",
+    r'^portal\.fb\.com$': "API",
+    r'^.*accountkit\.com$': "Embedded SDK",
+    r'^edge-chat\.facebook\.com$': "Messaging",
+    r'^.*video.*\.facebook\.com$': "Video",
+    r'^instagram.*\.fbcdn\.net': "Photos",
+    r'^whatsapp.*\.fbcdn\.net$': "Messaging",
+    r'^.*upload.*.\fbcdn\.com$': "Content Upload"
+
 }
 
-
-
-"2.tlu.dl.delivery.mp.microsoft.com",
-
-"au.ff.avast.com",
 
 class FqdnProcessor(object):
     """An object class holding compiled matcher state
@@ -99,9 +124,9 @@ class FqdnProcessor(object):
     def process_fqdn(self, fqdn):
         """Process an input domain name, returning an org and category tuple
         """
-        if 'google' in fqdn or 'gmail' in fqdn or 'ytimg' in fqdn or 'youtube' in fqdn or "gstatic.com" in fqdn or "ggpht.com" in fqdn or "app-measurement.com" in fqdn or "gvt1.com" in fqdn:
+        if 'google' in fqdn or 'gmail' in fqdn or 'ytimg' in fqdn or 'youtube' in fqdn or "gstatic.com" in fqdn or "ggpht.com" in fqdn or "app-measurement.com" in fqdn or "gvt1.com" in fqdn or "ampproject" in fqdn or "crashlytics.com" in fqdn:
             return "Google", self._process_google_category(fqdn)
-        elif 'fbcdn' in fqdn or 'facebook' in fqdn or 'fbsbx' in fqdn:
+        elif 'fbcdn' in fqdn or 'facebook' in fqdn or 'fbsbx' in fqdn or "fb.com" in fqdn or "accountkit.com" in fqdn:
             return "Facebook", self._process_facebook_category(fqdn)
 
         if 'whatsapp' in fqdn:
@@ -120,7 +145,7 @@ class FqdnProcessor(object):
             return "Akamai", "Mixed CDN"
 
         if 'amazonaws' in fqdn or 'aws.com' in fqdn:
-            return "amazon_web_services", "Other"
+            return "amazon_web_services", "IAAS"
 
         if 'cloudfront' in fqdn:
             return "Cloudfront", "Mixed CDN"
@@ -165,7 +190,7 @@ class FqdnProcessor(object):
         if "tudoo.mobi" in fqdn:
             return "Tudoo", "Video"
 
-        if "tiktokcdn.com" in fqdn or "tiktokv.com" in fqdn:
+        if "tiktokcdn.com" in fqdn or "tiktokv.com" in fqdn or "muscdn.com" in fqdn or "log-tb.sgsnssdk.com" in fqdn:  # muscdn -> musicly!
             return "TikTok", "Video"
 
         if "topbuzzcdn.com" in fqdn:
@@ -174,7 +199,7 @@ class FqdnProcessor(object):
         if "phncdn.com" in fqdn:
             return "PHN CDN", "Mixed CDN"
 
-        if "adcs.rqmob.com" in fqdn:
+        if "rqmob.com" in fqdn:
             return "RQ Mob", "Ad Network"
 
         if "pubgmobile.com" in fqdn:
@@ -190,11 +215,20 @@ class FqdnProcessor(object):
         if "windowsupdate.com" in fqdn:
             return "Microsoft", "Device Services"
 
+        if "dl.delivery.mp.microsoft.com" in fqdn:
+            return "Microsoft", "Updates"
+
+        if "download.microsoft.com" in fqdn:
+            return "Microsoft", "Updates"
+
         if "tokopedia.net" in fqdn:
             return "Tokopedia", "Shopping"
 
-        if "9appsdownloading.com" in fqdn or "ucweb.com" in fqdn:
-            return "UC Browser", "Other"
+        if "9appsdownloading.com" in fqdn:
+            return "UC Browser", "Software Update"
+
+        if "ucweb.com" in fqdn:
+            return "UC Browser", "Compressed Web"
 
         if "liftoff.io" in fqdn:
             return "Liftoff", "Ad Network"
@@ -204,6 +238,84 @@ class FqdnProcessor(object):
 
         if "v-mate.mobi" in fqdn:  # https://techcrunch.com/2019/05/30/alibaba-vmate-100m-india/
             return "VMate", "Video"
+
+        if "emome-ip.hinet.net" in fqdn:
+            return "HiNet", "IAAS"
+
+        if "like.video" in fqdn or "bigo.sg" in fqdn:
+            return "Likee", "Video"
+
+        if "hlssrv.com" in fqdn:
+            return "HLSPlay", "Video"
+
+        if "opera-mini.net" in fqdn or "operacdn.com" in fqdn:
+            return "Opera Mini", "Compressed Web"
+
+        if "im-gb.com" in fqdn:  # Looks like an indo specific basic HTML news aggregator?!?
+            return "Im-Gb", "Compressed Web"
+
+        if "img.vidmatefilm.org" in fqdn:
+            return "VidMateFilm", "Video"
+
+        if "videoxcdn.net" in fqdn:
+            return "VideoX", "Adult Video"
+
+        if "bioskopview.com" in fqdn:
+            return "Bioskopview", "Video"
+
+        if "adcolony.com" in fqdn:
+            return "Adcolony", "Ad Network"
+
+        if "www2090.o0-5.com" in fqdn:
+            return "Fembed", "Video"
+
+        if "cootek.com" in fqdn:
+            return "Cootek", "Mixed CDN"
+
+        if "unityads.unity3d.com" in fqdn:
+            return "Unity Ads", "Ad Network"
+
+        if "az-dn.gw.samsungapps.com" in fqdn:
+            return "Samsung", "Device Services"
+
+        if "hiido.com" in fqdn:  # Chinese file sharing app
+            return "Hiido", "Mixed"
+
+        if "cf.shopee.co.id" in fqdn or "shopeemobile.com" in fqdn:
+            return "Shopee", "Shopping"
+
+        if "amplitude.com" in fqdn:
+            return "Amplitude", "Ad Network"
+
+        if "ivideosmart.com" in fqdn:
+            return "iVideoSmart", "Ad Network"
+
+        if "mangatoon.100sta.com" in fqdn:
+            return "Mangatoon", "Photos"
+
+        if "ushareit.com" in fqdn:  # Chinese file sharing app
+            return "UshareIt", "Mixed"
+
+        if "au.ff.avast.com" in fqdn:
+            return "Avast", "Antivirus"
+
+        if "symantecliveupdate.com" in fqdn:
+            return "Symantic", "Antivirus"
+
+        if "definitionupdates.microsoft.com" in fqdn:
+            return "Microsoft", "Antivirus"
+
+        if "media.tenor.co" in fqdn:
+            return "Tenor", "Photos"
+
+        if "like-video.com" in fqdn:
+            return "like-video", "IAAS"
+
+        if "www11.idnview.com" in fqdn:
+            return "Idn View", "Video"
+
+        if "joox.com" in fqdn:
+            return "Joox", "Music"
 
         return "Other", "Other"
 
