@@ -76,8 +76,8 @@ GOOGLE_REGEXES = {
     r'^google\..*$': "Main Site",
     r'^apis.google.com$': "API",
     r'^suggestqueries\.google\.com$': "API",  # Search completion
-    r'^video\.google\..*$': "Video"
-    r'^hangouts\.google\..*$'
+    r'^video\.google\..*$': "Video",
+    r'^hangouts\.google\..*$': "Messaging",
 }
 
 FACEBOOK_REGEXES = {
