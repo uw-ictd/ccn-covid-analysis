@@ -168,7 +168,7 @@ class FqdnProcessor(object):
     def process_fqdn(self, fqdn):
         """Process an input domain name, returning an org and category tuple
         """
-        if 'google' in fqdn or 'gmail' in fqdn or 'ytimg' in fqdn or 'youtube' in fqdn or "gstatic.com" in fqdn or "ggpht.com" in fqdn or "app-measurement.com" in fqdn or "gvt1.com" in fqdn or "ampproject" in fqdn or "crashlytics.com" in fqdn or "2mdn.net" in fqdn:
+        if 'google' in fqdn or 'gmail' in fqdn or 'ytimg' in fqdn or 'youtube' in fqdn or "gstatic.com" in fqdn or "ggpht.com" in fqdn or "app-measurement.com" in fqdn or "gvt1.com" in fqdn or "ampproject" in fqdn or "crashlytics.com" in fqdn or "2mdn.net" in fqdn or "doubleclick.net" in fqdn:
             return "Google", self._process_google_category(fqdn)
         elif 'fbcdn' in fqdn or 'facebook' in fqdn or 'fbsbx' in fqdn or "fb.com" in fqdn or "accountkit.com" in fqdn:
             return "Facebook", self._process_facebook_category(fqdn)
@@ -228,7 +228,7 @@ class FqdnProcessor(object):
         if "igamecj.com" in fqdn:  # Appears to be a PUBG pirate download
             return "Other", "Games"
 
-        if "vivoglobal.com" in fqdn:
+        if "vivoglobal.com" in fqdn or "vivo.com" in fqdn:
             return "Vivo", "Software or Updates"
 
         if "tudoo.mobi" in fqdn:
@@ -295,7 +295,7 @@ class FqdnProcessor(object):
         if "hlssrv.com" in fqdn:
             return "HLSPlay", "Video"
 
-        if "opera-mini.net" in fqdn or "operacdn.com" in fqdn or "transcoder.opera.com" in fqdn:
+        if "opera-mini.net" in fqdn or "operacdn.com" in fqdn or "transcoder.opera.com" in fqdn or "mobile.opera.com" in fqdn:
             return "Opera Mini", "Compressed Web"
 
         if "im-gb.com" in fqdn:  # Looks like an indo specific basic HTML news aggregator?!?
@@ -328,7 +328,7 @@ class FqdnProcessor(object):
         if "hiido.com" in fqdn:  # Chinese file sharing app
             return "Hiido", "Files"
 
-        if "cf.shopee.co.id" in fqdn or "shopeemobile.com" in fqdn:
+        if "cf.shopee.co.id" in fqdn or "shopeemobile.com" in fqdn or "shopee.co.id" in fqdn:
             return "Shopee", "Shopping"
 
         if "amplitude.com" in fqdn:
@@ -385,7 +385,7 @@ class FqdnProcessor(object):
         if "cdnsyy.com" in fqdn:
             return "cdn syy", "Mixed CDN"
 
-        if "hl-img.peco.uodoo.com" in fqdn:
+        if "uodoo.com" in fqdn:
             return "Uodoo", "Non-video Content"
 
         if "applovin.com" in fqdn:
@@ -453,5 +453,38 @@ class FqdnProcessor(object):
 
         if "download.mediatek.com" in fqdn:
             return "Mediatek", "Software or Updates"
+
+        if "download.adobe.com" in fqdn:
+            return "Adobe", "Software or Updates"
+
+        if "rdtcdn.com" in fqdn:
+            return "Rdt CDN", "Mixed CDN"
+
+        if "linode.com" in fqdn:
+            return "Linode", "IAAS"
+
+        if "bukalapak.com" in fqdn:
+            return "Bukalapak", "Shopping"
+
+        if "adtilt.com" in fqdn:
+            return "Adtilt", "Ad Network"
+
+        if "feedify.net" in fqdn:
+            return "Feedify", "Ad Network"
+
+        if "snapchat.com" in fqdn:
+            return "Snapchat", "Video"
+
+        if "alicdn.com" in fqdn:
+            return "Alibaba CDN", "Mixed CDN"
+
+        if "ksmobile.com" in fqdn:  # Phone app conglomorate
+            return "KS Mobile", "Software or Updates"
+
+        if "unrulymedia.com" in fqdn:  # Video.unrulymedia serves video ads
+            return "Unruly Media", "Ad Network"
+
+        if "blogspot.com" in fqdn:
+            return "Blogspot", "Non-video Content"
 
         return "Other", "Other"
