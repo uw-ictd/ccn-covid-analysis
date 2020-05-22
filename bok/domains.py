@@ -150,7 +150,7 @@ class FqdnProcessor(object):
             if re.match(r'.*googleapis\.com', fqdn) is not None:
                 return "API"
 
-            return "Other"
+            return "Unknown (Not Mapped)"
 
     def _process_facebook_category(self, fqdn):
         match_regex = None
@@ -163,21 +163,25 @@ class FqdnProcessor(object):
         if match_regex is not None:
             return self.facebook_re[match_regex.pattern]
         else:
-            return "Other"
+            return "Unknown (Not Mapped)"
 
     def process_fqdn(self, fqdn):
         """Process an input domain name, returning an org and category tuple
         """
+        if fqdn is None or fqdn == "":
+            return "Unknown (No DNS)", "Unknown (No DNS)"
+
         if 'google' in fqdn or 'gmail' in fqdn or 'ytimg' in fqdn or 'youtube' in fqdn or "gstatic.com" in fqdn or "ggpht.com" in fqdn or "app-measurement.com" in fqdn or "gvt1.com" in fqdn or "ampproject" in fqdn or "crashlytics.com" in fqdn or "2mdn.net" in fqdn or "doubleclick.net" in fqdn:
             return "Google", self._process_google_category(fqdn)
-        elif 'fbcdn' in fqdn or 'facebook' in fqdn or 'fbsbx' in fqdn or "fb.com" in fqdn or "accountkit.com" in fqdn:
+
+        if 'fbcdn' in fqdn or 'facebook' in fqdn or 'fbsbx' in fqdn or "fb.com" in fqdn or "accountkit.com" in fqdn:
             return "Facebook", self._process_facebook_category(fqdn)
 
         if 'whatsapp' in fqdn:
             return "WhatsApp", "Messaging"
 
         if 'twimg' in fqdn or 'twitter' in fqdn:
-            return "twitter", "Messaging"
+            return "Twitter", "Messaging"
 
         if 'instagram' in fqdn:
             return "Instagram", "Non-video Content"
@@ -189,7 +193,9 @@ class FqdnProcessor(object):
             return "Akamai", "Mixed CDN"
 
         if 'amazonaws' in fqdn or 'aws.com' in fqdn:
-            return "amazon_web_services", "IAAS"
+            return "Amazon Web Services", "IAAS"
+        elif 'amazon' in fqdn:
+            return "Amazon", "Shopping"
 
         if 'cloudfront' in fqdn:
             return "Cloudfront", "Mixed CDN"
@@ -198,7 +204,7 @@ class FqdnProcessor(object):
             return "Cloudflare", "Mixed CDN"
 
         if "livestream818.com" in fqdn:
-            return "Religious", "Video"
+            return "818 Religious Conference", "Video"
 
         if "network.bokondini" in fqdn:
             return "Local Services", "Shopping"
@@ -257,16 +263,19 @@ class FqdnProcessor(object):
             return "Samsung", "Software or Updates"
 
         if "windowsupdate.com" in fqdn:
-            return "Microsoft", "Software or Updates"
+            return "Microsoft (non-azure)", "Software or Updates"
 
         if "dl.delivery.mp.microsoft.com" in fqdn:
-            return "Microsoft", "Software or Updates"
+            return "Microsoft (non-azure)", "Software or Updates"
 
         if "officecdn.microsoft.com.edgesuite.net" in fqdn:
-            return "Microsoft", "Software or Updates"
+            return "Microsoft (non-azure)", "Software or Updates"
 
         if "download.microsoft.com" in fqdn:
-            return "Microsoft", "Software or Updates"
+            return "Microsoft (non-azure)", "Software or Updates"
+
+        if "azure" in fqdn:
+            return "Azure (Microsoft)", "IAAS"
 
         if "tokopedia.net" in fqdn:
             return "Tokopedia", "Shopping"
@@ -487,4 +496,4 @@ class FqdnProcessor(object):
         if "blogspot.com" in fqdn:
             return "Blogspot", "Non-video Content"
 
-        return "Other", "Other"
+        return "Unknown (Not Mapped)", "Unknown (Not Mapped)"

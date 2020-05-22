@@ -101,8 +101,8 @@ def make_category_plot(infile):
                 title="Total Traffic Per Week(GB)",
                 ),
         # shape="direction",
-        color="name",
-        detail="name",
+        color="category",
+        detail="category",
     ).properties(
         # title="Local Service Use",
         width=500,
@@ -126,6 +126,11 @@ def make_org_plot(infile):
     print(grouped_flows)
     print(grouped_flows["org"].unique())
 
+    test = grouped_flows.groupby(["org"]).sum()
+    pd.set_option('display.max_rows', None)
+    print(test.sort_values("bytes_total").tail(200))
+    pd.set_option('display.max_rows', 30)
+
     grouped_flows["GB"] = grouped_flows["bytes_total"] / (1000**3)
     alt.Chart(grouped_flows).mark_area().encode(
         x=alt.X("start_bin:T",
@@ -137,8 +142,8 @@ def make_org_plot(infile):
                 stack="normalize",
                 ),
         # shape="direction",
-        color="category",
-        detail="category",
+        color="org",
+        detail="org",
     ).properties(
         # title="Local Service Use",
         width=500,
@@ -157,8 +162,8 @@ def make_org_plot(infile):
                 title="Total Traffic Per Week(GB)",
                 ),
         # shape="direction",
-        color="name",
-        detail="name",
+        color="org",
+        detail="org",
     ).properties(
         # title="Local Service Use",
         width=500,
@@ -172,7 +177,8 @@ def make_org_plot(infile):
 if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
     graph_temporary_file = "scratch/graphs/bytes_per_category"
-    # rerun_categorization("data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start",
-    #                      "data/clean/flows/typical_fqdn_category2_local_TM_DIV_none_INDEX_start")
+    rerun_categorization("data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start",
+                         "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
     reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
     # chart = make_category_plot(graph_temporary_file)
+    # chart = make_org_plot(graph_temporary_file)
