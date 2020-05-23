@@ -24,8 +24,8 @@ GOOGLE_REGEXES = {
     r'^.*ytimg.*$': "Video",
     r'^.*youtube.*$': "Video",
     r'^clients.*\.google\..*$': "Authentication",
-    r'^.*gstatic\.com': "Static",
-    # r'^connectivitycheck\.gstatic\.com$': "Device Services",
+    r'^(?:(?!connectivitycheck).)*gstatic\.com': "Non-video Content",  # Static
+    r'^connectivitycheck\.gstatic\.com$': "Device Services",
     # r'^fonts\.gstatic\.com': "Static",
     r'^(?:(?!yt).)*ggpht\.com$': "Non-video Content",  # HTTPS everywhere lists it as related to google code and google user content.
     r'^yt.*\.ggpht\.com$': "Video",  # Youtube image proxy
@@ -43,7 +43,7 @@ GOOGLE_REGEXES = {
     r'^clientservices\.googleapis\.com$': "API",
     r'^voledevice-pa\.googleapis\.com$': "API",
     r'^backup\.googleapis\.com$': "Files",  # User device backup...
-    r'^.*translate.*\.com$': "Translation",  # Some at google apis, some at google.com
+    r'^.*translate.*\.com$': "API",  # Some at google apis, some at google.com
     r'^chromefeedcontentsuggestions-pa.googleapis.com$': "API",
     r'^mail\.google\.com$': "Messaging",
     r'^inbox\.google\.com$': "Messaging",
@@ -82,8 +82,8 @@ GOOGLE_REGEXES = {
 
 FACEBOOK_REGEXES = {
     r'^.*video.*\.fbcdn\.net$': "Video",
-    r'^static.*\.fbcdn\.net$': "Static",
-    r'^static.*\.facebook\.com$': "Static",
+    r'^static.*\.fbcdn\.net$': "Non-video Content",  # Static
+    r'^static.*\.facebook\.com$': "Non-video Content",  # Static
     r'^.*scontent.*\.fbcdn\.net$': "Non-video Content",
     r'^lookaside.*\.facebook\.com$': "Non-video Content",
     r'^platform-lookaside.*\.fbsbx\.com$': "Non-video Content",
@@ -120,9 +120,11 @@ FACEBOOK_REGEXES = {
     r'^.*upload.*\.facebook\.com$': "Content Upload",
     # r'^fblive-upload\.facebook\.com': "Content Upload",
     # r'^rupload.facebook.com$': "Content Upload",
-    r'^z-m-static.*\.fbcdn\.net$': "Static",
+    r'^z-m-static.*\.fbcdn\.net$': "Non-video Content",  # static
     r'^z-m-external.*\.fbcdn\.net$': "Mixed CDN",
     r'^fbsbx\.com$': "Mixed CDN",
+    r'^edge-stun.*\.facebook\.com$': "Messaging",
+    r'^stun.*\.facebook\.com$': "Messaging",
 }
 
 
