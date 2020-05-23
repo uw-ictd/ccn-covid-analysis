@@ -41,9 +41,6 @@ def _categorize_user(in_path, out_path):
         "ICE (STUN/TURN)",
     )
 
-    # Third pass to track stun state and otherwise unknown peer IPs
-    frame = dask.delayed(_augment_user_flows_with_stun_state)(frame)
-
     # Lastly assign local by IP type
     frame["local"] = frame.apply(
         lambda row: _annotate_local(row["dest_ip"]),
@@ -53,12 +50,12 @@ def _categorize_user(in_path, out_path):
     return bok.dask_infra.clean_write_parquet(frame, out_path, compute=False)
 
 
-def _augment_user_flows_with_stun_state(flow_frame):
+def _augment_user_flows_with_stun_state(in_path, out_path):
     """Iterate over the flows and track STUN/TURN state for the user
 
     Will not be correct unless the flow is indexed by time
     """
-
+    flow_frame = bok.dask_infra.read_parquet(in_path)
     # Bookeeping for building a new frame
     max_rows_per_division = 10000
     out_chunk = list()
@@ -118,7 +115,8 @@ def _augment_user_flows_with_stun_state(flow_frame):
     out_frame = out_frame.set_index("start").repartition(partition_size="64M",
                                                          force=True)
     out_frame = out_frame.categorize(columns=["fqdn_source", "org", "category"])
-    return out_frame
+
+    return bok.dask_infra.clean_write_parquet(out_frame, out_path, compute=False)
 
 
 def augment_all_user_flows(in_parent_directory, out_parent_directory, client):
@@ -132,10 +130,29 @@ def augment_all_user_flows(in_parent_directory, out_parent_directory, client):
         compute_token = _categorize_user(in_user_directory, out_user_directory)
         tokens.append(compute_token)
 
-    print("Starting computation")
+    print("Starting dask direct annotation computation")
     client.compute(tokens, sync=True)
-
     print("Completed category augmentation")
+
+
+def stun_augment_all_user_flows(in_parent_directory, out_parent_directory, client):
+    users_in_flow_log = sorted(os.listdir(in_parent_directory))
+    tokens = []
+    for user in users_in_flow_log:
+        print("Doing STUN state tracking for user:", user)
+        in_user_directory = os.path.join(in_parent_directory, user)
+        out_user_directory = os.path.join(out_parent_directory, user)
+
+        compute_token = dask.delayed(_augment_user_flows_with_stun_state)(in_user_directory, out_user_directory)
+        tokens.append(compute_token)
+
+    print("Starting dask direct annotation computation")
+    write_tokens = client.compute(tokens, sync=True)
+
+    print("Writing all dataframes")
+    client.compute(write_tokens, sync=True)
+
+    print("Completed STUN augmentation")
 
 
 def _annotate_local(address):
@@ -172,10 +189,12 @@ if __name__ == "__main__":
 
     in_parent_directory = "scratch/flows/typical_fqdn_TM_DIV_user_INDEX_start/"
     annotated_parent_directory = "scratch/flows/typical_fqdn_category_org_local_TM_DIV_user_INDEX_start"
+    stun_annotated_parent_directory = "scratch/flows/typical_fqdn_category_stun_org_local_TM_DIV_user_INDEX_start"
     merged_out_directory = "scratch/flows/typical_fqdn_category_org_local_TM_DIV_none_INDEX_start"
 
     augment_all_user_flows(in_parent_directory, annotated_parent_directory, client)
-    merge_parquet_frames(annotated_parent_directory, merged_out_directory)
+    stun_augment_all_user_flows(annotated_parent_directory, stun_annotated_parent_directory)
+    merge_parquet_frames(stun_annotated_parent_directory, merged_out_directory)
 
     client.close()
     print("Exited")
