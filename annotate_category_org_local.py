@@ -84,7 +84,8 @@ def _augment_user_flows_with_stun_state(in_path, out_path):
             # See if this flow is actually a stun flow
             for stun_flow in stun_state:
                 if flow.user_port == stun_flow.user_port:
-                    if flow.category == "Unknown (No DNS)":
+                    if ((flow.category == "Unknown (No DNS)") or
+                            (flow.category == "Unknown (Not Mapped)")):
                         augmented_flow["category"] = "Peer to Peer"
                     elif "emome-ip.hinet.net" in flow.fqdn:
                         # These appear to be generic dns records for users
@@ -122,7 +123,7 @@ def _augment_user_flows_with_stun_state(in_path, out_path):
         print("User has no flows")
         print(in_path)
         print(len(flow_frame))
-        raise RuntimeError("PANIC!!!!")
+        raise RuntimeError("PANIC!!!! {} {} {}".format("User has no flows", in_path, len(flow_frame)))
 
     out_frame = out_frame.rename(columns={"Index": "start"})
     out_frame = out_frame.set_index("start").repartition(partition_size="64M",
@@ -159,7 +160,7 @@ def stun_augment_all_user_flows(in_parent_directory, out_parent_directory, clien
         compute_token = dask.delayed(_augment_user_flows_with_stun_state)(in_user_directory, out_user_directory)
         tokens.append(compute_token)
 
-    print("Starting dask direct annotation computation")
+    print("Starting dask stun computation")
     write_tokens = client.compute(tokens, sync=True)
 
     print("Writing all dataframes")
