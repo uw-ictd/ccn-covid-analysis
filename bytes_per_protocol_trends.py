@@ -105,6 +105,8 @@ def _assign_protocol_plain_name(proto, port):
             return "HTTPS"
         if port == 993:
             return "IMAP"
+        if port == 5349:
+            return "STUN/TURN TLS"
         return "Other TCP"
     elif proto == 17:
         if port == 53:
@@ -118,7 +120,7 @@ def _assign_protocol_plain_name(proto, port):
         if port == 443:
             return "HTTP/3 (QUIC)"
         if port == 3478:
-            return "STUN"
+            return "STUN/TURN"
         return "Other UDP"
 
     return "Other"
