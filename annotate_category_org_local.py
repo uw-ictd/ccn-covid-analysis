@@ -123,14 +123,14 @@ def augment_all_user_flows(in_parent_directory, out_parent_directory, client):
     users_in_flow_log = sorted(os.listdir(in_parent_directory))
     tokens = []
     for user in users_in_flow_log:
-        print("Doing STUN state tracking for user:", user)
+        print("Doing category augmentation for user:", user)
         in_user_directory = os.path.join(in_parent_directory, user)
         out_user_directory = os.path.join(out_parent_directory, user)
 
         compute_token = _categorize_user(in_user_directory, out_user_directory)
         tokens.append(compute_token)
 
-    print("Starting dask direct annotation computation")
+    print("Starting dask category augmentation computation")
     client.compute(tokens, sync=True)
     print("Completed category augmentation")
 
@@ -192,8 +192,8 @@ if __name__ == "__main__":
     stun_annotated_parent_directory = "scratch/flows/typical_fqdn_category_stun_org_local_TM_DIV_user_INDEX_start"
     merged_out_directory = "scratch/flows/typical_fqdn_category_org_local_TM_DIV_none_INDEX_start"
 
-    augment_all_user_flows(in_parent_directory, annotated_parent_directory, client)
-    stun_augment_all_user_flows(annotated_parent_directory, stun_annotated_parent_directory)
+    # augment_all_user_flows(in_parent_directory, annotated_parent_directory, client)
+    stun_augment_all_user_flows(annotated_parent_directory, stun_annotated_parent_directory, client)
     merge_parquet_frames(stun_annotated_parent_directory, merged_out_directory)
 
     client.close()
