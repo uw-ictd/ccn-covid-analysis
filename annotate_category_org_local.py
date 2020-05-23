@@ -139,7 +139,7 @@ def augment_all_user_flows(in_parent_directory, out_parent_directory, client):
         tokens.append(compute_token)
 
     print("Starting computation")
-    client.compute(tokens)
+    client.compute(tokens, sync=True)
 
     print("Completed category augmentation")
 
