@@ -2,6 +2,7 @@ import datetime
 import pandas as pd
 import dask.dataframe
 import dask.distributed
+import dask.delayed
 import ipaddress
 import os
 
@@ -41,12 +42,7 @@ def _categorize_user(in_path, out_path):
     )
 
     # Third pass to track stun state and otherwise unknown peer IPs
-    # TODO(matt9j) Check the column types are preserved
-    print("Frame before annotation")
-    print(frame)
-    frame = _augment_user_flows_with_stun_state(frame)
-    print("Frame after annotation")
-    print(frame)
+    frame = dask.delayed(_augment_user_flows_with_stun_state)(frame)
 
     # Lastly assign local by IP type
     frame["local"] = frame.apply(
@@ -74,9 +70,6 @@ def _augment_user_flows_with_stun_state(flow_frame):
     # time increases the chance of incidental reuse of the port on the client.
     expiry_threshold = datetime.timedelta(minutes=5)
     for i, flow in enumerate(flow_frame.itertuples()):
-        if i % 10000 == 0:
-            print("Processed flow", i)
-
         flow_start_time = flow.Index
         augmented_flow = flow._asdict()
 
@@ -97,6 +90,7 @@ def _augment_user_flows_with_stun_state(flow_frame):
                     if ((flow.category != "Unknown (No DNS)") and
                             (flow.category != "Unknown (Not Mapped)")):
                         print("Overwriting category", flow.category)
+                        print("Flow fqdn", flow.fqdn)
                     augmented_flow["category"] = "Peer to Peer"
 
         out_chunk.append(augmented_flow)
