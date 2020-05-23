@@ -84,11 +84,18 @@ def _augment_user_flows_with_stun_state(in_path, out_path):
             # See if this flow is actually a stun flow
             for stun_flow in stun_state:
                 if flow.user_port == stun_flow.user_port:
-                    if ((flow.category != "Unknown (No DNS)") and
-                            (flow.category != "Unknown (Not Mapped)")):
-                        print("Overwriting category", flow.category)
-                        print("Flow fqdn", flow.fqdn)
-                    augmented_flow["category"] = "Peer to Peer"
+                    if flow.category == "Unknown (No DNS)":
+                        augmented_flow["category"] = "Peer to Peer"
+                    elif "emome-ip.hinet.net" in flow.fqdn:
+                        # These appear to be generic dns records for users
+                        # within Chunghwa Telecom (in Taiwan)
+                        augmented_flow["category"] = "Peer to Peer"
+                    elif "turnservice" in flow.fqdn:
+                        augmented_flow["category"] = "Messaging"
+                    else:
+                        # There is a bit of noise from port reuse.
+                        print("Not overriding existing category", flow.category)
+                        print(flow.fqdn)
 
         out_chunk.append(augmented_flow)
         if len(out_chunk) >= max_rows_per_division:
@@ -110,6 +117,12 @@ def _augment_user_flows_with_stun_state(in_path, out_path):
             out_frame = new_frame
         else:
             out_frame = out_frame.append(new_frame)
+
+    if out_frame is None:
+        print("User has no flows")
+        print(in_path)
+        print(len(flow_frame))
+        raise RuntimeError("PANIC!!!!")
 
     out_frame = out_frame.rename(columns={"Index": "start"})
     out_frame = out_frame.set_index("start").repartition(partition_size="64M",
