@@ -40,16 +40,20 @@ def rerun_categorization(in_path, out_path):
 
 def reduce_to_pandas(outfile, dask_client):
     flows = bok.dask_infra.read_parquet(
-        "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["category", "org", "bytes_up", "bytes_down"]]
+        "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["category", "org", "bytes_up", "bytes_down", "protocol", "dest_port"]]
 
     # Compress to days
     flows = flows.reset_index()
     flows["start_bin"] = flows["start"].dt.floor("d")
     flows = flows.set_index("start_bin")
 
-    # Groupby will drop None category values, so manually reassign to other
-    flows["category"] = flows["category"].fillna("No DNS")
-    flows["org"] = flows["org"].fillna("No DNS")
+    # Explore STUN Traffic
+    stun = flows.loc[flows["protocol"] == 17 & flows["dest_port"] == 3478]
+    stun = stun[["category", "bytes_up", "bytes_down", "org"]].groupby(["category", "org"]).sum()
+
+    pd.set_option("display.max_rows", 200)
+    print(stun.head(200))
+    pd.reset_option("display.max_rows")
 
     # Do the grouping
     flows = flows.groupby(["start_bin", "category", "org"]).sum()
@@ -318,8 +322,8 @@ if __name__ == "__main__":
     graph_temporary_file = "scratch/graphs/bytes_per_category"
     # rerun_categorization("data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start",
     #                      "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
-    # reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
-    make_category_plot(graph_temporary_file)
-    make_org_plot(graph_temporary_file)
-    compute_stats(graph_temporary_file, "org")
-    compute_stats(graph_temporary_file, "category")
+    reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
+    # make_category_plot(graph_temporary_file)
+    # make_org_plot(graph_temporary_file)
+    # compute_stats(graph_temporary_file, "org")
+    # compute_stats(graph_temporary_file, "category")
