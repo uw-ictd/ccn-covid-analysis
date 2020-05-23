@@ -6,6 +6,7 @@ import ipaddress
 import os
 
 import bok.dask_infra
+import bok.domains
 
 
 def _categorize_user(in_path, out_path):
