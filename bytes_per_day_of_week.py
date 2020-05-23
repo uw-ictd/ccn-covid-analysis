@@ -7,11 +7,11 @@ import pandas as pd
 
 def create_all_flows(dask_client):
     typical_flows = bok.dask_infra.read_parquet(
-        "data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start")[["protocol", "bytes_up", "bytes_down"]]
+        "data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start")[["end", "protocol", "bytes_up", "bytes_down"]]
 
-    p2p_flows = bok.dask_infra.read_parquet("data/clean/flows/p2p_TM_DIV_none_INDEX_start")[["protocol", "bytes_a_to_b", "bytes_b_to_a"]]
+    p2p_flows = bok.dask_infra.read_parquet("data/clean/flows/p2p_TM_DIV_none_INDEX_start")[["end", "protocol", "bytes_a_to_b", "bytes_b_to_a"]]
 
-    nouser_flows = bok.dask_infra.read_parquet("data/clean/flows/nouser_TM_DIV_none_INDEX_start")[["protocol", "bytes_a_to_b", "bytes_b_to_a"]]
+    nouser_flows = bok.dask_infra.read_parquet("data/clean/flows/nouser_TM_DIV_none_INDEX_start")[["end", "protocol", "bytes_a_to_b", "bytes_b_to_a"]]
 
     typical_flows["bytes_total"] = typical_flows["bytes_up"] + typical_flows["bytes_down"]
     p2p_flows["bytes_total"] = p2p_flows["bytes_a_to_b"] + p2p_flows["bytes_b_to_a"]
