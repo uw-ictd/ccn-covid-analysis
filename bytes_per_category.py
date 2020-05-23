@@ -10,34 +10,6 @@ import bok.domains
 import bok.pd_infra
 
 
-def rerun_categorization(in_path, out_path):
-    """Run categorization over the input parquet file and write to the output
-
-    Requires the input parquet file specify an `fqdn` column
-    """
-    frame = bok.dask_infra.read_parquet(in_path)
-    processor = bok.domains.FqdnProcessor()
-
-    frame["org_category"] = frame.apply(
-        lambda row: processor.process_fqdn(row["fqdn"]),
-        axis="columns",
-        meta=("org_category", object))
-
-    frame["org"] = frame.apply(
-        lambda row: row["org_category"][0],
-        axis="columns",
-        meta=("org", object))
-
-    frame["category"] = frame.apply(
-        lambda row: row["org_category"][1],
-        axis="columns",
-        meta=("category", object))
-
-    frame = frame.drop("org_category", axis=1)
-
-    return bok.dask_infra.clean_write_parquet(frame, out_path)
-
-
 def reduce_to_pandas(outfile, dask_client):
     flows = bok.dask_infra.read_parquet(
         "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["category", "org", "bytes_up", "bytes_down", "protocol", "dest_port"]]
@@ -320,8 +292,6 @@ def make_org_plot(infile):
 if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
     graph_temporary_file = "scratch/graphs/bytes_per_category"
-    # rerun_categorization("data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start",
-    #                      "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
     reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
     # make_category_plot(graph_temporary_file)
     # make_org_plot(graph_temporary_file)
