@@ -123,7 +123,7 @@ def _augment_user_flows_with_stun_state(flow_frame):
     out_frame = out_frame.rename(columns={"Index": "start"})
     out_frame = out_frame.set_index("start").repartition(partition_size="64M",
                                                          force=True)
-    out_frame = out_frame.categorize(columns=["fqdn_source", "category"])
+    out_frame = out_frame.categorize(columns=["fqdn_source", "org", "category"])
     return out_frame
 
 
