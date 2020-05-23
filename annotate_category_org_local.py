@@ -35,7 +35,10 @@ def _categorize_user(in_path, out_path):
     frame = frame.drop("org_category", axis=1)
 
     # Second pass assign by specialized protocols
-    frame.loc[((frame["protocol"] == 17) & (frame["dest_port"] == 3478)), "category"] = "ICE (STUN/TURN)"
+    frame["category"] = frame["category"].mask(
+        ((frame["protocol"] == 17) & (frame["dest_port"] == 3478)),
+        "ICE (STUN/TURN)",
+    )
 
     # Third pass to track stun state and otherwise unknown peer IPs
     # TODO(matt9j) Check the column types are preserved
