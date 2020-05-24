@@ -13,7 +13,9 @@ def reduce_to_pandas(outfile, dask_client):
     flows["hour"] = flows["start"].dt.hour
     flows = flows.set_index("day_bin")
 
-    # Do the grouping
+    # Do a two level grouping to eliminate duplicate entries for each user flow.
+    flows = flows.groupby(["day_bin", "hour", "user"]).sum()
+    flows = flows.reset_index()
     flows = flows.groupby(["day_bin", "hour"]).count()
 
     flows = flows.compute()
@@ -25,9 +27,9 @@ def make_plot(infile):
     grouped_flows = bok.pd_infra.read_parquet(infile)
     grouped_flows = grouped_flows.reset_index()
 
-    working_times = grouped_flows.loc[(grouped_flows["start_bin"] < "2019-07-30") | (grouped_flows["start_bin"] > "2019-08-31")]
+    working_times = grouped_flows.loc[(grouped_flows["day_bin"] < "2019-07-30") | (grouped_flows["day_bin"] > "2019-08-31")]
     grouped_flows["outage"] = "Outage"
-    grouped_flows.loc[(grouped_flows["start_bin"] < "2019-07-30") | (grouped_flows["start_bin"] > "2019-08-31"), "outage"] = "Normal"
+    grouped_flows.loc[(grouped_flows["day_bin"] < "2019-07-30") | (grouped_flows["day_bin"] > "2019-08-31"), "outage"] = "Normal"
 
     alt.Chart(working_times).mark_boxplot().encode(
         x=alt.X('hour:O',
@@ -62,16 +64,16 @@ def make_plot(infile):
     aggregate = aggregate.reset_index()
     aggregate.columns = [' '.join(col).strip() for col in aggregate.columns.values]
     aggregate = aggregate.rename(
-        columns={"GB mean": "Mean",
-                 "GB <lambda_0>": "90th Percentile",
-                 "GB <lambda_1>": "99th Percentile",
+        columns={"user mean": "Mean",
+                 "user <lambda_0>": "90th Percentile",
+                 "user <lambda_1>": "99th Percentile",
                  })
 
     aggregate = aggregate.melt(
         id_vars=["hour"],
         value_vars=["Mean", "90th Percentile", "99th Percentile"],
         var_name="type",
-        value_name="GB"
+        value_name="user"
     )
 
     print(aggregate)
@@ -110,10 +112,7 @@ def make_plot(infile):
     ).resolve_scale(
         color='independent',
         shape='independent'
-    ).save(
-        "renders/users_per_time_of_day_lines.png",
-        scale_factor=2,
-    )
+    ).show()
 
 
 if __name__ == "__main__":
