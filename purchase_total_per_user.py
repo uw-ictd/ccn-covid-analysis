@@ -41,7 +41,7 @@ print(stats_frame)
 stats_frame = stats_frame.reset_index()
 alt.Chart(stats_frame).mark_line().encode(
     x=alt.X('amount_USD:Q',
-            scale=alt.Scale(type="log"),
+            scale=alt.Scale(type="linear"),
             title="Total Amount Purchased (USD)"
             ),
     y=alt.Y('cdf',
