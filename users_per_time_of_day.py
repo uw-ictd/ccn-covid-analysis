@@ -5,7 +5,7 @@ import bok.pd_infra
 
 def reduce_to_pandas(outfile, dask_client):
     flows = bok.dask_infra.read_parquet(
-        "data/clean/flows/typical_fqdn_category_org_local_TM_DIV_none_INDEX_start")[["user"]]
+        "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["user"]]
 
     # Compress to days
     flows = flows.reset_index()
@@ -45,7 +45,7 @@ def make_plot(infile):
         x=alt.X('hour:O',
                 title="Hour of the Day"
                 ),
-        y=alt.Y('GB:Q',
+        y=alt.Y('user:Q',
                 title="Active User Count"
                 ),
         color=alt.Color(
@@ -54,6 +54,64 @@ def make_plot(infile):
         )
     ).save(
         "renders/users_per_time_of_day_overplot.png",
+        scale_factor=2,
+    )
+
+    aggregate = working_times.groupby(["hour"]).agg({"user": ["mean", lambda x: x.quantile(0.90), lambda x: x.quantile(0.99)]})
+    # Flatten column names
+    aggregate = aggregate.reset_index()
+    aggregate.columns = [' '.join(col).strip() for col in aggregate.columns.values]
+    aggregate = aggregate.rename(
+        columns={"GB mean": "Mean",
+                 "GB <lambda_0>": "90th Percentile",
+                 "GB <lambda_1>": "99th Percentile",
+                 })
+
+    aggregate = aggregate.melt(
+        id_vars=["hour"],
+        value_vars=["Mean", "90th Percentile", "99th Percentile"],
+        var_name="type",
+        value_name="GB"
+    )
+
+    print(aggregate)
+    # Create a hybrid chart to fix legend issue with line chart and shape
+    lines = alt.Chart(aggregate).mark_line().encode(
+        x=alt.X('hour:O',
+                title="Hour of the Day"
+                ),
+        y=alt.Y('user:Q',
+                title="Active User Count"
+                ),
+        color=alt.Color(
+            "type",
+            legend=None,
+        ),
+    )
+
+    points = alt.Chart(aggregate).mark_point(size=100).encode(
+        x=alt.X('hour:O',
+                title="Hour of the Day"
+                ),
+        y=alt.Y('user:Q',
+                title="Active User Count"
+                ),
+        color=alt.Color(
+            "type",
+        ),
+        shape=alt.Shape(
+            "type",
+            title=""
+        ),
+    )
+
+    alt.layer(
+        points, lines
+    ).resolve_scale(
+        color='independent',
+        shape='independent'
+    ).save(
+        "renders/users_per_time_of_day_lines.png",
         scale_factor=2,
     )
 
