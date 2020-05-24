@@ -26,13 +26,9 @@ def make_plot(infile):
     grouped_flows = grouped_flows.reset_index()
 
     grouped_flows["GB"] = grouped_flows["bytes_total"] / (1000**3)
-    working_times = grouped_flows.loc[(grouped_flows["start_bin"] < "2019-07-30") | (grouped_flows["start_bin"] > "2019-08-31")]
+    working_times = grouped_flows.loc[(grouped_flows["day_bin"] < "2019-07-30") | (grouped_flows["day_bin"] > "2019-08-31")]
     grouped_flows["outage"] = "Outage"
-    grouped_flows.loc[(grouped_flows["start_bin"] < "2019-07-30") | (grouped_flows["start_bin"] > "2019-08-31"), "outage"] = "Normal"
-    print(grouped_flows)
-
-    outages = grouped_flows.loc[grouped_flows["GB"] < 0.9]
-    print(outages)
+    grouped_flows.loc[(grouped_flows["day_bin"] < "2019-07-30") | (grouped_flows["day_bin"] > "2019-08-31"), "outage"] = "Normal"
 
     alt.Chart(working_times).mark_boxplot().encode(
         x=alt.X('hour:O',
@@ -62,9 +58,67 @@ def make_plot(infile):
         scale_factor=2,
     )
 
+    aggregate = working_times.groupby(["hour"]).agg({"GB": ["mean", lambda x: x.quantile(0.90), lambda x: x.quantile(0.99)]})
+    # Flatten column names
+    aggregate = aggregate.reset_index()
+    aggregate.columns = [' '.join(col).strip() for col in aggregate.columns.values]
+    aggregate = aggregate.rename(
+        columns={"GB mean": "Mean",
+                 "GB <lambda_0>": "90th Percentile",
+                 "GB <lambda_1>": "99th Percentile",
+                 })
+
+    aggregate = aggregate.melt(
+        id_vars=["hour"],
+        value_vars=["Mean", "90th Percentile", "99th Percentile"],
+        var_name="type",
+        value_name="GB"
+    )
+
+    print(aggregate)
+    # Create a hybrid chart to fix legend issue with line chart and shape
+    lines = alt.Chart(aggregate).mark_line().encode(
+        x=alt.X('hour:O',
+                title="Hour of the Day"
+                ),
+        y=alt.Y('GB:Q',
+                title="GB Per Hour"
+                ),
+        color=alt.Color(
+            "type",
+            legend=None,
+        ),
+    )
+
+    points = alt.Chart(aggregate).mark_point(size=100).encode(
+        x=alt.X('hour:O',
+                title="Hour of the Day"
+                ),
+        y=alt.Y('GB:Q',
+                title="GB Per Hour"
+                ),
+        color=alt.Color(
+            "type",
+        ),
+        shape=alt.Shape(
+            "type",
+            title=""
+        ),
+    )
+
+    alt.layer(
+        points, lines
+    ).resolve_scale(
+        color='independent',
+        shape='independent'
+    ).save(
+        "renders/bytes_per_time_of_day_lines.png",
+        scale_factor=2,
+    )
+
 
 if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
     graph_temporary_file = "scratch/graphs/bytes_per_time_of_day"
-    reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
+    # reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
     make_plot(infile=graph_temporary_file)
