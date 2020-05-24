@@ -7,6 +7,7 @@ import pandas as pd
 
 import bok.constants
 import bok.dask_infra
+import bok.pd_infra
 
 
 # Module specific format options
@@ -22,15 +23,13 @@ def make_rate_chart():
     purchases = transactions.loc[transactions["kind"] == "purchase"]
 
     # Find the first day the user was active. Define "active" as making first
-    # purchase.
-    active_dates = purchases.sort_values("timestamp").groupby("user").first().reset_index()[["user", "timestamp"]]
-    active_dates["delta_since_first_purchase"] = (bok.constants.MAX_DATE -
-                                                  active_dates["timestamp"])
+    # purchase or first data in network.
+    user_active_ranges = bok.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")[["user", "days_since_first_active", "days_active"]]
 
     # Drop users that have been active less than a week.
-    users_to_analyze = active_dates.loc[
-        active_dates["delta_since_first_purchase"] >= datetime.timedelta(weeks=1)
-        ][["user", "delta_since_first_purchase"]]
+    users_to_analyze = user_active_ranges.loc[
+        user_active_ranges["days_since_first_active"] >= 7
+        ]
 
     aggregated_purchases = purchases.groupby(
         "user"
@@ -45,23 +44,38 @@ def make_rate_chart():
                                                       how="inner")
     # Compute USD/Day
     aggregated_purchases["USD_per_day"] = (
-            aggregated_purchases["amount_USD"] * 86400 / # (seconds/day)
-            aggregated_purchases["delta_since_first_purchase"].dt.total_seconds()
+            aggregated_purchases["amount_USD"] /
+            aggregated_purchases["days_since_first_active"]
     )
 
-    # Drop un-needed columns since altair cannot handle timedelta types.
-    aggregated_purchases = aggregated_purchases[["user", "USD_per_day"]]
+    # # Drop un-needed columns since altair cannot handle timedelta types.
+    # aggregated_purchases = aggregated_purchases[["user", "USD_per_day", "days_active"]]
     print(aggregated_purchases)
 
-    alt.Chart(aggregated_purchases).mark_bar().encode(
+    alt.Chart(aggregated_purchases).mark_circle(opacity=0.7).encode(
         x=alt.X('user',
-                sort=alt.SortField(field="amount_bytes",
+                sort=alt.SortField(field="amount_USD",
                                    order="descending"
                                    ),
+                axis=alt.Axis(labels=False),
+                title="User (Ordered by Total USD)"
                 ),
         y=alt.Y('USD_per_day',
-                scale=alt.Scale(type="log"),
+                title= "Average Daily Purchase (USD)"
+                #scale=alt.Scale(type="log"),
                 ),
+        color=alt.Color(
+            "days_active:Q",
+            title="Days Active",
+            scale=alt.Scale(scheme="viridis"),
+        ),
+        size=alt.Size(
+            "amount_USD",
+            title="Total (USD)",
+            scale=alt.Scale(domain=[0, 2000], range=[30, 1000]),
+        ),
+    ).properties(
+        width=600,
     ).save("renders/rate_purchase_per_user.png", scale_factor=2.0)
 
     # Compute a CDF since the specific user does not matter
