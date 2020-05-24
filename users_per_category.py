@@ -26,7 +26,6 @@ def make_category_plot(infile):
     grouped_flows = grouped_flows.reset_index()
     grouped_flows["bytes_total"] = grouped_flows["bytes_up"] + grouped_flows["bytes_down"]
 
-    grouped_flows = grouped_flows.reset_index()
     print(grouped_flows)
 
     # Figure out sorting order by total amount.
@@ -71,9 +70,7 @@ def make_org_plot(infile):
 
 if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
-    graph_temporary_file = "scratch/graphs/bytes_per_category"
-    # rerun_categorization("data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start",
-    #                      "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
-    # reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
+    graph_temporary_file = "scratch/graphs/users_per_category"
+    reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
     make_category_plot(graph_temporary_file)
     make_org_plot(graph_temporary_file)
