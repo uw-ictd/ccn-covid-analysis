@@ -55,6 +55,7 @@ def make_category_plot(infile):
         color=alt.Color(
             "logGB:Q",
             title="log(Total GB)",
+            scale=alt.Scale(scheme="viridis"),
         ),
     ).properties(
         width=500,
@@ -85,11 +86,73 @@ def make_category_plot(infile):
         color=alt.Color(
             "normalized_bytes:Q",
             title="Normalized (Per User) Traffic",
+            scale=alt.Scale(scheme="viridis"),
         ),
     ).properties(
         width=500,
     ).save(
         "renders/users_per_category_normalized.png",
+        scale_factor=2,
+    )
+
+
+def make_category_plot_separate_top_n(infile, n_to_separate=20):
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.max_rows', None)
+    pd.set_option('display.width', None)
+    grouped_flows = bok.pd_infra.read_parquet(infile)
+    grouped_flows = grouped_flows.reset_index()
+    grouped_flows["bytes_total"] = grouped_flows["bytes_up"] + grouped_flows["bytes_down"]
+
+    # Figure out sorting order by total amount.
+    cat_totals = grouped_flows.groupby("category").sum().reset_index()
+    cat_sort_order = cat_totals.sort_values("bytes_total", ascending=False).set_index("bytes_total").reset_index()
+    cat_sort_list = cat_sort_order["category"].tolist()
+
+    user_totals = grouped_flows.groupby("user").sum().reset_index()
+    user_sort_order = user_totals.sort_values("bytes_total", ascending=False).set_index("bytes_total").reset_index()
+    user_sort_list = user_sort_order["user"].tolist()
+    print("user_sort_list")
+
+    # Generate a frame from the sorted user list that identifies the top users
+    top_annotation_frame = user_sort_order[["user"]]
+    bottom_n = len(user_sort_order) - n_to_separate
+    top_annotation_frame = top_annotation_frame.assign(topN="Bottom {}".format(bottom_n))
+    top_annotation_frame.loc[top_annotation_frame.index < n_to_separate, "topN"] = "Top {}".format(n_to_separate)
+
+    grouped_flows["GB"] = grouped_flows["bytes_total"] / (1000**3)
+    grouped_flows = grouped_flows[["category", "user", "GB"]].groupby(["user", "category"]).sum()
+    grouped_flows = grouped_flows.reset_index()
+    grouped_flows["logGB"] = grouped_flows["GB"].transform(np.log10)
+    grouped_flows = grouped_flows.merge(top_annotation_frame, on="user")
+
+    alt.Chart(grouped_flows).mark_rect().encode(
+        x=alt.X("user:N",
+                title="User (Sorted by Total GB)",
+                axis=alt.Axis(labels=False),
+                sort=user_sort_list,
+                ),
+        y=alt.Y("category:N",
+                title="Category (Sorted by Total GB)",
+                sort=cat_sort_list,
+                ),
+        # shape="direction",
+        color=alt.Color(
+            "GB:Q",
+            title="Total GB",
+            scale=alt.Scale(scheme="viridis"),
+            ),
+    ).facet(
+        column=alt.Column(
+            "topN:N",
+            sort="descending",
+            title="",
+        ),
+    ).resolve_scale(
+        x="independent",
+        color="independent"
+    ).save(
+        "renders/users_per_category_split_outliers.png",
         scale_factor=2,
     )
 
@@ -143,6 +206,7 @@ def make_org_plot(infile):
         color=alt.Color(
             "logGB:Q",
             title="log(Total GB)",
+            scale=alt.Scale(scheme="viridis"),
         ),
     ).properties(
         width=500,
@@ -172,6 +236,7 @@ def make_org_plot(infile):
         color=alt.Color(
             "normalized_bytes:Q",
             title="Normalized (Per User) Traffic",
+            scale=alt.Scale(scheme="viridis"),
         ),
     ).properties(
         width=500,
@@ -181,10 +246,10 @@ def make_org_plot(infile):
     )
 
 
-
 if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
     graph_temporary_file = "scratch/graphs/users_per_category"
     # reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
     # make_category_plot(graph_temporary_file)
-    make_org_plot(graph_temporary_file)
+    # make_org_plot(graph_temporary_file)
+    make_category_plot_separate_top_n(graph_temporary_file)
