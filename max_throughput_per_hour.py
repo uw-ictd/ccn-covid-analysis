@@ -2,6 +2,7 @@
 """
 
 import altair
+import bok.constants
 import bok.dask_infra
 import dask.config
 import dask.dataframe
@@ -18,7 +19,7 @@ seconds_in_day = seconds_in_hour * 24
 hour_intervals = 1
 seconds_intervals = hour_intervals * seconds_in_hour
 # IMPORTANT: Run get_date_range() to update these values when loading in a new dataset!
-max_date = datetime.datetime.strptime('2020-02-13 21:29:54', '%Y-%m-%d %H:%M:%S')
+max_date = bok.constants.MAX_DATE
 
 def date_to_hour_cohort(x):
     diff = max_date - x

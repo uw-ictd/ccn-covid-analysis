@@ -2,6 +2,7 @@
 """
 
 import altair
+import bok.constants
 import dask.config
 import dask.dataframe
 import dask.distributed
@@ -15,7 +16,7 @@ import bok.dask_infra
 # Configs
 day_intervals = 7
 # IMPORTANT: Run get_date_range() to update these values when loading in a new dataset!
-max_date = datetime.datetime.strptime('2020-05-03 00:00:00', '%Y-%m-%d %H:%M:%S')
+max_date = bok.constants.MAX_DATE
 
 def cohort_as_date_interval(x):
     cohort_start = max_date - datetime.timedelta(day_intervals * x + day_intervals - 1)
