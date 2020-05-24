@@ -112,7 +112,10 @@ def make_plot(infile):
     ).resolve_scale(
         color='independent',
         shape='independent'
-    ).show()
+    ).save(
+        "renders/users_per_time_of_day_lines.png",
+        scale_factor=2,
+    )
 
 
 if __name__ == "__main__":
