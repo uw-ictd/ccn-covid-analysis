@@ -201,9 +201,9 @@ if __name__ == "__main__":
     in_parent_directory = "scratch/flows/typical_fqdn_TM_DIV_user_INDEX_start/"
     annotated_parent_directory = "scratch/flows/typical_fqdn_category_org_local_TM_DIV_user_INDEX_start"
     stun_annotated_parent_directory = "scratch/flows/typical_fqdn_category_stun_org_local_TM_DIV_user_INDEX_start"
-    merged_out_directory = "scratch/flows/typical_fqdn_category_org_local_TM_DIV_none_INDEX_start"
+    merged_out_directory = "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
 
-    # augment_all_user_flows(in_parent_directory, annotated_parent_directory, client)
+    augment_all_user_flows(in_parent_directory, annotated_parent_directory, client)
     stun_augment_all_user_flows(annotated_parent_directory, stun_annotated_parent_directory, client)
     merge_parquet_frames(stun_annotated_parent_directory, merged_out_directory)
 
