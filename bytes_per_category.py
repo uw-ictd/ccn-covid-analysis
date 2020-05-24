@@ -156,29 +156,28 @@ def make_category_plot(infile):
         scale_factor=2,
     )
 
+
 def compute_stats(infile, dimension):
     grouped_flows = bok.pd_infra.read_parquet(infile)
     grouped_flows = grouped_flows.reset_index()
     grouped_flows["bytes_total"] = grouped_flows["bytes_up"] + grouped_flows["bytes_down"]
 
-    # Consolidate by org
     flows = grouped_flows[["bytes_total", dimension]].groupby([dimension]).sum()
 
-    # Bytes Mapped per org
-    flows["MB_total"] = flows["bytes_total"] / 1000**2
-    total_megabytes = sum(flows["MB_total"])
-    unknown_dns_megabytes = flows["MB_total"]["Unknown (No DNS)"]
-    unknown_not_mapped_megabytes = flows["MB_total"]["Unknown (Not Mapped)"]
-    amount_mappable = total_megabytes - unknown_dns_megabytes
-    amount_mapped = total_megabytes - unknown_dns_megabytes - unknown_not_mapped_megabytes
+    flows["GB_total"] = flows["bytes_total"] / 1000**3
+    total_gigabytes = sum(flows["GB_total"])
+    unknown_dns_gigabytes = flows["GB_total"]["Unknown (No DNS)"]
+    unknown_not_mapped_gigabytes = flows["GB_total"]["Unknown (Not Mapped)"]
+    amount_mappable = total_gigabytes - unknown_dns_gigabytes
+    amount_mapped = total_gigabytes - unknown_dns_gigabytes - unknown_not_mapped_gigabytes
 
     print("Stats for {}:".format(dimension))
-    print("Total MB:", total_megabytes)
-    print("Total Unknown", unknown_dns_megabytes)
+    print("Total GB:", total_gigabytes)
+    print("Total Unknown", unknown_dns_gigabytes)
     print("Amount Mappable", amount_mappable)
     print("Amount Mapped", amount_mapped)
-    print("Fraction unmappable", unknown_dns_megabytes/total_megabytes)
-    print("Fraction mapped of total", amount_mapped/total_megabytes)
+    print("Fraction unmappable", unknown_dns_gigabytes/total_gigabytes)
+    print("Fraction mapped of total", amount_mapped/total_gigabytes)
     print("Fraction mapped of mappable", amount_mapped/amount_mappable)
 
 
@@ -290,8 +289,8 @@ def make_org_plot(infile):
 if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
     graph_temporary_file = "scratch/graphs/bytes_per_category"
-    reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
-    # make_category_plot(graph_temporary_file)
-    # make_org_plot(graph_temporary_file)
-    # compute_stats(graph_temporary_file, "org")
-    # compute_stats(graph_temporary_file, "category")
+    # reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
+    make_category_plot(graph_temporary_file)
+    make_org_plot(graph_temporary_file)
+    compute_stats(graph_temporary_file, "org")
+    compute_stats(graph_temporary_file, "category")
