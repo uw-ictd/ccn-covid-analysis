@@ -47,53 +47,67 @@ def compute_purchase_range_frame():
 
     # Find the first day the user made a purchase
     first_purchases = purchases.sort_values("timestamp").groupby("user").first().reset_index()[["user", "timestamp"]]
+    first_purchases = first_purchases.rename(columns={"timestamp": "first_purchase"})
     last_purchases = purchases.sort_values("timestamp").groupby("user").last().reset_index()[["user", "timestamp"]]
+    last_purchases = last_purchases.rename(columns={"timestamp": "last_purchase"})
 
     purchase_ranges = first_purchases.merge(last_purchases, on="user")
 
     return purchase_ranges
 
 
-def compute_user_deltas(flow_range_intermediate_file):
+def _choose_earliest(row):
+    if row["start"] < row["first_purchase"]:
+        return row["start"], "Flow"
+    else:
+        return row["first_purchase"], "Purchase"
+
+
+def _choose_latest(row):
+    if row["end"] > row["last_purchase"]:
+        return row["end"], "Flow"
+    else:
+        return row["last_purchase"], "Purchase"
+
+
+def compute_user_deltas(flow_range_intermediate_file, active_delta_out_file):
     flow_ranges = bok.pd_infra.read_parquet(flow_range_intermediate_file)
     purchase_ranges = compute_purchase_range_frame()
-    print(flow_ranges)
-    print(purchase_ranges)
 
+    # Merge on user
+    flow_ranges = flow_ranges.reset_index()
+    user_ranges = flow_ranges.merge(purchase_ranges, on="user")
 
-    active_dates["delta_since_first_purchase"] = (bok.constants.MAX_DATE -
-                                                  active_dates["timestamp"])
+    # Find the earliest and latest recorded points.
+    user_ranges["earliest"] = user_ranges.apply(lambda row: _choose_earliest(row)[0], axis=1)
+    user_ranges["earliest_kind"] = user_ranges.apply(lambda row: _choose_earliest(row)[1], axis=1)
+    user_ranges["latest"] = user_ranges.apply(lambda row: _choose_latest(row)[0], axis=1)
+    user_ranges["latest_kind"] = user_ranges.apply(lambda row: _choose_latest(row)[1], axis=1)
 
-    # Drop users that have been active less than a week.
-    users_to_analyze = active_dates.loc[
-        active_dates["delta_since_first_purchase"] >= datetime.timedelta(weeks=1)
-        ][["user", "delta_since_first_purchase"]]
+    # Actually compute the deltas
+    user_ranges["delta_since_first_active"] = \
+        bok.constants.MAX_DATE - user_ranges["earliest"]
 
-    aggregated_purchases = purchases.groupby(
-        "user"
-    )[["amount_idr", "amount_bytes"]].sum().reset_index()
+    user_ranges["delta_active"] = \
+        user_ranges["latest"] - user_ranges["earliest"]
 
-    aggregated_purchases["amount_GB"] = aggregated_purchases["amount_bytes"] * float(1) / (1000 ** 3)
-    aggregated_purchases["amount_USD"] = aggregated_purchases["amount_idr"] * bok.constants.IDR_TO_USD
+    # Also store deltas as fractional days
+    user_ranges["days_since_first_active"] = \
+        user_ranges["delta_since_first_active"].dt.total_seconds() / float(86400)  # (seconds per day)
 
-    # Merge in the active times
-    aggregated_purchases = aggregated_purchases.merge(users_to_analyze,
-                                                      on="user",
-                                                      how="inner")
-    # Compute USD/Day
-    aggregated_purchases["USD_per_day"] = (
-            aggregated_purchases["amount_USD"] * 86400 / # (seconds/day)
-            aggregated_purchases["delta_since_first_purchase"].dt.total_seconds()
-    )
+    user_ranges["days_active"] = \
+        user_ranges["delta_active"].dt.total_seconds() / float(86400)  # (seconds per day)
 
-    # Drop un-needed columns since altair cannot handle timedelta types.
-    aggregated_purchases = aggregated_purchases[["user", "USD_per_day"]]
-    print(aggregated_purchases)
+    # Drop un-needed intermediate columns
+    user_ranges = user_ranges.drop(["start", "end", "first_purchase", "last_purchase"], axis="columns")
+
+    bok.pd_infra.clean_write_parquet(user_ranges, active_delta_out_file)
 
 
 if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
     flow_source_file = "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
     flow_range_file = "scratch/graphs/user_active_deltas"
+    delta_out_file = "data/clean/user_active_deltas.parquet"
     reduce_flows_to_pandas(flow_source_file, flow_range_file)
-    compute_user_deltas(flow_range_file)
+    compute_user_deltas(flow_range_file, delta_out_file)
