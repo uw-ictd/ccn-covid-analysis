@@ -28,8 +28,13 @@ def make_rate_chart():
 
     # Drop users that have been active less than a week.
     users_to_analyze = user_active_ranges.loc[
-        user_active_ranges["days_since_first_active"] >= 7
+        user_active_ranges["days_since_first_active"] >= 7,
         ]
+
+    # Drop users active for less than one week
+    users_to_analyze = users_to_analyze.loc[
+        users_to_analyze["days_active"] >=7,
+    ]
 
     aggregated_purchases = purchases.groupby(
         "user"
@@ -45,7 +50,7 @@ def make_rate_chart():
     # Compute USD/Day
     aggregated_purchases["USD_per_day"] = (
             aggregated_purchases["amount_USD"] /
-            aggregated_purchases["days_since_first_active"]
+            aggregated_purchases["days_active"]
     )
 
     # # Drop un-needed columns since altair cannot handle timedelta types.
@@ -53,24 +58,24 @@ def make_rate_chart():
     print(aggregated_purchases)
 
     alt.Chart(aggregated_purchases).mark_circle(opacity=0.7).encode(
-        x=alt.X('user',
+        x=alt.X('days_active:Q',
                 sort=alt.SortField(field="amount_USD",
                                    order="descending"
                                    ),
-                axis=alt.Axis(labels=False),
-                title="User (Ordered by Total USD)"
+                axis=alt.Axis(labels=True),
+                title="Days Active"
                 ),
         y=alt.Y('USD_per_day',
                 title= "Average Daily Purchase (USD)"
                 #scale=alt.Scale(type="log"),
                 ),
         color=alt.Color(
-            "days_active:Q",
-            title="Days Active",
+            "amount_USD:Q",
+            title="Total (USD)",
             scale=alt.Scale(scheme="viridis"),
         ),
         size=alt.Size(
-            "amount_USD",
+            "amount_USD:Q",
             title="Total (USD)",
             scale=alt.Scale(domain=[0, 2000], range=[30, 1000]),
         ),
