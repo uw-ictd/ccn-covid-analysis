@@ -2,11 +2,9 @@
 """
 
 import altair as alt
-import numpy as np
 import pandas as pd
 
 import bok.dask_infra
-import bok.domains
 import bok.pd_infra
 
 
@@ -24,7 +22,7 @@ def reduce_to_pandas(outfile, dask_client):
     stun = stun[["category", "bytes_up", "bytes_down", "org"]].groupby(["category", "org"]).sum()
 
     pd.set_option("display.max_rows", 200)
-    print(stun.head(200))
+    print(stun.compute().head(200))
     pd.reset_option("display.max_rows")
 
     # Do the grouping
