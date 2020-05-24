@@ -130,7 +130,8 @@ def _augment_user_flows_with_stun_state(in_path, out_path):
                                                          force=True)
     out_frame = out_frame.categorize(columns=["fqdn_source", "org", "category"])
 
-    return bok.dask_infra.clean_write_parquet(out_frame, out_path, compute=False)
+    bok.dask_infra.clean_write_parquet(out_frame, out_path)
+    print("Finished writing user", in_path)
 
 
 def augment_all_user_flows(in_parent_directory, out_parent_directory, client):
@@ -161,11 +162,7 @@ def stun_augment_all_user_flows(in_parent_directory, out_parent_directory, clien
         tokens.append(compute_token)
 
     print("Starting dask stun computation")
-    write_tokens = client.compute(tokens, sync=True)
-
-    print("Writing all dataframes")
-    client.compute(write_tokens, sync=True)
-
+    client.compute(tokens, sync=True)
     print("Completed STUN augmentation")
 
 
