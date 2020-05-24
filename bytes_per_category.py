@@ -17,14 +17,6 @@ def reduce_to_pandas(outfile, dask_client):
     flows["start_bin"] = flows["start"].dt.floor("d")
     flows = flows.set_index("start_bin")
 
-    # Explore STUN Traffic
-    stun = flows.loc[flows["protocol"] == 17 & flows["dest_port"] == 3478]
-    stun = stun[["category", "bytes_up", "bytes_down", "org"]].groupby(["category", "org"]).sum()
-
-    pd.set_option("display.max_rows", 200)
-    print(stun.compute().head(200))
-    pd.reset_option("display.max_rows")
-
     # Do the grouping
     flows = flows.groupby(["start_bin", "category", "org"]).sum()
     flows = flows.compute()
