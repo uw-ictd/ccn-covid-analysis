@@ -21,6 +21,8 @@ data/
 
 # Ignore the temporary results
 scratch/
+# On remote systems scratch might actually be a symlink
+scratch
 
 # Ignore dask disk overflow space
 dask-worker-space/
