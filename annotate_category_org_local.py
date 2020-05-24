@@ -87,11 +87,13 @@ def _augment_user_flows_with_stun_state(in_path, out_path):
                     if ((flow.category == "Unknown (No DNS)") or
                             (flow.category == "Unknown (Not Mapped)")):
                         augmented_flow["category"] = "Peer to Peer"
+                        augmented_flow["org"] = "ICE Peer (Unknown Org)"
                     elif "emome-ip.hinet.net" in flow.fqdn:
                         # These appear to be generic dns records for users
                         # within Chunghwa Telecom (in Taiwan)
                         augmented_flow["category"] = "Peer to Peer"
-                    elif "turnservice" in flow.fqdn:
+                        augmented_flow["org"] = "ICE Peer (Unknown Org)"
+                    elif "turnservice" in flow.fqdn or "facebook" in flow.fqdn:
                         augmented_flow["category"] = "Messaging"
                     else:
                         # There is a bit of noise from port reuse.

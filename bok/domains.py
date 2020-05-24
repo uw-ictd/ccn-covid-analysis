@@ -234,7 +234,7 @@ class FqdnProcessor(object):
             return "Oppo", "Software or Updates"
 
         if "igamecj.com" in fqdn:  # Appears to be a PUBG pirate download
-            return "Other", "Games"
+            return "IgameCJ", "Games"
 
         if "vivoglobal.com" in fqdn or "vivo.com" in fqdn:
             return "Vivo", "Software or Updates"
@@ -292,7 +292,7 @@ class FqdnProcessor(object):
             return "Liftoff", "Ad Network"
 
         if "avatar." in fqdn and ".com" in fqdn:  # Appears to be a gambling site tracker? Middle subdomain is usually random
-            return "Other", "Ad Network"
+            return "Avatar Tracker", "Ad Network"
 
         if "v-mate.mobi" in fqdn:  # https://techcrunch.com/2019/05/30/alibaba-vmate-100m-india/
             return "VMate", "Video"
