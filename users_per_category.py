@@ -61,7 +61,6 @@ def make_category_plot(infile):
     # ]
 
     grouped_flows = grouped_flows.merge(users_to_analyze, on="user", how="inner")
-    print(user_active_ranges.head(10))
 
     alt.Chart(grouped_flows).mark_rect().encode(
         x=alt.X("user:N",
@@ -117,8 +116,6 @@ def make_category_plot(infile):
     )
 
     # Normalize by each user's time in network to better compare users
-
-    print(grouped_flows.head(10))
     time_normalized_flows = grouped_flows
     time_normalized_flows["MB_per_day"] = time_normalized_flows["GB"] * 1000 / time_normalized_flows["days_active"]
     time_normalized_flows["log_MB_per_day"] = time_normalized_flows["MB_per_day"].transform(np.log10)
@@ -163,7 +160,6 @@ def make_category_plot_separate_top_n(infile, n_to_separate=20):
     user_totals = grouped_flows.groupby("user").sum().reset_index()
     user_sort_order = user_totals.sort_values("bytes_total", ascending=False).set_index("bytes_total").reset_index()
     user_sort_list = user_sort_order["user"].tolist()
-    print("user_sort_list")
 
     # Generate a frame from the sorted user list that identifies the top users
     top_annotation_frame = user_sort_order[["user"]]
@@ -222,12 +218,10 @@ def make_org_plot(infile):
     user_count = user_count.drop(0).reset_index()
     user_count = user_count.groupby(["org", "user"]).sum().reset_index()
     user_count = user_count.groupby(["org"]).count()
-    print(user_count)
     small_orgs = user_count.loc[user_count["user"] < 5]
     small_orgs = small_orgs.reset_index()["org"]
-    print(small_orgs)
+
     grouped_flows = grouped_flows.replace(small_orgs.values, value="Aggregated (Users < 5)")
-    print(grouped_flows)
 
     # Filter users by time in network to eliminate early incomplete samples
     user_active_ranges = bok.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")[["user", "days_since_first_active", "days_active"]]
@@ -310,7 +304,7 @@ def make_org_plot(infile):
 if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
     graph_temporary_file = "scratch/graphs/users_per_category"
-    reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
+    # reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
     make_category_plot(graph_temporary_file)
     make_org_plot(graph_temporary_file)
     # make_category_plot_separate_top_n(graph_temporary_file)
