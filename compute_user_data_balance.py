@@ -92,6 +92,10 @@ def reduce_to_user_pd_frame(user, outpath):
 
     # Set byte types as integers rather than floats.
     user_data_spends = user_data_spends.astype({"bytes": int})
+
+    # Resample for displaying large time periods
+    user_data_spends = user_data_spends.resample("1h").sum()
+
     user_data_purchases = user_data_purchases.astype({"bytes": int})
     user_data_spends["type"] = "spend"
     user_data_purchases["type"] = "topup"
@@ -105,9 +109,6 @@ def reduce_to_user_pd_frame(user, outpath):
         "timestamp"
     )
 
-    # Resample for displaying large time periods
-    #user_ledger = user_ledger.resample("1h").sum()
-
     running_user_balance = user_ledger
     running_user_balance["balance"] = user_ledger["bytes"].transform(pd.Series.cumsum)
 
@@ -115,30 +116,42 @@ def reduce_to_user_pd_frame(user, outpath):
 
 
 def make_plot(inpath):
-    gap_df = bok.dask_infra.read_parquet("data/clean/log_gaps_TM.parquet")
+    gap_df = bok.pd_infra.read_parquet("data/clean/log_gaps_TM.parquet")
     running_user_balance = bok.pd_infra.read_parquet(inpath)
+
+    # get topups separately
+    topups = running_user_balance.copy()
+    topups = topups.loc[topups["type"]=="topup"]
+    topups = topups.reset_index()
 
     alt.data_transformers.disable_max_rows()
 
     # reset the index to recover the timestamp for plotting
-    running_user_balance = running_user_balance.reset_index()
+    running_user_balance = running_user_balance.reset_index().sort_values("timestamp")
     print("length:", len(running_user_balance))
-    print(running_user_balance)
+    print(topups.head())
 
     # alt.Chart(running_user_balance).mark_line(interpolate='step-after').encode(
-    points = alt.Chart(running_user_balance).mark_circle().encode(
-        x="timestamp",
-        y="balance",
-        color="type",
-        tooltip=["balance", "timestamp"],
+    lines = alt.Chart(running_user_balance).mark_line(interpolate='step-after').encode(
+        x="timestamp:T",
+        y=alt.Y(
+            "balance:Q",
+            scale=alt.Scale(domain=[0, 1000000000]),
+        ),
+        tooltip=["balance:Q", "timestamp:T"],
     ).properties(width=800)
 
-    vertline = alt.Chart(gap_df).mark_rect().encode(
+    points = alt.Chart(topups).mark_point(color="#F54242").encode(
+        x="timestamp:T",
+        y="balance:Q",
+    )
+
+    vertline = alt.Chart(gap_df).mark_rect(color="#FFAA00").encode(
         x="start:T",
         x2="end:T",
     )
 
-    combo = points + vertline
+    combo = vertline + lines + points
 
     combo.interactive().show()
 
@@ -148,12 +161,19 @@ if __name__ == "__main__":
 
     # ff26563a118d01972ef7ac443b65a562d7f19cab327a0115f5c42660c58ce2b8
     # 5759d99492dc4aace702a0d340eef1d605ba0da32a526667149ba059305a4ccb <- small data
-    test_user = "ff26563a118d01972ef7ac443b65a562d7f19cab327a0115f5c42660c58ce2b8"
+    test_user = "5759d99492dc4aace702a0d340eef1d605ba0da32a526667149ba059305a4ccb"
     graph_temporary_file = "scratch/graphs/user_data_balance"
 
     if platform.large_compute_support:
+        print("Running compute subcommands")
         client = bok.dask_infra.setup_dask_client()
         reduce_to_user_pd_frame(test_user, outpath=graph_temporary_file)
+        client.close()
+    else:
+        print("Using cached results!")
 
     if platform.altair_support:
+        print("Running altair subcommands")
         make_plot(inpath=graph_temporary_file)
+
+    print("Exiting")
