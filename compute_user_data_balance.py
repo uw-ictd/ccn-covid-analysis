@@ -94,7 +94,8 @@ def reduce_to_user_pd_frame(user, outpath):
     user_data_spends = user_data_spends.astype({"bytes": int})
 
     # Resample for displaying large time periods
-    user_data_spends = user_data_spends.resample("1h").sum()
+    user_data_spends = user_data_spends.set_index("timestamp")
+    user_data_spends = user_data_spends.resample("1h").sum().reset_index()
 
     user_data_purchases = user_data_purchases.astype({"bytes": int})
     user_data_spends["type"] = "spend"
