@@ -1,20 +1,19 @@
 import altair as alt
 import pandas as pd
-import dask.dataframe
-import dask.distributed
 import os
 
 
 import bok.parsers
 import bok.dask_infra
+import bok.pd_infra
+import bok.platform
 
 
 def compute_user_data_purchase_histories():
     """Compute the running ledger of total data purchased by each user
     """
     # Extract data from the transactions file into a resolved pandas frame
-    transactions = dask.dataframe.read_parquet("data/clean/transactions",
-                                               engine="fastparquet").compute()
+    transactions = bok.dask_infra.read_parquet("data/clean/transactions_TM").compute()
 
     # Track purchases as positive balance
     purchases = transactions.loc[
@@ -35,9 +34,9 @@ def compute_user_data_use_history(user_id, client):
     """Compute the data use history of a single user
     """
     data_path = os.path.join(
-        "data/clean/flows/typical_fqdn_DIV_user_INDEX_start", user_id)
+        "data/clean/flows/typical_fqdn_TM_DIV_user_INDEX_start", user_id)
 
-    df = dask.dataframe.read_parquet(data_path, engine="fastparquet")
+    df = bok.dask_infra.read_parquet(data_path)
 
     # Convert to pandas!
     # Drop unnecessary columns to limit the memory footprint.
@@ -54,7 +53,6 @@ def compute_user_data_use_history(user_id, client):
 
     # Reset the index once it's in memory.
     df = df.reset_index().set_index("end").sort_values("end")
-
 
     # Set byte types as integers rather than floats.
     df = df.astype({"bytes_up": int, "bytes_down": int})
@@ -76,17 +74,10 @@ def compute_user_data_use_history(user_id, client):
     return df
 
 
-if __name__ == "__main__":
-    client = bok.dask_infra.setup_dask_client()
-
-    print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
-
-    # ff26563a118d01972ef7ac443b65a562d7f19cab327a0115f5c42660c58ce2b8
-    # 5759d99492dc4aace702a0d340eef1d605ba0da32a526667149ba059305a4ccb <- small data
-    test_user = "ff26563a118d01972ef7ac443b65a562d7f19cab327a0115f5c42660c58ce2b8"
+def reduce_to_user_pd_frame(user, outpath):
     data_purchase_histories = compute_user_data_purchase_histories()
     user_data_purchases = data_purchase_histories.loc[
-        data_purchase_histories["user"] == test_user
+        data_purchase_histories["user"] == user
         ]
 
     # Normalize purchases for merging
@@ -94,7 +85,7 @@ if __name__ == "__main__":
         ["user"], axis="columns"
     ).reset_index()
 
-    user_data_spends = compute_user_data_use_history(test_user, client)
+    user_data_spends = compute_user_data_use_history(user, client)
 
     # Define spends as negative
     user_data_spends["bytes"] = -user_data_spends["bytes"]
@@ -114,50 +105,18 @@ if __name__ == "__main__":
         "timestamp"
     )
 
-
-
-    # Convert to local time UTC+9
-    user_ledger.index = user_ledger.index + pd.tseries.offsets.DateOffset(hours=9)
-
-    # Slice an interval to view
-    user_ledger = user_ledger[(user_ledger.index > '2019-05-25 00:00') & (user_ledger.index < '2019-05-26 23:59')]
-
-    # Find gaps that could indicate shutdowns
-    gap_frame = user_data_spends
-    gap_frame = gap_frame.sort_values("start")
-    gap_frame = gap_frame.rename({"timestamp": "end"}, axis="columns")
-    gap_frame["start"] = gap_frame["start"] + pd.tseries.offsets.DateOffset(hours=9)
-    gap_frame["end"] = gap_frame["end"] + pd.tseries.offsets.DateOffset(hours=9)
-    gap_frame = gap_frame[(gap_frame["start"] > '2019-05-25 00:00') & (gap_frame["start"] < '2019-05-26 23:59')]
-    print("Gap Frame is:")
-    print(gap_frame)
-
-    last_end_time = None
-    gaps = []
-    for i, entry in enumerate(gap_frame.itertuples()):
-        if i % 10000 == 0:
-            print("Processed flow", i)
-
-        if last_end_time is not None:
-            if entry.start > last_end_time:
-                gaps.append(last_end_time)
-
-        last_end_time = entry.end
-
-    gap_df = pd.DataFrame(gaps, columns=["gaps"])
-    print(gaps)
-
-
-
-            # df = df.drop(["bytes_up", "bytes_down", "start"],
-    #              axis="columns")
-
-
     # Resample for displaying large time periods
     #user_ledger = user_ledger.resample("1h").sum()
 
     running_user_balance = user_ledger
     running_user_balance["balance"] = user_ledger["bytes"].transform(pd.Series.cumsum)
+
+    bok.pd_infra.clean_write_parquet(running_user_balance, outpath)
+
+
+def make_plot(inpath):
+    gap_df = bok.dask_infra.read_parquet("data/clean/log_gaps_TM.parquet")
+    running_user_balance = bok.pd_infra.read_parquet(inpath)
 
     alt.data_transformers.disable_max_rows()
 
@@ -172,12 +131,29 @@ if __name__ == "__main__":
         y="balance",
         color="type",
         tooltip=["balance", "timestamp"],
-    ).properties(width=800)\
+    ).properties(width=800)
 
-    vertline = alt.Chart(gap_df).mark_rule().encode(
-        x="gaps"
+    vertline = alt.Chart(gap_df).mark_rect().encode(
+        x="start:T",
+        x2="end:T",
     )
 
     combo = points + vertline
 
     combo.interactive().show()
+
+
+if __name__ == "__main__":
+    platform = bok.platform.read_config()
+
+    # ff26563a118d01972ef7ac443b65a562d7f19cab327a0115f5c42660c58ce2b8
+    # 5759d99492dc4aace702a0d340eef1d605ba0da32a526667149ba059305a4ccb <- small data
+    test_user = "ff26563a118d01972ef7ac443b65a562d7f19cab327a0115f5c42660c58ce2b8"
+    graph_temporary_file = "scratch/graphs/user_data_balance"
+
+    if platform.large_compute_support:
+        client = bok.dask_infra.setup_dask_client()
+        reduce_to_user_pd_frame(test_user, outpath=graph_temporary_file)
+
+    if platform.altair_support:
+        make_plot(inpath=graph_temporary_file)
