@@ -38,7 +38,7 @@ def compute_filtered_purchase_and_use_intermediate(outfile, client):
 
     all_flows = bok.dask_infra.read_parquet(
         "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
-    ).loc[:, ["user", "bytes_up", "bytes_down", "local"]]
+    ).loc[:, ["user", "bytes_up", "bytes_down", "local", "end"]]
 
     # Filter the balances included to users who have been minimally active
     user_active_ranges = bok.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")
@@ -69,7 +69,7 @@ def compute_filtered_purchase_and_use_intermediate(outfile, client):
     purchases = purchases.loc[
         purchases["kind"] == "purchase",
         ["timestamp", "user", "amount_bytes", "time_since_last_purchase"]
-    ]
+    ].rename({"amount_bytes": "bytes_purchased"}, axis="columns")
 
     # Filter purchases with the same users to analyze as used for flows
     purchases = purchases.loc[purchases["user"].isin(users_to_analyze["user"])]
@@ -77,8 +77,18 @@ def compute_filtered_purchase_and_use_intermediate(outfile, client):
     # Convert purchases to dask and append
     purchases_df = dask.dataframe.from_pandas(purchases, npartitions=1)
 
-    flows = flows.reset_index()
+    flows = flows.reset_index().rename({"start": "timestamp"}, axis="columns")
     aggregate = flows.append(purchases_df)
+
+    # Apply fillna only to specific byte columns to avoid clobbering useful NaT values in timestamp columns.
+    aggregate["bytes_up"] = aggregate["bytes_up"].fillna(0)
+    aggregate["bytes_down"] = aggregate["bytes_down"].fillna(0)
+    aggregate["bytes_purchased"] = aggregate["bytes_purchased"].fillna(0)
+
+    # Set byte types as integers rather than floats.
+    aggregate = aggregate.astype({"bytes_up": int,
+                                  "bytes_down": int,
+                                  "bytes_purchased": int})
 
     print(purchases_df)
     print(flows)
