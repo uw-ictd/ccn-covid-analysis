@@ -65,9 +65,13 @@ def compute_filtered_purchase_and_use_intermediate(outfile, client):
     flows = nonlocal_user_filtered_flows
 
     purchases = bok.pd_infra.read_parquet("data/clean/transactions_consolidated_TM.parquet")
-    print("purchases")
-    print(purchases)
-    purchases_df = dask.dataframe.from_pandas(purchases)
+    purchases = purchases.loc[
+        purchases["kind"] == "purchase",
+        ["timestamp", "user", "amount_bytes", "time_since_last_purchase"]
+    ]
+    purchases_df = dask.dataframe.from_pandas(purchases, npartitions=1)
+    print(purchases_df)
+    print(flows)
 
     write_delayed = bok.dask_infra.clean_write_parquet(all_flows, outfile, compute=False)
 
