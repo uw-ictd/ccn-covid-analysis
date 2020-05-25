@@ -30,6 +30,37 @@ def compute_user_data_purchase_histories():
     return purchases
 
 
+def compute_filtered_purchase_and_use_intermediate(outfile):
+    """Compute an intermediate dask frame with flows from selected users and
+    user purchases
+    """
+
+    all_flows = bok.dask_infra.read_parquet(
+        "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
+    ).loc[:, ["user", "bytes_up", "bytes_down", "local"]]
+
+    # Filter the balances included to users who have been minimally active
+    user_active_ranges = bok.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")
+    # Drop users new to the network first active less than a week ago.
+    users_to_analyze = user_active_ranges.loc[
+        user_active_ranges["days_since_first_active"] >= 7,
+    ]
+    # Drop users active for less than 1 day
+    users_to_analyze = users_to_analyze.loc[
+        users_to_analyze["days_active"] >= 1.0,
+    ]
+
+    # Filter excluded users who have not been active enough to have good data.
+    all_flows = all_flows.loc[all_flows["user"].isin(users_to_analyze["user"])]
+
+    print(all_flows)
+
+    # Remove local address flows, which are zero-rated!
+    all_flows = all_flows.loc[~all_flows["local"]]
+
+    bok.dask_infra.clean_write_parquet(all_flows, outfile)
+
+
 def compute_user_data_use_history(user_id, client):
     """Compute the data use history of a single user
     """
@@ -137,7 +168,7 @@ def make_plot(inpath):
         x="timestamp:T",
         y=alt.Y(
             "balance:Q",
-            scale=alt.Scale(domain=[0, 1000000000]),
+            #scale=alt.Scale(domain=[0, 1000000000]),
         ),
         tooltip=["balance:Q", "timestamp:T"],
     ).properties(width=800)
@@ -163,12 +194,14 @@ if __name__ == "__main__":
     # ff26563a118d01972ef7ac443b65a562d7f19cab327a0115f5c42660c58ce2b8
     # 5759d99492dc4aace702a0d340eef1d605ba0da32a526667149ba059305a4ccb <- small data
     test_user = "5759d99492dc4aace702a0d340eef1d605ba0da32a526667149ba059305a4ccb"
+    grouped_flows_and_purchases_file = "scratch/filtered_flows_and_purchases_TM_DIV_none_INDEX_start"
     graph_temporary_file = "scratch/graphs/user_data_balance"
 
     if platform.large_compute_support:
         print("Running compute subcommands")
         client = bok.dask_infra.setup_dask_client()
-        reduce_to_user_pd_frame(test_user, outpath=graph_temporary_file)
+        #reduce_to_user_pd_frame(test_user, outpath=graph_temporary_file)
+        compute_filtered_purchase_and_use_intermediate(grouped_flows_and_purchases_file)
         client.close()
     else:
         print("Using cached results!")
