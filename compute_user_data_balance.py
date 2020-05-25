@@ -1,4 +1,5 @@
 import altair as alt
+import dask.dataframe
 import pandas as pd
 import os
 
@@ -50,18 +51,34 @@ def compute_filtered_purchase_and_use_intermediate(outfile, client):
         users_to_analyze["days_active"] >= 1.0,
     ]
 
-    print("Original length:", len(all_flows))
+    all_flows_length = all_flows.shape[0]
     # Filter excluded users who have not been active enough to have good data.
-    all_flows = all_flows.loc[all_flows["user"].isin(users_to_analyze["user"])]
+    user_filtered_flows = all_flows.loc[all_flows["user"].isin(users_to_analyze["user"])]
+    user_filtered_flows_length = user_filtered_flows.shape[0]
 
-    print(all_flows)
-    print("User Excluded:", len(all_flows))
+    # Remove local address flows, which are zero-rated and don't give balance
+    # information.
+    nonlocal_user_filtered_flows = user_filtered_flows.loc[~user_filtered_flows["local"]]
+    nonlocal_user_filtered_flows_length = nonlocal_user_filtered_flows.shape[0]
 
-    # Remove local address flows, which are zero-rated!
-    all_flows = all_flows.loc[~all_flows["local"]]
+    # Work with our filtered flows now
+    flows = nonlocal_user_filtered_flows
 
-    print("local excluded:", len(all_flows))
-    bok.dask_infra.clean_write_parquet(all_flows, outfile)
+    purchases = bok.pd_infra.read_parquet("data/clean/transactions_consolidated_TM.parquet")
+    print("purchases")
+    print(purchases)
+    purchases_df = dask.dataframe.from_pandas(purchases)
+
+    write_delayed = bok.dask_infra.clean_write_parquet(all_flows, outfile, compute=False)
+
+    results = client.compute(
+        [all_flows_length, user_filtered_flows_length, nonlocal_user_filtered_flows_length, write_delayed],
+        sync=True)
+
+    print("Flows in balance intermediate stats:")
+    print("Original length:{}".format(results[0]))
+    print("Post user:{} ({}% selective)".format(results[1], results[1]/results[0]*100))
+    print("Post user and nonlocal:{} ({}% selective)".format(results[2], results[2]/results[0]*100))
 
 
 def compute_user_data_use_history(user_id, client):
