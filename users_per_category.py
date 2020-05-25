@@ -112,7 +112,37 @@ def make_category_plot(infile):
     ).properties(
         width=500,
     ).save(
-        "renders/users_per_category_normalized.png",
+        "renders/users_per_category_normalized_user_total.png",
+        scale_factor=2,
+    )
+
+    # Normalize by each user's time in network to better compare users
+
+    print(grouped_flows.head(10))
+    time_normalized_flows = grouped_flows
+    time_normalized_flows["MB_per_day"] = time_normalized_flows["GB"] * 1000 / time_normalized_flows["days_active"]
+    time_normalized_flows["log_MB_per_day"] = time_normalized_flows["MB_per_day"].transform(np.log10)
+
+    alt.Chart(time_normalized_flows).mark_rect().encode(
+        x=alt.X("user:N",
+                title="User (Sorted by Total)",
+                axis=alt.Axis(labels=False),
+                sort=user_sort_list,
+                ),
+        y=alt.Y("category:N",
+                title="Category (Sorted by Total)",
+                sort=cat_sort_list,
+                ),
+        # shape="direction",
+        color=alt.Color(
+            "log_MB_per_day:Q",
+            title="MB per Day (Log Transformed)",
+            scale=alt.Scale(scheme="viridis"),
+        ),
+    ).properties(
+        width=500,
+    ).save(
+        "renders/users_per_category_normalized_time.png",
         scale_factor=2,
     )
 
