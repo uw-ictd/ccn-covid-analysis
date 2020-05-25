@@ -122,10 +122,9 @@ def _augment_user_flows_with_stun_state(in_path, out_path):
             out_frame = out_frame.append(new_frame)
 
     if out_frame is None:
-        print("User has no flows")
+        print("User has no flows in the current dataset slice, returning early")
         print(in_path)
-        print(len(flow_frame))
-        raise RuntimeError("PANIC!!!! {} {} {}".format("User has no flows", in_path, len(flow_frame)))
+        return
 
     out_frame = out_frame.rename(columns={"Index": "start"})
     out_frame = out_frame.set_index("start").repartition(partition_size="64M",
