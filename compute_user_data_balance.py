@@ -30,7 +30,7 @@ def compute_user_data_purchase_histories():
     return purchases
 
 
-def compute_filtered_purchase_and_use_intermediate(outfile):
+def compute_filtered_purchase_and_use_intermediate(outfile, client):
     """Compute an intermediate dask frame with flows from selected users and
     user purchases
     """
@@ -50,14 +50,17 @@ def compute_filtered_purchase_and_use_intermediate(outfile):
         users_to_analyze["days_active"] >= 1.0,
     ]
 
+    print("Original length:", len(all_flows))
     # Filter excluded users who have not been active enough to have good data.
     all_flows = all_flows.loc[all_flows["user"].isin(users_to_analyze["user"])]
 
     print(all_flows)
+    print("User Excluded:", len(all_flows))
 
     # Remove local address flows, which are zero-rated!
     all_flows = all_flows.loc[~all_flows["local"]]
 
+    print("local excluded:", len(all_flows))
     bok.dask_infra.clean_write_parquet(all_flows, outfile)
 
 
@@ -201,7 +204,7 @@ if __name__ == "__main__":
         print("Running compute subcommands")
         client = bok.dask_infra.setup_dask_client()
         #reduce_to_user_pd_frame(test_user, outpath=graph_temporary_file)
-        compute_filtered_purchase_and_use_intermediate(grouped_flows_and_purchases_file)
+        compute_filtered_purchase_and_use_intermediate(grouped_flows_and_purchases_file, client)
         client.close()
     else:
         print("Using cached results!")
