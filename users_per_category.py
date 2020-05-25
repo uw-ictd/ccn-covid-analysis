@@ -10,6 +10,12 @@ import bok.domains
 import bok.pd_infra
 
 
+# Module specific format options
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', None)
+pd.set_option('display.max_rows', None)
+
+
 def reduce_to_pandas(outfile, dask_client):
     flows = bok.dask_infra.read_parquet(
         "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["user", "category", "org", "bytes_up", "bytes_down"]]
@@ -41,6 +47,22 @@ def make_category_plot(infile):
     grouped_flows = grouped_flows.reset_index()
     grouped_flows["logGB"] = grouped_flows["GB"].transform(np.log10)
 
+    # Filter users by time in network to eliminate early incomplete samples
+    user_active_ranges = bok.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")[["user", "days_since_first_active", "days_active"]]
+    # Drop users that joined less than a week ago or were active for less than a week.
+    users_to_analyze = user_active_ranges.loc[
+        user_active_ranges["days_since_first_active"] >= 7
+        ]
+
+    # Only needed if using the time normalized graph.
+    # # Drop users active for less than one week
+    # users_to_analyze = users_to_analyze.loc[
+    #     users_to_analyze["days_active"] >= 7,
+    # ]
+
+    grouped_flows = grouped_flows.merge(users_to_analyze, on="user", how="inner")
+    print(user_active_ranges.head(10))
+
     alt.Chart(grouped_flows).mark_rect().encode(
         x=alt.X("user:N",
                 title="User (Sorted by Total GB)",
@@ -68,7 +90,6 @@ def make_category_plot(infile):
     user_total_to_merge = user_totals[["user", "bytes_total"]].rename(columns={"bytes_total": "user_total_bytes"})
     normalized_user_flows = grouped_flows.copy()
     normalized_user_flows = normalized_user_flows.merge(user_total_to_merge, on="user")
-    print(normalized_user_flows)
     normalized_user_flows["user_total_bytes"] = normalized_user_flows["user_total_bytes"] / 1000**3
     normalized_user_flows["normalized_bytes"] = normalized_user_flows["GB"]/normalized_user_flows["user_total_bytes"]
 
@@ -178,6 +199,16 @@ def make_org_plot(infile):
     grouped_flows = grouped_flows.replace(small_orgs.values, value="Aggregated (Users < 5)")
     print(grouped_flows)
 
+    # Filter users by time in network to eliminate early incomplete samples
+    user_active_ranges = bok.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")[["user", "days_since_first_active", "days_active"]]
+    # Drop users that joined less than a week ago or were active for less than a week.
+    users_to_analyze = user_active_ranges.loc[
+        user_active_ranges["days_since_first_active"] >= 7
+        ]
+
+    grouped_flows = grouped_flows.merge(users_to_analyze, on="user", how="inner")
+    print(user_active_ranges.head(10))
+
     # Figure out sorting order by total amount.
     org_totals = grouped_flows.groupby("org").sum().reset_index()
     org_sort_order = org_totals.sort_values("bytes_total", ascending=False).set_index("bytes_total").reset_index()
@@ -249,7 +280,7 @@ def make_org_plot(infile):
 if __name__ == "__main__":
     client = bok.dask_infra.setup_dask_client()
     graph_temporary_file = "scratch/graphs/users_per_category"
-    # reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
-    # make_category_plot(graph_temporary_file)
-    # make_org_plot(graph_temporary_file)
-    make_category_plot_separate_top_n(graph_temporary_file)
+    reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
+    make_category_plot(graph_temporary_file)
+    make_org_plot(graph_temporary_file)
+    # make_category_plot_separate_top_n(graph_temporary_file)
