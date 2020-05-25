@@ -16,6 +16,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# Compute platform config
+platform-conf.toml
+
 # Ignore source data
 data/
 
