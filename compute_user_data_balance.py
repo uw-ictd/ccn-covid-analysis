@@ -317,7 +317,7 @@ def reduce_to_pandas(infile, outfile, client):
         aggregated_balances["user"] == "ff26563a118d01972ef7ac443b65a562d7f19cab327a0115f5c42660c58ce2b8"
         ]
 
-    df = df.reset_index().set_index("user_hist_i")[["timestamp", "balance", "user"]]
+    df = df.reset_index().set_index("user_hist_i")[["timestamp", "balance", "user", "type", "bytes_down"]]
 
     df = df.compute()
 
@@ -369,19 +369,33 @@ def reduce_to_user_pd_frame(user, outpath):
 def make_plot(inpath):
     gap_df = bok.pd_infra.read_parquet("data/clean/log_gaps_TM.parquet")
     running_user_balance = bok.pd_infra.read_parquet(inpath)
+    print(running_user_balance)
+    # Limit the domain instead of the time resolution
+    running_user_balance = running_user_balance.loc[(running_user_balance["timestamp"] > "2019-03-19") &
+                                                    (running_user_balance["timestamp"] < "2019-03-21")]
+    print(gap_df)
+    gap_df = gap_df.loc[(gap_df["start"] > "2019-03-19") &
+                        (gap_df["start"] < "2019-03-21")]
+
+    # Resample for displaying large time periods
+    # running_user_balance = running_user_balance.set_index("timestamp")
+    # running_user_balance = running_user_balance.resample("1h").mean()
 
     # get topups separately
     topups = running_user_balance.copy()
-    topups = topups.loc[topups["type"]=="purchase"]
+    topups = topups.loc[
+        (topups["type"]=="purchase") |
+        (topups["type"] == "tare") |
+        ((topups["type"] == "ext") & (topups["bytes_down"] > 0))]
     topups = topups.reset_index()
 
     alt.data_transformers.disable_max_rows()
+
 
     # reset the index to recover the timestamp for plotting
     #TODO(matt9j) Check on the sorting
     running_user_balance = running_user_balance.reset_index().sort_values("timestamp")
     print("length:", len(running_user_balance))
-    print(topups.head())
 
     # alt.Chart(running_user_balance).mark_line(interpolate='step-after').encode(
     lines = alt.Chart(running_user_balance).mark_line(interpolate='step-after').encode(
@@ -393,9 +407,10 @@ def make_plot(inpath):
         tooltip=["balance:Q", "timestamp:T"],
     ).properties(width=800)
 
-    points = alt.Chart(topups).mark_point(color="#F54242").encode(
+    points = alt.Chart(topups).mark_point(color="#F54242", opacity=0.2, size=200).encode(
         x="timestamp:T",
         y="balance:Q",
+        color="type:N",
     )
 
     vertline = alt.Chart(gap_df).mark_rect(color="#FFAA00").encode(
