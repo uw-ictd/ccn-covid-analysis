@@ -133,6 +133,9 @@ def estimate_zero_corrected_user_balance(user_history_frame):
 
     df = user_history_frame.reset_index()  # Access timestamp directly
 
+    # Break ties by putting purchases before external flows.
+    df = df.sort_values(["timestamp", "type"], ascending=(True, False))
+
     # Purchases mark a fencepost where we know the data balance should go positive.
     df["next_purchase_time"] = df["timestamp"].where(
         df["type"] == "purchase",
