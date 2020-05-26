@@ -4,6 +4,7 @@
 import dask.config
 import dask.distributed
 import dask.dataframe
+import os
 import shutil
 
 
@@ -67,3 +68,27 @@ def read_parquet(path):
     """Read a parquet file with common options standardized in the project
     """
     return dask.dataframe.read_parquet(path, engine="fastparquet")
+
+
+def merge_parquet_frames(in_parent_directory, out_frame_path):
+    """Iterate through divs in a parent directory and merge to the out frame
+    """
+    merged_frame = None
+    div_on_disk = sorted(os.listdir(in_parent_directory))
+    for div in div_on_disk:
+        div_path = os.path.join(in_parent_directory, div)
+        frame = read_parquet(div_path)
+
+        if merged_frame is None:
+            merged_frame = frame
+        else:
+            merged_frame = merged_frame.append(frame)
+
+    merged_frame = merged_frame.reset_index().set_index(
+        "start"
+    ).repartition(
+        partition_size="64M",
+        force=True
+    )
+
+    clean_write_parquet(merged_frame, out_frame_path)

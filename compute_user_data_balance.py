@@ -124,22 +124,14 @@ def compute_filtered_purchase_and_use_intermediate(outfile, client):
     print("Post user and nonlocal:{} ({}% selective)".format(results[2], results[2]/results[0]*100))
 
 
-def compute_probable_zero_ranges(infile, outfile):
+def estimate_zero_corrected_user_balance(user_history_frame):
     """Estimate and record probable ranges for each user when their data balance is actually zero.
+
+    Operates with Pandas rather than dask and uses lots of grouping,
+    so probably is necessary. Will require significant memory for some users.
     """
 
-    # flows_and_purchases = bok.dask_infra.read_parquet(infile)
-    #
-    # df = flows_and_purchases.loc[
-    #     flows_and_purchases["user"] == "ff26563a118d01972ef7ac443b65a562d7f19cab327a0115f5c42660c58ce2b8"
-    #     ]
-    #
-    # df = df.compute()
-    #
-    # bok.pd_infra.clean_write_parquet(df, "scratch/test_zeros_frame.parquet")
-    df = bok.pd_infra.read_parquet("scratch/test_zeros_frame.parquet")
-
-    df = df.reset_index()  # Access timestamp directly
+    df = user_history_frame.reset_index()  # Access timestamp directly
 
     # Purchases mark a fencepost where we know the data balance should go positive.
     df["next_purchase_time"] = df["timestamp"].where(
@@ -171,6 +163,7 @@ def compute_probable_zero_ranges(infile, outfile):
         ])
         zero_range = zero_range._asdict()
         zero_range["count"] = count
+        del zero_range["Index"]
         likely_zero_ranges.append(zero_range)
 
     # TODO(matt9j) Cross reference against other flows to see if the backhaul is just down.
@@ -191,7 +184,7 @@ def compute_probable_zero_ranges(infile, outfile):
                      "bytes_up": 0,
                      "bytes_down": 0,
                      "type": "init",
-                     "bytes_purchased": pd.NA,  # We will fill these values later
+                     "bytes_purchased": 0,
                      "net_bytes": pd.NA,
                      }
 
@@ -199,7 +192,6 @@ def compute_probable_zero_ranges(infile, outfile):
     df = df.append(initial_entry, ignore_index=True)
 
     # Apply zeroing offsets
-    print(likely_zero_ranges)
     tare_offsets = likely_zero_ranges
     tare_offsets = tare_offsets.assign(
         user=user,
@@ -235,16 +227,14 @@ def compute_probable_zero_ranges(infile, outfile):
     df["balance"] = df["net_bytes"].cumsum()
 
     # Assign tare values needed to fix the balance
-    # Include external flows with downlink since they may also indicate balance low points.
+    # Include external flows with downlink since they may also indicate valid balance low points.
     tare_offsets = df.loc[((df["type"] == "tare") |
                            ((df["type"] == "ext") & (df["bytes_down"] > 0)))].copy()
     # Track the "reverse cumulative min" to find inter-topups where the
     # balance actually goes down. This should be the lowest balance from each
     # row forward. These are cases where we know one of the prior topups did
     # not happen at zero, or that we missed a topup entry.
-    print(df)
     tare_offsets["cum_min_balance"] = tare_offsets.loc[::-1, ["balance"]].cummin()[::-1]
-    print(tare_offsets)
 
     tare_offsets = tare_offsets.loc[df["type"] == "tare"]
 
@@ -258,55 +248,76 @@ def compute_probable_zero_ranges(infile, outfile):
     # Recompute final tared balance
     df["balance"] = df["net_bytes"].cumsum()
 
+    # Apply last layer of haulage filtering logic to ignore accumulated negative flows.
+    df.loc[df["balance"] < 0, "balance"] = 0
+
+    # Cleanup intermediates
+    df = df.drop(columns=["count"])
     print(df)
-    print(df.loc[df["type"] == "tare"])
-    print(df.loc[((df["type"] == "purchase") & (df["timestamp"] >= "2019-03-16 09:00:00"))])
-    print(df.loc[df["balance"] < 0])
     return df
 
 
-def compute_user_data_use_history(user_id, client):
-    """Compute the data use history of a single user
+def _process_and_split_single_user(flows_and_purchases, outfile, user):
+    """From dask to dask, process and zero tare a single user's history.
+
+     Takes as input an overall dataframe file and outputs a user-specific
+     dataframe file.
     """
-    data_path = os.path.join(
-        "data/clean/flows/typical_fqdn_TM_DIV_user_INDEX_start", user_id)
 
-    df = bok.dask_infra.read_parquet(data_path)
+    df = flows_and_purchases.loc[
+        flows_and_purchases["user"] == user
+        ]
 
-    # Convert to pandas!
-    # Drop unnecessary columns to limit the memory footprint.
-    df = df.drop(["user",
-                  "dest_ip",
-                  "user_port",
-                  "dest_port",
-                  "protocol",
-                  "fqdn",
-                  "ambiguous_fqdn_count",
-                  "fqdn_source",
-                  ],
-                 axis="columns").compute()
+    df = df.compute()
 
-    # Reset the index once it's in memory.
-    df = df.reset_index().set_index("end").sort_values("end")
+    corrected_df = estimate_zero_corrected_user_balance(df)
 
-    # Set byte types as integers rather than floats.
-    df = df.astype({"bytes_up": int, "bytes_down": int})
-    df["bytes_total"] = df["bytes_up"] + df["bytes_down"]
-    print("total spend df")
-    print(df)
+    # The date sort is not stable, so be sure to save a unique ordering for
+    # the user's balance.
+    corrected_df = corrected_df.reset_index().rename(columns={"Index", "user_hist_i"})
+    dask_df = dask.dataframe.from_pandas(corrected_df, npartitions=1)
+    dask_df = dask_df.categorize(columns=["type", "user"])
+    dask_df = dask_df.repartition(partition_size="64M",
+                                  force=True)
 
-    # Get the end column back
-    df = df.reset_index()
+    bok.dask_infra.clean_write_parquet(dask_df, outfile)
 
-    # Rename to normalize for appending with the transaction log and remove
-    # temporary columns
-    df = df.rename({"end": "timestamp", "bytes_total": "bytes"}, axis="columns")
 
-    # TODO(matt9j) Temporary
-    # df = df.drop(["bytes_up", "bytes_down", "start"],
-    #              axis="columns")
+def tare_all_users(infile, out_parent_directory, client):
+    frame = bok.dask_infra.read_parquet(infile)
+    users = frame["user"].unique().compute()
+    tokens = []
 
-    return df
+    # TODO(matt9j) Temporary debug
+    users = ["ff26563a118d01972ef7ac443b65a562d7f19cab327a0115f5c42660c58ce2b8",
+             "5759d99492dc4aace702a0d340eef1d605ba0da32a526667149ba059305a4ccb"]
+
+    for user in users:
+        print("Processing and taring single user:", user)
+        out_user_directory = os.path.join(out_parent_directory, user)
+
+        compute_token = dask.delayed(_process_and_split_single_user)(frame, out_user_directory, user)
+        tokens.append(compute_token)
+
+    print("Starting dask zero computation")
+    client.compute(tokens, sync=True)
+    print("Completed zero estimation augmentation")
+
+
+def reduce_to_pandas(infile, outfile, client):
+    print("Beginning pandas reduction")
+    aggregated_balances = bok.dask_infra.read_parquet(infile)
+
+    # TODO For now just select a single user to debug.
+    df = aggregated_balances.loc[
+        aggregated_balances["user"] == "ff26563a118d01972ef7ac443b65a562d7f19cab327a0115f5c42660c58ce2b8"
+        ]
+
+    df = df.reset_index().set_index("user_hist_i")[["timestamp", "balance", "user"]]
+
+    df = df.compute()
+
+    bok.pd_infra.clean_write_parquet(df, outfile)
 
 
 def reduce_to_user_pd_frame(user, outpath):
@@ -357,12 +368,13 @@ def make_plot(inpath):
 
     # get topups separately
     topups = running_user_balance.copy()
-    topups = topups.loc[topups["type"]=="topup"]
+    topups = topups.loc[topups["type"]=="purchase"]
     topups = topups.reset_index()
 
     alt.data_transformers.disable_max_rows()
 
     # reset the index to recover the timestamp for plotting
+    #TODO(matt9j) Check on the sorting
     running_user_balance = running_user_balance.reset_index().sort_values("timestamp")
     print("length:", len(running_user_balance))
     print(topups.head())
@@ -399,7 +411,8 @@ if __name__ == "__main__":
     # 5759d99492dc4aace702a0d340eef1d605ba0da32a526667149ba059305a4ccb <- small data
     test_user = "5759d99492dc4aace702a0d340eef1d605ba0da32a526667149ba059305a4ccb"
     grouped_flows_and_purchases_file = "scratch/filtered_flows_and_purchases_TM_DIV_none_INDEX_start"
-    probable_zeros_file = "scratch/probable_zero_data_balance_ranges_TM_DIV_none_INDEX_start"
+    split_tared_balance_file = "scratch/tared_user_data_balance_TM_DIV_user_INDEX_start"
+    merged_balance_file = "scratch/tared_user_data_balance_TM_DIF_none_INDEX_start"
     graph_temporary_file = "scratch/graphs/user_data_balance"
 
     if platform.large_compute_support:
@@ -407,12 +420,12 @@ if __name__ == "__main__":
         client = bok.dask_infra.setup_dask_client()
         # reduce_to_user_pd_frame(test_user, outpath=graph_temporary_file)
         # compute_filtered_purchase_and_use_intermediate(grouped_flows_and_purchases_file, client)
-        compute_probable_zero_ranges(grouped_flows_and_purchases_file, probable_zeros_file)
+        tare_all_users(grouped_flows_and_purchases_file, split_tared_balance_file, client)
+        bok.dask_infra.merge_parquet_frames(split_tared_balance_file, merged_balance_file)
+        reduce_to_pandas(merged_balance_file, graph_temporary_file)
         client.close()
     else:
         print("Using cached results!")
-        # TODO (Remove)
-        compute_probable_zero_ranges(grouped_flows_and_purchases_file, probable_zeros_file)
 
     if platform.altair_support:
         print("Running altair subcommands")
