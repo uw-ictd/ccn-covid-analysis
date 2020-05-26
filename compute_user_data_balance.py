@@ -175,7 +175,9 @@ def estimate_zero_corrected_user_balance(user_history_frame):
     likely_zero_ranges = pd.DataFrame(likely_zero_ranges)
 
     # Likely zero threshold if there are 20 or more unsuccessful flow attempts.
-    likely_zero_ranges = likely_zero_ranges.loc[likely_zero_ranges["count"] >= 50]
+    if len(likely_zero_ranges) > 0:
+        likely_zero_ranges = likely_zero_ranges.loc[likely_zero_ranges["count"] >= 50]
+
     print(len(likely_zero_ranges))
 
     # Compute the spend amount
@@ -246,8 +248,9 @@ def estimate_zero_corrected_user_balance(user_history_frame):
 
     # Edge case of the starting value requires the fillna, otherwise all
     # other entries get the negative of the minimum forward looking balance!
-    df.loc[df["type"] == "tare", ["net_bytes"]] = \
-        - tare_offsets["cum_min_balance"].diff().fillna(tare_offsets["cum_min_balance"].iloc[0])
+    if len(tare_offsets) > 0:
+        df.loc[df["type"] == "tare", ["net_bytes"]] = \
+            - tare_offsets["cum_min_balance"].diff().fillna(tare_offsets["cum_min_balance"].iloc[0])
 
     df = df.astype({"net_bytes": int})
 
@@ -258,7 +261,9 @@ def estimate_zero_corrected_user_balance(user_history_frame):
     df.loc[df["balance"] < 0, "balance"] = 0
 
     # Cleanup intermediates
-    df = df.drop(columns=["count"])
+    if len(tare_offsets) > 0:
+        df = df.drop(columns=["count"])
+
     return df
 
 
