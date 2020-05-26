@@ -133,20 +133,22 @@ def estimate_zero_corrected_user_balance(user_history_frame):
 
     df = user_history_frame.reset_index()  # Access timestamp directly
 
-    # Break ties by putting purchases before external flows.
-    df = df.sort_values(["timestamp", "type"], ascending=(True, False))
+    # Define purchases as having the same start and end time.
+    df.loc[df["type"]=="purchase", "end"] = df["timestamp"]
 
-    # Purchases mark a fencepost where we know the data balance should go positive.
-    df["next_purchase_time"] = df["timestamp"].where(
-        df["type"] == "purchase",
-        other=pd.NaT,
-    ).fillna(value=None, method="bfill")
+    # Sort by end when assigning the end time (some flows start with uplink
+    # before a purchase is made, which then allows the data to flow "right
+    # before" the purchase)
+    df = df.sort_values(["end"])
 
     # The end time of the last external downlink is a conservative bound on when the balance was last positive.
     df["last_ext_rx_end_time"] = df["end"].where(
         ((df["type"] == "ext") & (df["bytes_down"] > 0)),
         other=pd.NaT,
     ).fillna(value=None, method="ffill")
+
+    # Return to a regular start time sort.
+    df = df.sort_values(["timestamp"])
 
     possible_zero_ranges = df.loc[
         ((df["type"] == "purchase") & (df["last_ext_rx_end_time"] < df["timestamp"])),
@@ -173,10 +175,11 @@ def estimate_zero_corrected_user_balance(user_history_frame):
     likely_zero_ranges = pd.DataFrame(likely_zero_ranges)
 
     # Likely zero threshold if there are 20 or more unsuccessful flow attempts.
-    likely_zero_ranges = likely_zero_ranges.loc[likely_zero_ranges["count"] >= 20]
+    likely_zero_ranges = likely_zero_ranges.loc[likely_zero_ranges["count"] >= 50]
+    print(len(likely_zero_ranges))
 
     # Compute the spend amount
-    df = df.drop(columns=["last_ext_rx_end_time", "next_purchase_time"])
+    df = df.drop(columns=["last_ext_rx_end_time"])
     df["net_bytes"] = df["bytes_purchased"] - df["bytes_up"] - df["bytes_down"]
 
     # Append the initial offset entry
@@ -287,14 +290,9 @@ def _process_and_split_single_user(infile, outfile, user):
     print("completed tare for user:", user)
 
 
-
 def tare_all_users(infile, out_parent_directory, client):
-    #users = bok.dask_infra.read_parquet(infile)["user"].unique().compute()
+    users = bok.dask_infra.read_parquet(infile)["user"].unique().compute()
     tokens = []
-
-    # TODO(matt9j) Temporary debug
-    users = ["ff26563a118d01972ef7ac443b65a562d7f19cab327a0115f5c42660c58ce2b8",
-             "5759d99492dc4aace702a0d340eef1d605ba0da32a526667149ba059305a4ccb"]
 
     for user in users:
         print("Processing and taring single user:", user)
@@ -371,26 +369,29 @@ def make_plot(inpath):
     running_user_balance = bok.pd_infra.read_parquet(inpath)
     print(running_user_balance)
     # Limit the domain instead of the time resolution
-    running_user_balance = running_user_balance.loc[(running_user_balance["timestamp"] > "2019-03-19") &
-                                                    (running_user_balance["timestamp"] < "2019-03-21")]
-    print(gap_df)
-    gap_df = gap_df.loc[(gap_df["start"] > "2019-03-19") &
-                        (gap_df["start"] < "2019-03-21")]
+    running_user_balance = running_user_balance.loc[(running_user_balance["timestamp"] > "2019-05-21 18:25") &
+                                                    (running_user_balance["timestamp"] < "2019-05-22 23:32")]
+    # print(gap_df)
+    gap_df = gap_df.loc[(gap_df["start"] > "2019-05-21 18:25") &
+                        (gap_df["start"] < "2019-05-22 23:32")]
 
-    # Resample for displaying large time periods
-    # running_user_balance = running_user_balance.set_index("timestamp")
-    # running_user_balance = running_user_balance.resample("1h").mean()
+
+    # running_user_balance = running_user_balance.loc[(running_user_balance["timestamp"] > "2019-03-19 18:25") &
+    #                                                 (running_user_balance["timestamp"] < "2019-03-21 18:32")]
 
     # get topups separately
     topups = running_user_balance.copy()
     topups = topups.loc[
         (topups["type"]=="purchase") |
-        (topups["type"] == "tare") |
-        ((topups["type"] == "ext") & (topups["bytes_down"] > 0))]
+        (topups["type"] == "tare")]
+
+    # ((topups["type"] == "ext") & (topups["bytes_down"] > 0))
     topups = topups.reset_index()
 
     alt.data_transformers.disable_max_rows()
-
+    # Resample for displaying large time periods
+    # running_user_balance = running_user_balance.set_index("timestamp")
+    # running_user_balance = running_user_balance.resample("1h").mean()
 
     # reset the index to recover the timestamp for plotting
     #TODO(matt9j) Check on the sorting
@@ -404,13 +405,14 @@ def make_plot(inpath):
             "balance:Q",
             #scale=alt.Scale(domain=[0, 1000000000]),
         ),
-        tooltip=["balance:Q", "timestamp:T"],
     ).properties(width=800)
 
     points = alt.Chart(topups).mark_point(color="#F54242", opacity=0.2, size=200).encode(
         x="timestamp:T",
         y="balance:Q",
         color="type:N",
+        tooltip=["balance:Q", "timestamp:T"],
+        text="timestamp",
     )
 
     vertline = alt.Chart(gap_df).mark_rect(color="#FFAA00").encode(
@@ -426,9 +428,6 @@ def make_plot(inpath):
 if __name__ == "__main__":
     platform = bok.platform.read_config()
 
-    # ff26563a118d01972ef7ac443b65a562d7f19cab327a0115f5c42660c58ce2b8
-    # 5759d99492dc4aace702a0d340eef1d605ba0da32a526667149ba059305a4ccb <- small data
-    test_user = "5759d99492dc4aace702a0d340eef1d605ba0da32a526667149ba059305a4ccb"
     grouped_flows_and_purchases_file = "scratch/filtered_flows_and_purchases_TM_DIV_none_INDEX_start"
     split_tared_balance_file = "scratch/tared_user_data_balance_TM_DIV_user_INDEX_start"
     merged_balance_file = "scratch/tared_user_data_balance_TM_DIF_none_INDEX_start"
@@ -437,7 +436,6 @@ if __name__ == "__main__":
     if platform.large_compute_support:
         print("Running compute subcommands")
         client = bok.dask_infra.setup_dask_client()
-        # reduce_to_user_pd_frame(test_user, outpath=graph_temporary_file)
         # compute_filtered_purchase_and_use_intermediate(grouped_flows_and_purchases_file, client)
         tare_all_users(grouped_flows_and_purchases_file, split_tared_balance_file, client)
         bok.dask_infra.merge_parquet_frames(split_tared_balance_file, merged_balance_file, index_column="timestamp")
@@ -447,6 +445,11 @@ if __name__ == "__main__":
         print("Using cached results!")
 
     if platform.altair_support:
+        # df = bok.pd_infra.read_parquet(
+        #     "scratch/tempff26563a118d01972ef7ac443b65a562d7f19cab327a0115f5c42660c58ce2b8.parquet")
+        # corrected_df = estimate_zero_corrected_user_balance(df)
+        # corrected_df = corrected_df.reset_index().rename(columns={"index": "user_hist_i"}).drop(columns=["time_since_last_purchase"])
+        # bok.pd_infra.clean_write_parquet(corrected_df, graph_temporary_file)
         print("Running altair subcommands")
         make_plot(inpath=graph_temporary_file)
 
