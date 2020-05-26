@@ -253,7 +253,6 @@ def estimate_zero_corrected_user_balance(user_history_frame):
 
     # Cleanup intermediates
     df = df.drop(columns=["count"])
-    print(df)
     return df
 
 
@@ -275,7 +274,7 @@ def _process_and_split_single_user(infile, outfile, user):
 
     # The date sort is not stable, so be sure to save a unique ordering for
     # the user's balance.
-    corrected_df = corrected_df.reset_index().rename(columns={"Index", "user_hist_i"})
+    corrected_df = corrected_df.reset_index().rename(columns={"Index": "user_hist_i"})
     dask_df = dask.dataframe.from_pandas(corrected_df, npartitions=1)
     dask_df = dask_df.categorize(columns=["type", "user"])
     dask_df = dask_df.repartition(partition_size="64M",
