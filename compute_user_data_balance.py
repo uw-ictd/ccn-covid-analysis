@@ -294,15 +294,21 @@ def tare_all_users(infile, out_parent_directory, client):
     users = bok.dask_infra.read_parquet(infile)["user"].unique().compute()
     tokens = []
 
-    for user in users:
+    batch_size = 1
+    for i, user in enumerate(users):
         print("Processing and taring single user:", user)
         out_user_directory = os.path.join(out_parent_directory, user)
 
         compute_token = dask.delayed(_process_and_split_single_user)(infile, out_user_directory, user)
         tokens.append(compute_token)
+        if (i % batch_size) == (batch_size - 1):
+            print("Computing zero align for batch", i)
+            client.compute(tokens, sync=True)
+            tokens = []
 
-    print("Starting dask zero computation")
-    client.compute(tokens, sync=True)
+    print("Starting dask zero cleanup computation")
+    if len(tokens) > 0:
+        client.compute(tokens, sync=True)
     print("Completed zero estimation augmentation")
 
 
