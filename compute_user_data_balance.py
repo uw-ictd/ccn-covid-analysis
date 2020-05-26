@@ -116,6 +116,15 @@ def compute_filtered_purchase_and_use_intermediate(outfile, client):
     print("Post user and nonlocal:{} ({}% selective)".format(results[2], results[2]/results[0]*100))
 
 
+def compute_probable_zero_ranges(infile, outfile):
+    """Estimate and record probable ranges for each user when their data balance is actually zero.
+    """
+
+    flows_and_purchases = bok.dask_infra.read_parquet(infile)
+    print(flows_and_purchases.head())
+    print(flows_and_purchases.tail())
+
+
 def compute_user_data_use_history(user_id, client):
     """Compute the data use history of a single user
     """
@@ -250,13 +259,15 @@ if __name__ == "__main__":
     # 5759d99492dc4aace702a0d340eef1d605ba0da32a526667149ba059305a4ccb <- small data
     test_user = "5759d99492dc4aace702a0d340eef1d605ba0da32a526667149ba059305a4ccb"
     grouped_flows_and_purchases_file = "scratch/filtered_flows_and_purchases_TM_DIV_none_INDEX_start"
+    probable_zeros_file = "scratch/probable_zero_data_balance_ranges_TM_DIV_none_INDEX_start"
     graph_temporary_file = "scratch/graphs/user_data_balance"
 
     if platform.large_compute_support:
         print("Running compute subcommands")
         client = bok.dask_infra.setup_dask_client()
-        #reduce_to_user_pd_frame(test_user, outpath=graph_temporary_file)
-        compute_filtered_purchase_and_use_intermediate(grouped_flows_and_purchases_file, client)
+        # reduce_to_user_pd_frame(test_user, outpath=graph_temporary_file)
+        # compute_filtered_purchase_and_use_intermediate(grouped_flows_and_purchases_file, client)
+        compute_probable_zero_ranges(grouped_flows_and_purchases_file, probable_zeros_file)
         client.close()
     else:
         print("Using cached results!")
