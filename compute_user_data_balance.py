@@ -274,7 +274,7 @@ def _process_and_split_single_user(infile, outfile, user):
 
     # The date sort is not stable, so be sure to save a unique ordering for
     # the user's balance.
-    corrected_df = corrected_df.reset_index().rename(columns={"Index": "user_hist_i"})
+    corrected_df = corrected_df.reset_index().rename(columns={"index": "user_hist_i"})
     dask_df = dask.dataframe.from_pandas(corrected_df, npartitions=1)
     dask_df = dask_df.categorize(columns=["type", "user"])
     dask_df = dask_df.repartition(partition_size="64M",
@@ -423,7 +423,7 @@ if __name__ == "__main__":
         # compute_filtered_purchase_and_use_intermediate(grouped_flows_and_purchases_file, client)
         tare_all_users(grouped_flows_and_purchases_file, split_tared_balance_file, client)
         bok.dask_infra.merge_parquet_frames(split_tared_balance_file, merged_balance_file, index_column="timestamp")
-        reduce_to_pandas(merged_balance_file, graph_temporary_file)
+        reduce_to_pandas(merged_balance_file, graph_temporary_file, client)
         client.close()
     else:
         print("Using cached results!")
