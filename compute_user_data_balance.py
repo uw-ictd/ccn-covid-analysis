@@ -257,15 +257,16 @@ def estimate_zero_corrected_user_balance(user_history_frame):
     return df
 
 
-def _process_and_split_single_user(flows_and_purchases, outfile, user):
+def _process_and_split_single_user(infile, outfile, user):
     """From dask to dask, process and zero tare a single user's history.
 
      Takes as input an overall dataframe file and outputs a user-specific
      dataframe file.
     """
+    df = bok.dask_infra.read_parquet(infile)
 
-    df = flows_and_purchases.loc[
-        flows_and_purchases["user"] == user
+    df = df.loc[
+        df["user"] == user
         ]
 
     df = df.compute()
@@ -281,11 +282,12 @@ def _process_and_split_single_user(flows_and_purchases, outfile, user):
                                   force=True)
 
     bok.dask_infra.clean_write_parquet(dask_df, outfile)
+    print("completed tare for user:", user)
+
 
 
 def tare_all_users(infile, out_parent_directory, client):
-    frame = bok.dask_infra.read_parquet(infile)
-    users = frame["user"].unique().compute()
+    #users = bok.dask_infra.read_parquet(infile)["user"].unique().compute()
     tokens = []
 
     # TODO(matt9j) Temporary debug
@@ -296,7 +298,7 @@ def tare_all_users(infile, out_parent_directory, client):
         print("Processing and taring single user:", user)
         out_user_directory = os.path.join(out_parent_directory, user)
 
-        compute_token = dask.delayed(_process_and_split_single_user)(frame, out_user_directory, user)
+        compute_token = dask.delayed(_process_and_split_single_user)(infile, out_user_directory, user)
         tokens.append(compute_token)
 
     print("Starting dask zero computation")
