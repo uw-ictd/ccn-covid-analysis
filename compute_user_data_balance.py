@@ -69,15 +69,20 @@ def compute_filtered_purchase_and_use_intermediate(outfile, client):
     purchases = purchases.loc[
         purchases["kind"] == "purchase",
         ["timestamp", "user", "amount_bytes", "time_since_last_purchase"]
-    ].rename({"amount_bytes": "bytes_purchased"}, axis="columns")
+    ].rename(columns={"amount_bytes": "bytes_purchased"})
 
     # Filter purchases with the same users to analyze as used for flows
     purchases = purchases.loc[purchases["user"].isin(users_to_analyze["user"])]
 
     # Convert purchases to dask and append
+    purchases["type"] = "purchase"
     purchases_df = dask.dataframe.from_pandas(purchases, npartitions=1)
 
-    flows = flows.reset_index().rename({"start": "timestamp"}, axis="columns")
+    flows = flows.reset_index().rename(columns={"start": "timestamp"})
+    flows["type"] = "local"
+    flows["type"] = flows["type"].where(flows["local"], other="ext")
+    flows = flows.drop(columns=["local"])
+
     aggregate = flows.append(purchases_df)
 
     # Apply fillna only to specific byte columns to avoid clobbering useful NaT values in timestamp columns.
@@ -89,6 +94,8 @@ def compute_filtered_purchase_and_use_intermediate(outfile, client):
     aggregate = aggregate.astype({"bytes_up": int,
                                   "bytes_down": int,
                                   "bytes_purchased": int})
+
+    aggregate = aggregate.categorize(columns=["type"])
 
     print(purchases_df)
     print(flows)
