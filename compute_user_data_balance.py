@@ -3,11 +3,17 @@ import dask.dataframe
 import pandas as pd
 import os
 
-
 import bok.parsers
 import bok.dask_infra
 import bok.pd_infra
 import bok.platform
+
+
+# Module specific format options
+pd.set_option('display.max_columns', None)
+pd.set_option('display.max_colwidth', None)
+pd.set_option('display.width', None)
+pd.set_option('display.max_rows', 20)
 
 
 def compute_user_data_purchase_histories():
@@ -121,8 +127,20 @@ def compute_probable_zero_ranges(infile, outfile):
     """
 
     flows_and_purchases = bok.dask_infra.read_parquet(infile)
-    print(flows_and_purchases.head())
-    print(flows_and_purchases.tail())
+
+    user_frame = flows_and_purchases.loc[
+        flows_and_purchases["user"] == "ff26563a118d01972ef7ac443b65a562d7f19cab327a0115f5c42660c58ce2b8"
+        ]
+
+    user_frame = user_frame.compute()
+
+    bok.pd_infra.clean_write_parquet(user_frame, "scratch/test_zeros_frame.parquet")
+    user_frame = bok.pd_infra.read_parquet("scratch/test_zeros_frame.parquet")
+    print("Read in temporary frame")
+    print(user_frame)
+
+    user_frame["last_purchase_time"] = user_frame["timestamp"].where(user_frame["type"] == "purchase", other=pd.NaT)
+    user_frame["last_purchase_time"] = user_frame["last_purchase_time"].fillna(value=None, method="bfill")
 
 
 def compute_user_data_use_history(user_id, client):
