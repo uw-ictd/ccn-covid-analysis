@@ -15,7 +15,7 @@ import bok.platform
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_colwidth', None)
 pd.set_option('display.width', None)
-pd.set_option('display.max_rows', 20)
+pd.set_option('display.max_rows', 40)
 
 
 def compute_user_data_purchase_histories():
@@ -130,74 +130,73 @@ def compute_probable_zero_ranges(infile, outfile):
 
     # flows_and_purchases = bok.dask_infra.read_parquet(infile)
     #
-    # user_frame = flows_and_purchases.loc[
+    # df = flows_and_purchases.loc[
     #     flows_and_purchases["user"] == "ff26563a118d01972ef7ac443b65a562d7f19cab327a0115f5c42660c58ce2b8"
     #     ]
     #
-    # user_frame = user_frame.compute()
+    # df = df.compute()
     #
-    # bok.pd_infra.clean_write_parquet(user_frame, "scratch/test_zeros_frame.parquet")
-    user_frame = bok.pd_infra.read_parquet("scratch/test_zeros_frame.parquet")
-    print("Read in temporary frame")
+    # bok.pd_infra.clean_write_parquet(df, "scratch/test_zeros_frame.parquet")
+    df = bok.pd_infra.read_parquet("scratch/test_zeros_frame.parquet")
 
-    user_frame = user_frame.reset_index()  # Access timestamp directly
+    df = df.reset_index()  # Access timestamp directly
 
     # Purchases mark a fencepost where we know the data balance should go positive.
-    user_frame["next_purchase_time"] = user_frame["timestamp"].where(
-        user_frame["type"] == "purchase",
+    df["next_purchase_time"] = df["timestamp"].where(
+        df["type"] == "purchase",
         other=pd.NaT,
     ).fillna(value=None, method="bfill")
 
     # The end time of the last external downlink is a conservative bound on when the balance was last positive.
-    user_frame["last_ext_rx_end_time"] = user_frame["end"].where(
-        ((user_frame["type"] == "ext") & (user_frame["bytes_down"] > 0)),
+    df["last_ext_rx_end_time"] = df["end"].where(
+        ((df["type"] == "ext") & (df["bytes_down"] > 0)),
         other=pd.NaT,
     ).fillna(value=None, method="ffill")
 
-    possible_zero_ranges = user_frame.loc[
-        ((user_frame["type"] == "purchase") & (user_frame["last_ext_rx_end_time"] < user_frame["timestamp"])),
+    possible_zero_ranges = df.loc[
+        ((df["type"] == "purchase") & (df["last_ext_rx_end_time"] < df["timestamp"])),
         ["last_ext_rx_end_time", "timestamp"]
     ].rename(columns={"last_ext_rx_end_time": "range_start",
                       "timestamp": "range_end"})
 
-    # TODO(matt9j) Mark some ranges as high confidence if there are overlapping failed external flows
-    likely_zero_ranges = possible_zero_ranges
+    # Mark ranges as high confidence if there are overlapping failed external flows
+    likely_zero_ranges = []
+    for zero_range in possible_zero_ranges.itertuples():
+        count = len(df.loc[
+            (((df["timestamp"] >= zero_range.range_start) & (df["timestamp"] <= zero_range.range_end)) |
+             ((df["end"] >= zero_range.range_start) & (df["end"] <= zero_range.range_end)) |
+             ((df["timestamp"] <= zero_range.range_start) & (df["end"] >= zero_range.range_end))) &
+            (df["type"] == "ext") &
+            (df["bytes_down"] <= 0)
+        ])
+        zero_range = zero_range._asdict()
+        zero_range["count"] = count
+        likely_zero_ranges.append(zero_range)
+
+    # TODO(matt9j) Cross reference against other flows to see if the backhaul is just down.
+    likely_zero_ranges = pd.DataFrame(likely_zero_ranges)
+
+    # Likely zero threshold if there are 20 or more unsuccessful flow attempts.
+    likely_zero_ranges = likely_zero_ranges.loc[likely_zero_ranges["count"] >= 20]
 
     # Compute the spend amount
-    user_frame = user_frame.drop(columns=["last_ext_rx_end_time", "next_purchase_time"])
-    user_frame["net_bytes"] = user_frame["bytes_purchased"] - user_frame["bytes_up"] - user_frame["bytes_down"]
-
-    # Compute the observed balance
-    user_frame["balance"] = user_frame.sort_values("timestamp")["net_bytes"].cumsum()
-    print(user_frame)
-
-    # Find the initial offset (existing balance before logging to ensure never negative)
-    global_minimum = user_frame["balance"].min()
-    if global_minimum < 0:
-        initial_offset = -global_minimum
-    else:
-        initial_offset = 0
+    df = df.drop(columns=["last_ext_rx_end_time", "next_purchase_time"])
+    df["net_bytes"] = df["bytes_purchased"] - df["bytes_up"] - df["bytes_down"]
 
     # Append the initial offset entry
-    timestamp = user_frame["timestamp"].min() - datetime.timedelta(seconds=1)
-    user = user_frame["user"].min()
+    timestamp = df["timestamp"].min() - datetime.timedelta(seconds=1)
+    user = df["user"].min()
     initial_entry = {"timestamp": timestamp,
                      "user": user,
                      "bytes_up": 0,
                      "bytes_down": 0,
                      "type": "init",
-                     "bytes_purchased": initial_offset,
-                     "net_bytes": initial_offset,
-                     "balance": 0,
+                     "bytes_purchased": pd.NA,  # We will fill these values later
+                     "net_bytes": pd.NA,
                      }
 
     # Append while ignoring the index of the appended row
-    user_frame = user_frame.append(initial_entry, ignore_index=True)
-    # Resort and restore index
-    user_frame = user_frame.set_index("timestamp").sort_values("timestamp").reset_index()
-    print(user_frame)
-    # Recompute the observed balance
-    user_frame["balance"] = user_frame.sort_values("timestamp")["net_bytes"].cumsum()
+    df = df.append(initial_entry, ignore_index=True)
 
     # Apply zeroing offsets
     print(likely_zero_ranges)
@@ -207,46 +206,63 @@ def compute_probable_zero_ranges(infile, outfile):
         type="tare",
         bytes_up=0,
         bytes_down=0,
-        net_bytes=pd.NA,
-        bytes_purchased=pd.NA,
-        balance=pd.NA,
+        net_bytes=0,
+        bytes_purchased=0,
     )
     tare_offsets = tare_offsets.rename(columns={"range_start": "timestamp",
                                                 "range_end": "end"})
 
     # Append while ignoring the index of the appended row
-    user_frame = user_frame.append(tare_offsets, ignore_index=True)
-    # Resort and restore index
-    user_frame = user_frame.set_index("timestamp").sort_values("timestamp").reset_index()
+    df = df.append(tare_offsets, ignore_index=True)
 
-    # Forward fill the balance into tare rows
-    user_frame["balance"] = user_frame["balance"].fillna(method="ffill")
+    # Resort and restore index-- note, the pandas sort is not stable, so old
+    # balance entries for the same second precision timestamp may be scrambled!
+    df = df.set_index("timestamp").sort_values("timestamp").reset_index()
+
+    # Compute the observed balance
+    df["balance"] = df["net_bytes"].cumsum()
+
+    # Find the initial offset (existing balance before logging to ensure never negative)
+    global_minimum = df["balance"].min()
+    if global_minimum < 0:
+        initial_offset = -global_minimum
+    else:
+        initial_offset = 0
+
+    df.loc[df["type"] == "init", ["net_bytes", "balance"]] = initial_offset
+
+    # Recompute the observed balance after adding the offset
+    df["balance"] = df["net_bytes"].cumsum()
 
     # Assign tare values needed to fix the balance
-    tare_offsets = user_frame.loc[user_frame["type"] == "tare"]
+    # Include external flows with downlink since they may also indicate balance low points.
+    tare_offsets = df.loc[((df["type"] == "tare") |
+                           ((df["type"] == "ext") & (df["bytes_down"] > 0)))].copy()
     # Track the "reverse cumulative min" to find inter-topups where the
     # balance actually goes down. This should be the lowest balance from each
     # row forward. These are cases where we know one of the prior topups did
     # not happen at zero, or that we missed a topup entry.
-    print(user_frame)
+    print(df)
     tare_offsets["cum_min_balance"] = tare_offsets.loc[::-1, ["balance"]].cummin()[::-1]
     print(tare_offsets)
-    #user_frame.loc[user_frame["type"] == "tare", "cum_min_balance"] = tare_offsets.loc[::-1, ["balance"]].cummin()[::-1]
+
+    tare_offsets = tare_offsets.loc[df["type"] == "tare"]
 
     # Edge case of the starting value requires the fillna, otherwise all
     # other entries get the negative of the minimum forward looking balance!
-    user_frame.loc[user_frame["type"] == "tare", ["net_bytes"]] = \
+    df.loc[df["type"] == "tare", ["net_bytes"]] = \
         - tare_offsets["cum_min_balance"].diff().fillna(tare_offsets["cum_min_balance"].iloc[0])
 
-    user_frame = user_frame.astype({"net_bytes": int})
+    df = df.astype({"net_bytes": int})
 
     # Recompute final tared balance
-    user_frame["balance"] = user_frame.sort_values("timestamp")["net_bytes"].cumsum()
+    df["balance"] = df["net_bytes"].cumsum()
 
-    print(user_frame)
-    print(user_frame.loc[user_frame["type"] == "tare"])
-    print(user_frame.loc[user_frame["balance"] < 0])
-    return user_frame
+    print(df)
+    print(df.loc[df["type"] == "tare"])
+    print(df.loc[((df["type"] == "purchase") & (df["timestamp"] >= "2019-03-16 09:00:00"))])
+    print(df.loc[df["balance"] < 0])
+    return df
 
 
 def compute_user_data_use_history(user_id, client):
