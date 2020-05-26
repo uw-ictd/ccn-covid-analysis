@@ -70,7 +70,7 @@ def read_parquet(path):
     return dask.dataframe.read_parquet(path, engine="fastparquet")
 
 
-def merge_parquet_frames(in_parent_directory, out_frame_path):
+def merge_parquet_frames(in_parent_directory, out_frame_path, index_column):
     """Iterate through divs in a parent directory and merge to the out frame
     """
     merged_frame = None
@@ -85,7 +85,7 @@ def merge_parquet_frames(in_parent_directory, out_frame_path):
             merged_frame = merged_frame.append(frame)
 
     merged_frame = merged_frame.reset_index().set_index(
-        "start"
+        index_column
     ).repartition(
         partition_size="64M",
         force=True

@@ -423,7 +423,7 @@ if __name__ == "__main__":
         # reduce_to_user_pd_frame(test_user, outpath=graph_temporary_file)
         # compute_filtered_purchase_and_use_intermediate(grouped_flows_and_purchases_file, client)
         tare_all_users(grouped_flows_and_purchases_file, split_tared_balance_file, client)
-        bok.dask_infra.merge_parquet_frames(split_tared_balance_file, merged_balance_file)
+        bok.dask_infra.merge_parquet_frames(split_tared_balance_file, merged_balance_file, index_column="timestamp")
         reduce_to_pandas(merged_balance_file, graph_temporary_file)
         client.close()
     else:
