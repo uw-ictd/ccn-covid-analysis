@@ -8,6 +8,7 @@ import os
 
 import bok.dask_infra
 import bok.domains
+import bok.platform
 
 
 def _categorize_user(in_path, out_path):
@@ -195,20 +196,48 @@ def merge_parquet_frames(in_parent_directory, out_frame_path):
     bok.dask_infra.clean_write_parquet(merged_frame, out_frame_path)
 
 
+def _print_heavy_hitter_unmapped_domains(infile):
+    df = bok.dask_infra.read_parquet(infile)
+
+    unmapped = df.loc[((df["org"] == "Unknown (Not Mapped)") | (df["category"] == "Unknown (Not Mapped)"))]
+    df = unmapped.groupby("fqdn").sum()
+
+    panda = df.compute()
+    print("Downlinks:")
+    print("----------")
+    print(panda.sort_values("bytes_down", ascending=False).head(50))
+
+    print("Uplinks:")
+    print("--------")
+    print(panda.sort_values("bytes_up", ascending=False).head(50))
+
+
 if __name__ == "__main__":
-    client = bok.dask_infra.setup_dask_client()
-    print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
+    platform = bok.platform.read_config()
 
     in_parent_directory = "scratch/flows/typical_fqdn_TM_DIV_user_INDEX_start/"
     annotated_parent_directory = "scratch/flows/typical_fqdn_category_org_local_TM_DIV_user_INDEX_start"
     stun_annotated_parent_directory = "scratch/flows/typical_fqdn_category_stun_org_local_TM_DIV_user_INDEX_start"
     merged_out_directory = "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
 
-    augment_all_user_flows(in_parent_directory, annotated_parent_directory, client)
-    stun_augment_all_user_flows(annotated_parent_directory, stun_annotated_parent_directory, client)
-    merge_parquet_frames(stun_annotated_parent_directory, merged_out_directory)
+    if platform.large_compute_support:
+        client = bok.dask_infra.setup_dask_client()
+        print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
 
-    client.close()
+        # Regular flow is below
+        # augment_all_user_flows(in_parent_directory, annotated_parent_directory, client)
+        # stun_augment_all_user_flows(annotated_parent_directory, stun_annotated_parent_directory, client)
+        # merge_parquet_frames(stun_annotated_parent_directory, merged_out_directory)
+
+        print("Temporary computation to find large domains.")
+        augment_all_user_flows(in_parent_directory, annotated_parent_directory, client)
+        #stun_augment_all_user_flows(annotated_parent_directory, stun_annotated_parent_directory, client)
+        merge_parquet_frames(annotated_parent_directory, "scratch/flows/unmapped_typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+        _print_heavy_hitter_unmapped_domains("scratch/flows/unmapped_typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+
+        client.close()
+
+    print("Finished heavy compute operations")
     print("Exited")
 
 
