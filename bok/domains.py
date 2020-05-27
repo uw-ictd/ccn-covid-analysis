@@ -179,31 +179,31 @@ class FqdnProcessor(object):
         if 'fbcdn' in fqdn or 'facebook' in fqdn or 'fbsbx' in fqdn or "fb.com" in fqdn or "accountkit.com" in fqdn:
             return "Facebook", self._process_facebook_category(fqdn)
 
-        if 'whatsapp' in fqdn:
-            return "WhatsApp", "Messaging"
+        # if 'whatsapp' in fqdn:
+        #     return "WhatsApp", "Messaging"
 
-        if 'twimg' in fqdn or 'twitter' in fqdn:
-            return "Twitter", "Messaging"
+        # if 'twimg' in fqdn or 'twitter' in fqdn:
+        #     return "Twitter", "Messaging"
 
-        if 'instagram' in fqdn:
-            return "Instagram", "Non-video Content"
+        # if 'instagram' in fqdn:
+        #     return "Instagram", "Non-video Content"
 
         if 'wikipedia' in fqdn:
             return "Wikipedia", "Non-video Content"
 
-        if 'akamai' in fqdn:
-            return "Akamai", "Mixed CDN"
+        # if 'akamai' in fqdn:
+        #     return "Akamai", "Mixed CDN"
 
         if 'amazonaws' in fqdn or 'aws.com' in fqdn:
             return "Amazon Web Services", "IAAS"
         elif 'amazon' in fqdn:
             return "Amazon", "Shopping"
 
-        if 'cloudfront' in fqdn:
-            return "Cloudfront", "Mixed CDN"
+        # if 'cloudfront' in fqdn:
+        #     return "Cloudfront", "Mixed CDN"
 
-        if 'cloudflare' in fqdn:
-            return "Cloudflare", "Mixed CDN"
+        # if 'cloudflare' in fqdn:
+        #     return "Cloudflare", "Mixed CDN"
 
         if "livestream818.com" in fqdn:
             return "818 Religious Conference", "Video"
