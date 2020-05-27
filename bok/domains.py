@@ -5,126 +5,126 @@ import re
 
 GOOGLE_REGEXES = {
     r'^www\.google\..*$': "Main Site",  # co.id, com.au, .com, .no, .cn etc.
-    r'^android\.clients\.google\.com$': "Software or Updates",
+    r'^google\..*$': "Main Site",
+    r'^apis.google.com$': "API",
+    r'^.*app-measurement\.com$': "API",  # Firebase Stats
+    r'^suggestqueries\.google\.com$': "API",  # Search completion
     r'^www\.googleapis\.com$': "API",
-    r'^play\.googleapis\.com$': "Software or Updates",
-    r'^(?:(?!ytimg).)*googleusercontent\.com$': "Non-video Content",
-    r'^.*googlevideo\.com$': "Video",
-    r'^android\.googleapis\.com$': "Software or Updates",
-    r'^dl\.google\.com$': "Software or Updates",
-    r'^.*\.doubleclick\.net$': "Ad Network",
-    r'^.*mtalk.*\.google\.com$': "Messaging",
+    r'^maps\.googleapis\.com$': "Location API",
+    r'^mobilemaps-pa\.googleapis\.com$': "Location API",
     r'^geomobileservices.*\.googleapis\.com$': "Location API",
     r'^semanticlocation.*\.googleapis\.com$': "Location API",
     r'^cloudconfig\.googleapis\.com$': "API",
-    r'^playatoms-pa\.googleapis\.com$': "Software or Updates",  # Related to google play store and play api
-    r'^accounts\.google\..*$': "Authentication",
+    r'^footprints-pa\.googleapis\.com$': "API",
+    r'^clientservices\.googleapis\.com$': "API",
+    r'^voledevice-pa\.googleapis\.com$': "API",
+    r'^.*translate.*\.com$': "API",  # Some at google apis, some at google.com
+    r'^chromefeedcontentsuggestions-pa.googleapis.com$': "API",
+    r'^.*crashlytics\.com$': "API",  # Firebase
+    r'^phonedeviceverification-pa\.googleapis\.com$': "API",
+    r'^safebrowsing\.googleapis\.com$': "API",
+    r'^mdh-pa\.googleapis\.com$': "API",
+    r'^mobilenetworkscoring-pa\.googleapis\.com$': "API",
+    r'^firebaseremoteconfig\.googleapis\.com$': "API",
+    r'^android-safebrowsing\.google\.com$': "API",
+    r'^fonts\.googleapis\.com$': "API",
+    r'^dns\.google.*$': "API",
     r'^people-pa\.googleapis\.com$': "API",
-    r'^instantmessaging-pa\.googleapis\.com$': "Messaging",
+    r'^id\.google\..*$': "Authentication",  # Not an indonesian specific site, api front end
+    r'^accounts\.google\..*$': "Authentication",
+    r'^clients.*\.google\..*$': "Authentication",
+    r'^cryptauthenrollment\.googleapis\.com$': "Authentication",
+    r'^(?:(?!ytimg).)*googleusercontent\.com$': "Non-video Content",
+    r'^(?:(?!connectivitycheck).)*gstatic\.com': "Non-video Content",  # Static
+    r'^(?:(?!yt).)*ggpht\.com$': "Non-video Content",  # HTTPS everywhere lists it as related to google code and google user content.
+    r'^.*gvt[0-9]*\.com$': "Mixed CDN",  # Video transcoding? and/or Chrome?
+    # r'^fonts\.gstatic\.com': "Static",
+    r'^connectivitycheck\.gstatic\.com$': "Device Services",
+    r'^android\.clients\.google\.com$': "Software or Updates",
+    r'^play\.googleapis\.com$': "Software or Updates",
+    r'^android\.googleapis\.com$': "Software or Updates",
+    r'^dl\.google\.com$': "Software or Updates",
+    r'^playatoms-pa\.googleapis\.com$': "Software or Updates",  # Related to google play store and play api
+    r'^update\.googleapis\.com$': "Software or Updates",
+    r'^play\.google\.com$': "Software or Updates",
+    r'^.*googlevideo\.com$': "Video",
     r'^.*ytimg.*$': "Video",
     r'^.*youtube.*$': "Video",
-    r'^clients.*\.google\..*$': "Authentication",
-    r'^(?:(?!connectivitycheck).)*gstatic\.com': "Non-video Content",  # Static
-    r'^connectivitycheck\.gstatic\.com$': "Device Services",
-    # r'^fonts\.gstatic\.com': "Static",
-    r'^(?:(?!yt).)*ggpht\.com$': "Non-video Content",  # HTTPS everywhere lists it as related to google code and google user content.
     r'^yt.*\.ggpht\.com$': "Video",  # Youtube image proxy
-    r'^.*app-measurement\.com$': "API",  # Firebase Stats
-    r'^.*gvt[0-9]*\.com$': "Mixed CDN",  # Video transcoding? and/or Chrome?
+    r'^video\.google\..*$': "Video",
+    r'^.*\.doubleclick\.net$': "Ad Network",
     r'^.*googlesyndication\.com$': "Ad Network",
-    r'^footprints-pa\.googleapis\.com$': "API",
+    r'.*2mdn\.net': "Ad Network",  # Doubleclick
+    r'^.*googletagservices\.com': "Ad Network",  # Tracking Pixels
+    r'^.*googletagmanager\.com$': "Ad Network",
+    r'.*analytics.*': "Ad Network",
+    r'.*adservice.*': "Ad Network",  # Seen with a variety of extensions and country codes
     r'^datasaver\.googleapis\.com$': "Compressed Web",
     r'^.*ampproject\.org$': "Compressed Web",
     r'^.*ampproject\.net$': "Compressed Web",
     r'^googleweblight\.com$': "Compressed Web",
     r'^litepages\.googlezip\.net$': "Compressed Web",
     r'^ampcid\.google\..*$': "Compressed Web",  # Seems to be country specific amp helpers?
-    r'^update\.googleapis\.com$': "Software or Updates",
-    r'^clientservices\.googleapis\.com$': "API",
-    r'^voledevice-pa\.googleapis\.com$': "API",
     r'^backup\.googleapis\.com$': "Files",  # User device backup...
-    r'^.*translate.*\.com$': "API",  # Some at google apis, some at google.com
-    r'^chromefeedcontentsuggestions-pa.googleapis.com$': "API",
-    r'^mail\.google\.com$': "Messaging",
-    r'^inbox\.google\.com$': "Messaging",
-    r'^.*gmail\.com$': "Messaging",
-    r'^.*crashlytics\.com$': "API",  # Firebase
-    r'^phonedeviceverification-pa\.googleapis\.com$': "API",
-    r'^photos\.googleapis\.com$': "Content Upload",
-    r'^cryptauthenrollment\.googleapis\.com$': "Authentication",
     r'^proxy\.googlezip\.net$': "Files",
-    r'^safebrowsing\.googleapis\.com$': "API",
-    r'^mdh-pa\.googleapis\.com$': "API",
-    r'^mobilenetworkscoring-pa\.googleapis\.com$': "API",
-    r'.*2mdn\.net': "Ad Network",  # Doubleclick
-    r'^firebaseremoteconfig\.googleapis\.com$': "API",
+    r'^drive\.google\.com$': "Files",
+    r'^photos\.googleapis\.com$': "Content Upload",
     r'^compress\.googlezip\.net$': "Content Upload",
-    r'^android-safebrowsing\.google\.com$': "API",
-    r'^.*googletagservices\.com': "Ad Network",  # Tracking Pixels
-    r'^.*googletagmanager\.com$': "Ad Network",
-    r'^play\.google\.com$': "Software or Updates",
-    r'^fonts\.googleapis\.com$': "API",
     r'^photosdata-pa\.googleapis\.com$': "Content Upload",  # Most traffic is upstream here
     r'^.*content-storage-upload\.googleapis\.com$': "Content Upload",  # Most traffic is upstream
-    r'^dns\.google.*$': "API",
-    r'.*analytics.*': "Ad Network",
-    r'.*adservice.*': "Ad Network",  # Seen with a variety of extensions and country codes
-    r'^maps\.googleapis\.com$': "Location API",
-    r'^drive\.google\.com$': "Files",
-    r'^mobilemaps-pa\.googleapis\.com$': "Location API",
-    r'^id\.google\..*$': "Authentication",  # Not an indonesian specific site, api front end
-    r'^google\..*$': "Main Site",
-    r'^apis.google.com$': "API",
-    r'^suggestqueries\.google\.com$': "API",  # Search completion
-    r'^video\.google\..*$': "Video",
+    r'^mail\.google\.com$': "Messaging",
+    r'^inbox\.google\.com$': "Messaging",
     r'^hangouts\.google\..*$': "Messaging",
+    r'^.*mtalk.*\.google\.com$': "Messaging",
+    r'^instantmessaging-pa\.googleapis\.com$': "Messaging",
+    r'^.*gmail\.com$': "Messaging",
 }
 
 FACEBOOK_REGEXES = {
+    r'^.*www\.facebook\.com$': "Main Site",
+    r'^web\.facebook\.com$': "Main Site",
+    r'^facebook\.com$': "Main Site",
+    r'^m\.facebook\.com$': "Main Site",
+    r'^mobile\.facebook\.com$': "Main Site",
+    r'^.*video.*\.facebook\.com$': "Video",
     r'^.*video.*\.fbcdn\.net$': "Video",
     r'^static.*\.fbcdn\.net$': "Non-video Content",  # Static
     r'^static.*\.facebook\.com$': "Non-video Content",  # Static
+    r'^z-m-static.*\.fbcdn\.net$': "Non-video Content",  # static
     r'^.*scontent.*\.fbcdn\.net$': "Non-video Content",
     r'^lookaside.*\.facebook\.com$': "Non-video Content",
     r'^platform-lookaside.*\.fbsbx\.com$': "Non-video Content",
-    r'^external.*\.fbcdn\.net$': "Mixed CDN",
-    r'^lithium.*\.facebook\.com$': "Ad Network",
     r'^.*api\.facebook\.com$': "API",
     r'^.*graph\.facebook\.com$': "API",
-    r'^edgeray.*\.facebook\.com$': "Mixed CDN",
+    r'^portal\.fb\.com$': "API",
     r'^connect\.facebook\.net$': "Authentication",  # Partner site embeddable sdk
     r'^connect\.facebook\.com$': "Authentication",  # Partner site embeddable sdk
-    r'^.*edge-mqtt.*\.facebook\.com$': "Messaging",
-    r"^mqtt.*\.facebook\.com$": "Messaging",
+    r'^.*accountkit\.com$': "Authentication",
+    r'^fbsbx\.com$': "Mixed CDN",
+    r'^cdn.fbsbx.com$': "Mixed CDN",
+    r'^edgeray.*\.facebook\.com$': "Mixed CDN",
+    r'^edge-star.*\.facebook\.com$': "Mixed CDN",
+    r'^external.*\.fbcdn\.net$': "Mixed CDN",
+    r'^z-m-external.*\.fbcdn\.net$': "Mixed CDN",
     r'^snaptu.*\.facebook\.com$': "Compressed Web",  # Staptu acquired to bootstrap FB-Lite
     r'^edge-snaptu.*\.facebook\.com$': "Compressed Web",
-    r'^edge-turnservice.*\.facebook\.com$': "Mixed CDN",
-    r'^.*www\.facebook\.com$': "Main Site",
-    r'^web\.facebook\.com$': "Main Site",
-    r'^an\.facebook\.com$': "Ad Network",
-    r'^cdn.fbsbx.com$': "Mixed CDN",
-    r'^m\.facebook\.com$': "Main Site",
-    r'^mobile\.facebook\.com$': "Main Site",
-    r'^portal\.fb\.com$': "API",
-    r'^.*accountkit\.com$': "Authentication",
-    r'^.*edge-chat\.facebook\.com$': "Messaging",
-    r'^.*video.*\.facebook\.com$': "Video",
-    r'^instagram.*\.fbcdn\.net': "Non-video Content",
-    r'^instagram.*\.facebook\.com': "Non-video Content",
-    r'^whatsapp.*\.fbcdn\.net$': "Messaging",
-    r'^.*whatsapp.*\.facebook\.com$': "Messaging",
+    r'^.*upload.*\.facebook\.com$': "Content Upload",
     r'^.*upload.*\.fbcdn\.com$': "Content Upload",
     r'^.*upload.*\.fbcdn\.net$': "Content Upload",
-    r'^facebook\.com$': "Main Site",
-    r'^edge-star.*\.facebook\.com$': "Mixed CDN",
-    r'^.*upload.*\.facebook\.com$': "Content Upload",
     # r'^fblive-upload\.facebook\.com': "Content Upload",
     # r'^rupload.facebook.com$': "Content Upload",
-    r'^z-m-static.*\.fbcdn\.net$': "Non-video Content",  # static
-    r'^z-m-external.*\.fbcdn\.net$': "Mixed CDN",
-    r'^fbsbx\.com$': "Mixed CDN",
+    r'^lithium.*\.facebook\.com$': "Ad Network",
+    r'^an\.facebook\.com$': "Ad Network",
+    r"^mqtt.*\.facebook\.com$": "Messaging",
+    r'^.*edge-mqtt.*\.facebook\.com$': "Messaging",
+    r'^.*edge-chat\.facebook\.com$': "Messaging",
     r'^edge-stun.*\.facebook\.com$': "Messaging",
     r'^stun.*\.facebook\.com$': "Messaging",
+    r'^edge-turnservice.*\.facebook\.com$': "Messaging",
+    r'^whatsapp.*\.fbcdn\.net$': "Messaging",
+    r'^.*whatsapp.*\.facebook\.com$': "Messaging",
+    r'^instagram.*\.fbcdn\.net': "Non-video Content",
+    r'^instagram.*\.facebook\.com': "Non-video Content",
 }
 
 
