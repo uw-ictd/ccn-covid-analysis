@@ -147,10 +147,11 @@ class FqdnProcessor(object):
                 match_regex = regex
 
         if match_regex is not None:
-            if match_regex == "Authentication":
+            matched_category = self.google_re[match_regex.pattern]
+            if matched_category == "Authentication":
                 return "API"
 
-            return self.google_re[match_regex.pattern]
+            return matched_category
         else:
             # Catch other small APIs after processing the main list
             if re.match(r'.*googleapis\.com', fqdn) is not None:
@@ -167,13 +168,14 @@ class FqdnProcessor(object):
                 match_regex = regex
 
         if match_regex is not None:
-            if match_regex in ["Mixed CDN", "Non-video Content"]:
+            matched_category = self.facebook_re[match_regex.pattern]
+            if matched_category in ["Mixed CDN", "Non-video Content"]:
                 return "Social Media"
 
-            if match_regex == "Authentication":
+            if matched_category == "Authentication":
                 return "API"
 
-            return self.facebook_re[match_regex.pattern]
+            return matched_category
         else:
             return "Unknown (Not Mapped)"
 
