@@ -37,7 +37,8 @@ GOOGLE_REGEXES = {
     r'^(?:(?!ytimg).)*googleusercontent\.com$': "Non-video Content",
     r'^(?:(?!connectivitycheck).)*gstatic\.com': "Non-video Content",  # Static
     r'^(?:(?!yt).)*ggpht\.com$': "Non-video Content",  # HTTPS everywhere lists it as related to google code and google user content.
-    r'^.*gvt[0-9]*\.com$': "Mixed CDN",  # Video transcoding? and/or Chrome?
+    r'^(?:(?!beacons.gcp).)*\.gvt[0-9]*\.com$': "Mixed CDN",  # Video transcoding? and/or Chrome?
+    r'^beacons.*gvt[0-9]*\.com$': "API",  # Bluetooth beacon tracking
     # r'^fonts\.gstatic\.com': "Static",
     r'^connectivitycheck\.gstatic\.com$': "API",  # Implemented as a static site but basically a check api
     r'^android\.clients\.google\.com$': "Software or Updates",
@@ -182,7 +183,7 @@ class FqdnProcessor(object):
         if fqdn is None or fqdn == "":
             return "Unknown (No DNS)", "Unknown (No DNS)"
 
-        if 'google' in fqdn or 'gmail' in fqdn or 'ytimg' in fqdn or 'youtube' in fqdn or "gstatic.com" in fqdn or "ggpht.com" in fqdn or "app-measurement.com" in fqdn or "gvt1.com" in fqdn or "ampproject" in fqdn or "crashlytics.com" in fqdn or "2mdn.net" in fqdn or "doubleclick.net" in fqdn:
+        if 'google' in fqdn or 'gmail' in fqdn or 'ytimg' in fqdn or 'youtube' in fqdn or "gstatic.com" in fqdn or "ggpht.com" in fqdn or "app-measurement.com" in fqdn or "gvt1.com" in fqdn or "ampproject" in fqdn or "crashlytics.com" in fqdn or "2mdn.net" in fqdn or "doubleclick.net" in fqdn or "1e100.net" in fqdn or "gvt2.com" in fqdn:
             return "Google", self._process_google_category(fqdn)
 
         if 'fbcdn' in fqdn or 'facebook' in fqdn or 'fbsbx' in fqdn or "fb.com" in fqdn or "accountkit.com" in fqdn:
@@ -512,5 +513,11 @@ class FqdnProcessor(object):
 
         if 'cloudflare' in fqdn:
             return "Cloudflare", "Mixed CDN"
+
+        if 'snssdk.com' in fqdn:
+            return "SN China", "API"
+
+        if 'xiaomi.com' in fqdn:
+            return "Xiaomi", "Software or Updates"
 
         return "Unknown (Not Mapped)", "Unknown (Not Mapped)"
