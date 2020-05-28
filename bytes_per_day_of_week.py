@@ -1,8 +1,10 @@
 import altair as alt
-import bok.dask_infra
-import bok.pd_infra
 import numpy as np
 import pandas as pd
+
+import bok.dask_infra
+import bok.pd_infra
+import bok.platform
 
 
 def create_all_flows(dask_client):
@@ -111,8 +113,18 @@ def make_plot(infile):
 
 
 if __name__ == "__main__":
-    client = bok.dask_infra.setup_dask_client()
+    platform = bok.platform.read_config()
     graph_temporary_file = "scratch/graphs/bytes_per_day_of_week"
-    # create_all_flows(client)
-    # reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
-    chart = make_plot(graph_temporary_file)
+
+    if platform.large_compute_support:
+        print("Performing compute operations")
+        client = bok.dask_infra.setup_dask_client()
+        # create_all_flows(client)
+        reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
+        client.close()
+
+    if platform.altair_support:
+        print("Performing vis operations")
+        chart = make_plot(graph_temporary_file)
+
+    print("Done!")
