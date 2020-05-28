@@ -74,18 +74,18 @@ def make_category_plot(infile):
     sort_order = cat_totals.sort_values("bytes_total", ascending=True).set_index("bytes_total").reset_index()
     sort_list = sort_order["category"].tolist()
     sort_list.reverse()
-    sort_order["order"] = sort_order.index
+    sort_order["down_order"] = sort_order.index
 
     # Merge the sort order back into the larger dataset
-    grouped_flows = grouped_flows.merge(sort_order[["category", "order"]], on="category")
-    grouped_flows["GB"] = grouped_flows["bytes_down"] / (1000**3)
+    grouped_flows = grouped_flows.merge(sort_order[["category", "down_order"]], on="category")
+    grouped_flows["down_GB"] = grouped_flows["bytes_down"] / (1000**3)
 
     area = alt.Chart(grouped_flows).mark_area().encode(
         x=alt.X("start_bin:T",
                 title="Time",
                 axis=alt.Axis(labels=True),
                 ),
-        y=alt.Y("sum(GB):Q",
+        y=alt.Y("sum(down_GB):Q",
                 title="Share of Downlink Traffic Per Week",
                 stack="normalize"
                 ),
@@ -96,32 +96,31 @@ def make_category_plot(infile):
             scale=alt.Scale(scheme="tableau20"),
             sort=sort_list,
         ),
-        order=alt.Order("order"),
+        order=alt.Order("down_order"),
     )
 
     (area + outage_annotation).properties(
         width=500,
     ).save(
-        "renders/bytes_per_category_down_vs_time_stream.png",
+        "renders/bytes_per_category_cat_down_weekly_stream.png",
         scale_factor=2,
     )
 
     # Figure out sorting order by upload amount.
     cat_up_totals = grouped_flows.groupby("category").sum().reset_index()
-    sort_order = cat_totals.sort_values("bytes_up", ascending=True).set_index("bytes_up").reset_index()
-    sort_order["order"] = sort_order.index
+    sort_order = cat_up_totals.sort_values("bytes_up", ascending=True).set_index("bytes_up").reset_index()
+    sort_order["up_order"] = sort_order.index
 
     # Merge the sort order back into the larger dataset
-    grouped_flows = grouped_flows.drop(columns="order")
-    grouped_flows = grouped_flows.merge(sort_order[["category", "order"]], on="category")
+    grouped_flows = grouped_flows.merge(sort_order[["category", "up_order"]], on="category")
 
-    grouped_flows["MB"] = grouped_flows["bytes_up"] / (1000**2)
+    grouped_flows["up_GB"] = grouped_flows["bytes_up"] / (1000**3)
     area = alt.Chart(grouped_flows).mark_area().encode(
         x=alt.X("start_bin:T",
                 title="Time",
                 axis=alt.Axis(labels=True),
                 ),
-        y=alt.Y("sum(MB):Q",
+        y=alt.Y("sum(up_GB):Q",
                 title="Share of Uplink Traffic Per Week",
                 stack="normalize",
                 ),
@@ -133,13 +132,13 @@ def make_category_plot(infile):
             # Keep the colors consistent between the category charts.
             sort=sort_list,
         ),
-        order=alt.Order("order"),
+        order=alt.Order("up_order"),
     )
 
     (area + outage_annotation).properties(
         width=500,
     ).save(
-        "renders/bytes_per_category_up_vs_time_stream.png",
+        "renders/bytes_per_category_cat_up_weekly_stream.png",
         scale_factor=2,
     )
 
@@ -152,7 +151,7 @@ def make_category_plot(infile):
     grouped_flows["bytes"] = grouped_flows["bytes"].replace(0, value=1)
     grouped_flows["bytes"] = grouped_flows["bytes"] / 1000**3
 
-    alt.Chart(grouped_flows).mark_bar(opacity=0.7).encode(
+    alt.Chart(grouped_flows).mark_bar(opacity=1.0).encode(
         x=alt.X("category:N",
                 title="Category",
                 axis=alt.Axis(labels=True),
@@ -164,7 +163,7 @@ def make_category_plot(infile):
                 #     # type="log",
                 #     domain=[0, 1000]
                 # ),
-                stack=None,
+                stack=True,
                 ),
         # shape="direction",
         color=alt.Color(
@@ -246,18 +245,18 @@ def make_org_plot(infile):
     sort_order = sort_check.sort_values("bytes_down", ascending=True).set_index("bytes_down").reset_index()
     sort_list = sort_order["org"].tolist()
     sort_list.reverse()
-    sort_order["order"] = sort_order.index
+    sort_order["down_order"] = sort_order.index
 
     # Merge the sort order back into the larger dataset
-    grouped_with_other = grouped_with_other.merge(sort_order[["org", "order"]], on="org")
+    grouped_with_other = grouped_with_other.merge(sort_order[["org", "down_order"]], on="org")
 
-    grouped_with_other["GB"] = grouped_with_other["bytes_down"] / (1000**3)
+    grouped_with_other["down_GB"] = grouped_with_other["bytes_down"] / (1000**3)
     area = alt.Chart(grouped_with_other).mark_area().encode(
         x=alt.X("start_bin:T",
                 title="Time",
                 axis=alt.Axis(labels=True),
                 ),
-        y=alt.Y("sum(GB):Q",
+        y=alt.Y("sum(down_GB):Q",
                 title="Share of Downlink Traffic Per Week",
                 stack="normalize",
                 ),
@@ -268,12 +267,12 @@ def make_org_plot(infile):
             scale=alt.Scale(scheme="tableau10"),
             sort=sort_list,
             ),
-        order=alt.Order("order"),
+        order=alt.Order("down_order"),
     )
     (area + outage_annotation).properties(
         width=500,
     ).save(
-        "renders/bytes_per_category_org_download_weekly_stream_main.png",
+        "renders/bytes_per_category_org_down_weekly_stream_main.png",
         scale_factor=2
     )
 
@@ -282,19 +281,18 @@ def make_org_plot(infile):
     sort_order = sort_check.sort_values("bytes_up", ascending=True).set_index("bytes_up").reset_index()
     sort_list = sort_order["org"].tolist()
     sort_list.reverse()
-    sort_order["order"] = sort_order.index
+    sort_order["up_order"] = sort_order.index
 
     # Merge the sort order back into the larger dataset
-    grouped_with_other = grouped_with_other.drop(columns=["order"])
-    grouped_with_other = grouped_with_other.merge(sort_order[["org", "order"]], on="org")
+    grouped_with_other = grouped_with_other.merge(sort_order[["org", "up_order"]], on="org")
 
-    grouped_with_other["GB"] = grouped_with_other["bytes_up"] / (1000**3)
+    grouped_with_other["up_GB"] = grouped_with_other["bytes_up"] / (1000**3)
     area = alt.Chart(grouped_with_other).mark_area().encode(
         x=alt.X("start_bin:T",
                 title="Time",
                 axis=alt.Axis(labels=True),
                 ),
-        y=alt.Y("sum(GB):Q",
+        y=alt.Y("sum(up_GB):Q",
                 title="Share of Uplink Traffic Per Week",
                 stack="normalize",
                 ),
@@ -305,12 +303,12 @@ def make_org_plot(infile):
             scale=alt.Scale(scheme="tableau10"),
             sort=sort_list,
         ),
-        order=alt.Order("order"),
+        order=alt.Order("up_order"),
     )
     (area + outage_annotation).properties(
         width=500,
     ).save(
-        "renders/bytes_per_category_org_upload_weekly_stream_main.png",
+        "renders/bytes_per_category_org_up_weekly_stream_main.png",
         scale_factor=2
     )
 
