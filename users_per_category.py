@@ -8,6 +8,7 @@ import pandas as pd
 import bok.dask_infra
 import bok.domains
 import bok.pd_infra
+import bok.platform
 
 
 # Module specific format options
@@ -302,9 +303,19 @@ def make_org_plot(infile):
 
 
 if __name__ == "__main__":
-    client = bok.dask_infra.setup_dask_client()
+    platform = bok.platform.read_config()
     graph_temporary_file = "scratch/graphs/users_per_category"
-    # reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
-    make_category_plot(graph_temporary_file)
-    make_org_plot(graph_temporary_file)
-    # make_category_plot_separate_top_n(graph_temporary_file)
+
+    if platform.large_compute_support:
+        print("Running compute tasks")
+        client = bok.dask_infra.setup_dask_client()
+        reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
+        client.close()
+
+    if platform.altair_support:
+        print("Running vis tasks")
+        make_category_plot(graph_temporary_file)
+        make_org_plot(graph_temporary_file)
+        # make_category_plot_separate_top_n(graph_temporary_file)
+
+    print("Done!")
