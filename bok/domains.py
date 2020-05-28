@@ -37,7 +37,7 @@ GOOGLE_REGEXES = {
     r'^(?:(?!ytimg).)*googleusercontent\.com$': "Non-video Content",
     r'^(?:(?!connectivitycheck).)*gstatic\.com': "Non-video Content",  # Static
     r'^(?:(?!yt).)*ggpht\.com$': "Non-video Content",  # HTTPS everywhere lists it as related to google code and google user content.
-    r'^(?:(?!beacons.gcp).)*\.gvt[0-9]*\.com$': "Mixed CDN",  # Video transcoding? and/or Chrome?
+    r'^(?:(?!beacons).)*\.gvt[0-9]*\.com$': "Mixed CDN",  # Video transcoding? and/or Chrome?
     r'^beacons.*gvt[0-9]*\.com$': "API",  # Bluetooth beacon tracking
     # r'^fonts\.gstatic\.com': "Static",
     r'^connectivitycheck\.gstatic\.com$': "API",  # Implemented as a static site but basically a check api
