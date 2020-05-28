@@ -142,6 +142,17 @@ def make_category_plot(infile):
         scale_factor=2,
     )
 
+
+def make_category_aggregate_bar_chart(infile):
+    grouped_flows = bok.pd_infra.read_parquet(infile).reset_index()
+
+    # Consolidate by week instead of by day
+    grouped_flows = grouped_flows[
+        ["start_bin", "category", "bytes_up", "bytes_down"]
+    ].groupby(
+        [pd.Grouper(key="start_bin", freq="W-MON"), "category"]
+    ).sum().reset_index()
+
     grouped_flows = grouped_flows.melt(id_vars=["category"],
                                        value_vars=["bytes_up", "bytes_down"],
                                        var_name="direction",
@@ -155,7 +166,7 @@ def make_category_plot(infile):
         x=alt.X("category:N",
                 title="Category",
                 axis=alt.Axis(labels=True),
-                sort=sort_list,
+                sort='-y',
                 ),
         y=alt.Y("bytes:Q",
                 title="Total Traffic(GB)",
@@ -169,15 +180,11 @@ def make_category_plot(infile):
         color=alt.Color(
             "direction",
             title="Type",
-            #scale=alt.Scale(scheme="tableau20"),
-            # Keep the colors consistent between the category charts.
-            #sort=sort_list,
         ),
-        #order=alt.Order("order"),
     ).properties(
         width=500,
     ).save(
-        "renders/bytes_per_category_up_and_down_vs_category.png",
+        "renders/bytes_per_category_bar_up_and_down_vs_category.png",
         scale_factor=2,
     )
 
@@ -376,6 +383,7 @@ if __name__ == "__main__":
     if platform.altair_support:
         make_category_plot(graph_temporary_file)
         make_org_plot(graph_temporary_file)
+        make_category_aggregate_bar_chart(graph_temporary_file)
 
     compute_stats(graph_temporary_file, "org")
     compute_stats(graph_temporary_file, "category")
