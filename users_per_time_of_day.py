@@ -1,6 +1,7 @@
 import altair as alt
 import bok.dask_infra
 import bok.pd_infra
+import bok.platform
 
 
 def reduce_to_pandas(outfile, dask_client):
@@ -43,7 +44,7 @@ def make_plot(infile):
         scale_factor=2,
     )
 
-    alt.Chart(grouped_flows).mark_point(opacity=0.3).encode(
+    alt.Chart(grouped_flows).mark_point(opacity=0.1).encode(
         x=alt.X('hour:O',
                 title="Hour of the Day"
                 ),
@@ -119,7 +120,15 @@ def make_plot(infile):
 
 
 if __name__ == "__main__":
-    client = bok.dask_infra.setup_dask_client()
+    platform = bok.platform.read_config()
     graph_temporary_file = "scratch/graphs/users_per_time_of_day"
-    reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
-    make_plot(infile=graph_temporary_file)
+
+    if platform.large_compute_support:
+        client = bok.dask_infra.setup_dask_client()
+        reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
+        client.close()
+
+    if platform.altair_support:
+        make_plot(infile=graph_temporary_file)
+
+    print("Done!")
