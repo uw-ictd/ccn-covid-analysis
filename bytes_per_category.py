@@ -216,83 +216,75 @@ def make_org_plot(infile):
     )
 
     # Group into other category
-    number_of_main_categories = 9
+    number_of_main_categories = 19
     sorted_flows = grouped_flows.groupby("org").sum().sort_values("bytes_total", ascending=False)
     orgs_to_other = sorted_flows.index[number_of_main_categories:]
     number_othered = len(orgs_to_other)
+
     # Create a separate frame with only the main flows and the aggregated other.
     grouped_with_other = grouped_flows.copy()
     grouped_with_other["org"] = grouped_with_other["org"].replace(orgs_to_other, "Other N={}".format(number_othered))
 
-    # Figure out sorting order by total amount.
-    sort_check = grouped_with_other.groupby("org").sum().reset_index()
-    sort_order = sort_check.sort_values("bytes_down", ascending=True).set_index("bytes_down").reset_index()
-    sort_list = sort_order["org"].tolist()
-    sort_list.reverse()
-    sort_order["down_order"] = sort_order.index
+    # Group together to find orders for the legend and both areas below.
+    org_groups = grouped_with_other.groupby("org").sum().reset_index()
+
+    # Figure out legend sorting order by total amount.
+    legend_order = org_groups.sort_values("bytes_total", ascending=False).set_index("bytes_total").reset_index()
+    legend_sort_list = legend_order["org"].tolist()
+
+    # Figure out area layer order by amounts for upload and download.
+    sort_order_down = org_groups.sort_values("bytes_down", ascending=True).set_index("bytes_down").reset_index()
+    sort_order_down["order"] = sort_order_down.index
+    sort_order_down["direction"] = "Downlink"
+
+    sort_order_up = org_groups.sort_values("bytes_up", ascending=True).set_index("bytes_up").reset_index()
+    sort_order_up["order"] = sort_order_up.index
+    sort_order_up["direction"] = "Uplink"
+
+    area_sort_orders = sort_order_up.append(sort_order_down)
+
+    # Melt the main dataframe
+    grouped_with_other["Downlink"] = grouped_with_other["bytes_down"] / (1000**3)
+    grouped_with_other["Uplink"] = grouped_with_other["bytes_up"] / (1000**3)
+    grouped_with_other = grouped_with_other.melt(
+        id_vars=["org", "start_bin"],
+        value_vars=["Downlink", "Uplink"],
+        var_name="direction",
+        value_name="GB"
+    )
 
     # Merge the sort order back into the larger dataset
-    grouped_with_other = grouped_with_other.merge(sort_order[["org", "down_order"]], on="org")
-
-    grouped_with_other["down_GB"] = grouped_with_other["bytes_down"] / (1000**3)
-    area = alt.Chart(grouped_with_other).mark_area().encode(
+    grouped_with_other = grouped_with_other.merge(area_sort_orders, on=["org", "direction"])
+    print(grouped_with_other)
+    area = alt.Chart().mark_area().encode(
         x=alt.X("start_bin:T",
                 title="Time",
                 axis=alt.Axis(labels=True),
                 ),
-        y=alt.Y("sum(down_GB):Q",
-                title="Share of Downlink Traffic Per Week",
+        y=alt.Y("sum(GB):Q",
+                title="Share of Traffic Per Week",
                 stack="normalize",
                 ),
         # shape="direction",
         color=alt.Color(
             "org",
-            title="Organization",
-            scale=alt.Scale(scheme="tableau10"),
-            sort=sort_list,
+            title="Organization (By Total)",
+            scale=alt.Scale(scheme="category20"),
+            sort=legend_sort_list,
             ),
-        order=alt.Order("down_order"),
+        order=alt.Order("order"),
     )
+
     (area + outage_annotation).properties(
         width=500,
-    ).save(
-        "renders/bytes_per_category_org_down_weekly_stream_main.png",
-        scale_factor=2
-    )
-
-    # Figure out sorting order by total amount for upload.
-    sort_check = grouped_with_other.groupby("org").sum().reset_index()
-    sort_order = sort_check.sort_values("bytes_up", ascending=True).set_index("bytes_up").reset_index()
-    sort_list = sort_order["org"].tolist()
-    sort_list.reverse()
-    sort_order["up_order"] = sort_order.index
-
-    # Merge the sort order back into the larger dataset
-    grouped_with_other = grouped_with_other.merge(sort_order[["org", "up_order"]], on="org")
-
-    grouped_with_other["up_GB"] = grouped_with_other["bytes_up"] / (1000**3)
-    area = alt.Chart(grouped_with_other).mark_area().encode(
-        x=alt.X("start_bin:T",
-                title="Time",
-                axis=alt.Axis(labels=True),
-                ),
-        y=alt.Y("sum(up_GB):Q",
-                title="Share of Uplink Traffic Per Week",
-                stack="normalize",
-                ),
-        # shape="direction",
-        color=alt.Color(
-            "org",
-            title="Organization",
-            scale=alt.Scale(scheme="tableau10"),
-            sort=sort_list,
+    ).facet(
+        column=alt.Column(
+            "direction:N",
+            title="",
         ),
-        order=alt.Order("up_order"),
-    )
-    (area + outage_annotation).properties(
-        width=500,
+        data=grouped_with_other,
     ).save(
-        "renders/bytes_per_category_org_up_weekly_stream_main.png",
+        "renders/bytes_per_category_org_facet_main.png",
         scale_factor=2
     )
 
