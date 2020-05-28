@@ -78,7 +78,7 @@ def make_plot(infile):
     bars = alt.Chart(working_times).mark_bar().encode(
         x=alt.X('day:N',
                 sort=days,
-                title="Day of Week"
+                title=""
                 ),
         y=alt.Y('GB:Q',
                 title="Mean GB Per Normal Day",
@@ -88,7 +88,7 @@ def make_plot(infile):
     ci = alt.Chart(working_times).mark_errorbar(extent="ci").encode(
         x=alt.X('day:N',
                 sort=days,
-                title="Day of Week",
+                title="",
                 ),
         y=alt.Y('GB:Q',
                 title="(95% Bootstrap CI)",
@@ -104,7 +104,7 @@ def make_plot(infile):
     overplot = alt.Chart(grouped_flows).mark_point(opacity=0.3).encode(
         x=alt.X('day:N',
                 sort=days,
-                title="Day of Week"
+                title=""
                 ),
         y=alt.Y('GB:Q',
                 title="GB Per Day"
