@@ -63,7 +63,7 @@ def make_plot(infile):
     ).properties(
         # title="Local Service Use",
         width=500,
-    ).save("renders/throughput_per_protocol_trends_normalized.png",
+    ).save("renders/bytes_per_protocol_trends_normalized.png",
            scale_factor=2
            )
 
@@ -81,7 +81,7 @@ def make_plot(infile):
     ).properties(
         # title="Local Service Use",
         width=500,
-    ).save("renders/throughput_per_protocol_trends.png",
+    ).save("renders/bytes_per_protocol_trends.png",
            scale_factor=2
            )
 
