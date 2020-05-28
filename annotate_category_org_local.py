@@ -155,7 +155,8 @@ def augment_all_user_flows(in_parent_directory, out_parent_directory, client):
 def stun_augment_all_user_flows(in_parent_directory, out_parent_directory, client):
     users_in_flow_log = sorted(os.listdir(in_parent_directory))
     tokens = []
-    for user in users_in_flow_log:
+    max_parallel_users = 10
+    for i, user in enumerate(users_in_flow_log):
         print("Doing STUN state tracking for user:", user)
         in_user_directory = os.path.join(in_parent_directory, user)
         out_user_directory = os.path.join(out_parent_directory, user)
@@ -163,8 +164,14 @@ def stun_augment_all_user_flows(in_parent_directory, out_parent_directory, clien
         compute_token = dask.delayed(_augment_user_flows_with_stun_state)(in_user_directory, out_user_directory)
         tokens.append(compute_token)
 
-    print("Starting dask stun computation")
-    client.compute(tokens, sync=True)
+        if (i % max_parallel_users) == (max_parallel_users - 1):
+            print("Starting dask stun intermediate computation")
+            client.compute(tokens, sync=True)
+            tokens = []
+
+    print("Starting dask stun final computation")
+    if len(tokens) > 0:
+        client.compute(tokens, sync=True)
     print("Completed STUN augmentation")
 
 
