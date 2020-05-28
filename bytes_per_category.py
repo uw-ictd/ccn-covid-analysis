@@ -4,8 +4,17 @@
 import altair as alt
 import pandas as pd
 
+import bok.constants
 import bok.dask_infra
 import bok.pd_infra
+import bok.platform
+
+
+# Module specific format options
+pd.set_option('display.max_columns', None)
+pd.set_option('display.max_colwidth', None)
+pd.set_option('display.width', None)
+pd.set_option('display.max_rows', 40)
 
 
 def reduce_to_pandas(outfile, dask_client):
@@ -38,6 +47,28 @@ def make_category_plot(infile):
 
     grouped_flows = grouped_flows.reset_index()
 
+    # Generate an outage annotation overlay
+    outage_info = pd.DataFrame([{"start": bok.constants.OUTAGE_START, "end": bok.constants.OUTAGE_END}])
+    outage_annotation = alt.Chart(outage_info).mark_rect(
+        opacity=0.7,
+        cornerRadius=2,
+        strokeWidth=2,
+        # stroke="black"
+    ).encode(
+        x=alt.X("start"),
+        x2=alt.X2("end"),
+        color=alt.value("#FFFFFF")
+    )
+
+    # text=outage_annotation.mark_text(
+    #     align="left",
+    #     baseline="bottom",
+    #     size=5,
+    # ).encode(
+    #     text=alt.value("Backhaul Failure"),
+    #     color=alt.value("#FFFFFF")
+    # )
+
     # Figure out sorting order by total amount.
     cat_totals = grouped_flows.groupby("category").sum().reset_index()
     sort_order = cat_totals.sort_values("bytes_total", ascending=True).set_index("bytes_total").reset_index()
@@ -47,17 +78,16 @@ def make_category_plot(infile):
 
     # Merge the sort order back into the larger dataset
     grouped_flows = grouped_flows.merge(sort_order[["category", "order"]], on="category")
+    grouped_flows["GB"] = grouped_flows["bytes_down"] / (1000**3)
 
-    grouped_flows["GB"] = grouped_flows["bytes_total"] / (1000**3)
-
-    alt.Chart(grouped_flows).mark_area().encode(
+    area = alt.Chart(grouped_flows).mark_area().encode(
         x=alt.X("start_bin:T",
                 title="Time",
                 axis=alt.Axis(labels=True),
                 ),
         y=alt.Y("sum(GB):Q",
-                title="Total Traffic Per Week(GB)",
-                #stack="normalize"
+                title="Share of Download Traffic Per Week",
+                stack="normalize"
                 ),
         # shape="direction",
         color=alt.Color(
@@ -67,10 +97,12 @@ def make_category_plot(infile):
             sort=sort_list,
         ),
         order=alt.Order("order"),
-    ).properties(
+    )
+
+    (area + outage_annotation).properties(
         width=500,
     ).save(
-        "renders/bytes_per_category_total_vs_time_stream.png",
+        "renders/bytes_per_category_down_vs_time_stream.png",
         scale_factor=2,
     )
 
@@ -84,14 +116,14 @@ def make_category_plot(infile):
     grouped_flows = grouped_flows.merge(sort_order[["category", "order"]], on="category")
 
     grouped_flows["MB"] = grouped_flows["bytes_up"] / (1000**2)
-    alt.Chart(grouped_flows).mark_area().encode(
+    area = alt.Chart(grouped_flows).mark_area().encode(
         x=alt.X("start_bin:T",
                 title="Time",
                 axis=alt.Axis(labels=True),
                 ),
         y=alt.Y("sum(MB):Q",
-                title="Upload Traffic Per Week(MB)",
-                #stack="normalize"
+                title="Share of Upload Traffic Per Week",
+                stack="normalize",
                 ),
         # shape="direction",
         color=alt.Color(
@@ -102,7 +134,9 @@ def make_category_plot(infile):
             sort=sort_list,
         ),
         order=alt.Order("order"),
-    ).properties(
+    )
+
+    (area + outage_annotation).properties(
         width=500,
     ).save(
         "renders/bytes_per_category_up_vs_time_stream.png",
@@ -181,9 +215,22 @@ def make_org_plot(infile):
     grouped_flows["bytes_total"] = grouped_flows["bytes_up"] + grouped_flows["bytes_down"]
 
     # Consolidate by week instead of by day
-    grouped_flows = grouped_flows[["start_bin", "bytes_total", "org"]].groupby([pd.Grouper(key="start_bin", freq="W-MON"), "org"]).sum()
+    grouped_flows = grouped_flows[["start_bin", "bytes_total", "bytes_up", "bytes_down", "org"]].groupby([pd.Grouper(key="start_bin", freq="W-MON"), "org"]).sum()
 
     grouped_flows = grouped_flows.reset_index()
+
+    # Generate an outage annotation overlay
+    outage_info = pd.DataFrame([{"start": bok.constants.OUTAGE_START, "end": bok.constants.OUTAGE_END}])
+    outage_annotation = alt.Chart(outage_info).mark_rect(
+        opacity=0.7,
+        cornerRadius=2,
+        strokeWidth=2,
+        # stroke="black"
+    ).encode(
+        x=alt.X("start"),
+        x2=alt.X2("end"),
+        color=alt.value("#FFFFFF")
+    )
 
     # Group into other category
     number_of_main_categories = 9
@@ -196,7 +243,7 @@ def make_org_plot(infile):
 
     # Figure out sorting order by total amount.
     sort_check = grouped_with_other.groupby("org").sum().reset_index()
-    sort_order = sort_check.sort_values("bytes_total", ascending=True).set_index("bytes_total").reset_index()
+    sort_order = sort_check.sort_values("bytes_down", ascending=True).set_index("bytes_down").reset_index()
     sort_list = sort_order["org"].tolist()
     sort_list.reverse()
     sort_order["order"] = sort_order.index
@@ -204,14 +251,15 @@ def make_org_plot(infile):
     # Merge the sort order back into the larger dataset
     grouped_with_other = grouped_with_other.merge(sort_order[["org", "order"]], on="org")
 
-    grouped_with_other["GB"] = grouped_with_other["bytes_total"] / (1000**3)
-    alt.Chart(grouped_with_other).mark_area().encode(
+    grouped_with_other["GB"] = grouped_with_other["bytes_down"] / (1000**3)
+    area = alt.Chart(grouped_with_other).mark_area().encode(
         x=alt.X("start_bin:T",
                 title="Time",
                 axis=alt.Axis(labels=True),
                 ),
         y=alt.Y("sum(GB):Q",
-                title="Total Traffic Per Week(GB)",
+                title="Share of Download Traffic Per Week",
+                stack="normalize",
                 ),
         # shape="direction",
         color=alt.Color(
@@ -221,10 +269,48 @@ def make_org_plot(infile):
             sort=sort_list,
             ),
         order=alt.Order("order"),
-    ).properties(
+    )
+    (area + outage_annotation).properties(
         width=500,
     ).save(
-        "renders/bytes_per_category_org_weekly_stream_main.png",
+        "renders/bytes_per_category_org_download_weekly_stream_main.png",
+        scale_factor=2
+    )
+
+    # Figure out sorting order by total amount for upload.
+    sort_check = grouped_with_other.groupby("org").sum().reset_index()
+    sort_order = sort_check.sort_values("bytes_up", ascending=True).set_index("bytes_up").reset_index()
+    sort_list = sort_order["org"].tolist()
+    sort_list.reverse()
+    sort_order["order"] = sort_order.index
+
+    # Merge the sort order back into the larger dataset
+    grouped_with_other = grouped_with_other.drop(columns=["order"])
+    grouped_with_other = grouped_with_other.merge(sort_order[["org", "order"]], on="org")
+
+    grouped_with_other["GB"] = grouped_with_other["bytes_up"] / (1000**3)
+    area = alt.Chart(grouped_with_other).mark_area().encode(
+        x=alt.X("start_bin:T",
+                title="Time",
+                axis=alt.Axis(labels=True),
+                ),
+        y=alt.Y("sum(GB):Q",
+                title="Share of Upload Traffic Per Week",
+                stack="normalize",
+                ),
+        # shape="direction",
+        color=alt.Color(
+            "org",
+            title="Organization",
+            scale=alt.Scale(scheme="tableau10"),
+            sort=sort_list,
+        ),
+        order=alt.Order("order"),
+    )
+    (area + outage_annotation).properties(
+        width=500,
+    ).save(
+        "renders/bytes_per_category_org_upload_weekly_stream_main.png",
         scale_factor=2
     )
 
@@ -248,14 +334,14 @@ def make_org_plot(infile):
     print(others)
 
     others["GB"] = others["bytes_total"] / (1000**3)
-    alt.Chart(others).mark_area().encode(
+    area = alt.Chart(others).mark_area().encode(
         x=alt.X("start_bin:T",
                 title="Time",
                 axis=alt.Axis(labels=True),
                 ),
         y=alt.Y("sum(GB):Q",
                 title="Total Traffic Per Week(GB)",
-                #stack="normalize",
+                stack="normalize",
                 ),
         # shape="direction",
         color=alt.Color(
@@ -266,7 +352,9 @@ def make_org_plot(infile):
         ),
         # The order actually makes this chart harder to understand, since the color needs to wrap around.
         order=alt.Order("order"),
-    ).configure_legend(
+    )
+
+    (area + outage_annotation).configure_legend(
         symbolLimit=100,
         columns=2,
     ).properties(
@@ -279,10 +367,17 @@ def make_org_plot(infile):
 
 
 if __name__ == "__main__":
-    client = bok.dask_infra.setup_dask_client()
+    platform = bok.platform.read_config()
+
     graph_temporary_file = "scratch/graphs/bytes_per_category"
-    # reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
-    make_category_plot(graph_temporary_file)
-    make_org_plot(graph_temporary_file)
+    if platform.large_compute_support:
+        client = bok.dask_infra.setup_dask_client()
+        reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
+        client.close()
+
+    if platform.altair_support:
+        make_category_plot(graph_temporary_file)
+        make_org_plot(graph_temporary_file)
+
     compute_stats(graph_temporary_file, "org")
     compute_stats(graph_temporary_file, "category")
