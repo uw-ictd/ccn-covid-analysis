@@ -38,10 +38,6 @@ def make_category_plot(infile):
     grouped_flows = grouped_flows.reset_index()
     grouped_flows["bytes_total"] = grouped_flows["bytes_up"] + grouped_flows["bytes_down"]
 
-    # Combine Static and Translate categories
-    grouped_flows["category"] = grouped_flows["category"].replace("Static", value="Non-video Content")
-    grouped_flows["category"] = grouped_flows["category"].replace("Translation", value="API")
-
     # Consolidate by week instead of by day
     grouped_flows = grouped_flows[["start_bin", "bytes_total", "category", "bytes_up", "bytes_down"]].groupby([pd.Grouper(key="start_bin", freq="W-MON"), "category"]).sum()
 
@@ -60,32 +56,33 @@ def make_category_plot(infile):
         color=alt.value("#FFFFFF")
     )
 
-    # text=outage_annotation.mark_text(
-    #     align="left",
-    #     baseline="bottom",
-    #     size=5,
-    # ).encode(
-    #     text=alt.value("Backhaul Failure"),
-    #     color=alt.value("#FFFFFF")
-    # )
-
-    # Figure out sorting order by total amount.
+    # Figure out legend sorting order by total amount.
     cat_totals = grouped_flows.groupby("category").sum().reset_index()
-    sort_order = cat_totals.sort_values("bytes_total", ascending=True).set_index("bytes_total").reset_index()
-    sort_list = sort_order["category"].tolist()
+    legend_sort_order = cat_totals.sort_values("bytes_total", ascending=True).set_index("bytes_total").reset_index()
+    sort_list = legend_sort_order["category"].tolist()
     sort_list.reverse()
-    sort_order["down_order"] = sort_order.index
 
-    # Merge the sort order back into the larger dataset
-    grouped_flows = grouped_flows.merge(sort_order[["category", "down_order"]], on="category")
-    grouped_flows["down_GB"] = grouped_flows["bytes_down"] / (1000**3)
+    # Now get the up and down sorts
+    cat_totals = grouped_flows.groupby("category").sum().reset_index()
+    sort_down_order = cat_totals.sort_values("bytes_down", ascending=True).set_index("bytes_down").reset_index()
+    sort_down_order["down_order"] = sort_down_order.index
+
+    sort_up_order = cat_totals.sort_values("bytes_up", ascending=True).set_index("bytes_up").reset_index()
+    sort_up_order["up_order"] = sort_up_order.index
+
+    # Merge the sort orders back into the larger dataset
+    grouped_flows = grouped_flows.merge(sort_down_order[["category", "down_order"]], on="category")
+    grouped_flows = grouped_flows.merge(sort_up_order[["category", "up_order"]], on="category")
+
+    grouped_flows["Downlink"] = grouped_flows["bytes_down"] / (1000**3)
+    grouped_flows["Uplink"] = grouped_flows["bytes_up"] / (1000**3)
 
     area = alt.Chart(grouped_flows).mark_area().encode(
         x=alt.X("start_bin:T",
                 title="Time",
                 axis=alt.Axis(labels=True),
                 ),
-        y=alt.Y("sum(down_GB):Q",
+        y=alt.Y("sum(Downlink):Q",
                 title="Share of Downlink Traffic Per Week",
                 stack="normalize"
                 ),
@@ -106,21 +103,12 @@ def make_category_plot(infile):
         scale_factor=2,
     )
 
-    # Figure out sorting order by upload amount.
-    cat_up_totals = grouped_flows.groupby("category").sum().reset_index()
-    sort_order = cat_up_totals.sort_values("bytes_up", ascending=True).set_index("bytes_up").reset_index()
-    sort_order["up_order"] = sort_order.index
-
-    # Merge the sort order back into the larger dataset
-    grouped_flows = grouped_flows.merge(sort_order[["category", "up_order"]], on="category")
-
-    grouped_flows["up_GB"] = grouped_flows["bytes_up"] / (1000**3)
     area = alt.Chart(grouped_flows).mark_area().encode(
         x=alt.X("start_bin:T",
                 title="Time",
                 axis=alt.Axis(labels=True),
                 ),
-        y=alt.Y("sum(up_GB):Q",
+        y=alt.Y("sum(Uplink):Q",
                 title="Share of Uplink Traffic Per Week",
                 stack="normalize",
                 ),
