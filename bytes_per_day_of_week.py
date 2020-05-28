@@ -75,7 +75,33 @@ def make_plot(infile):
         scale_factor=2,
     )
 
-    alt.Chart(grouped_flows).mark_point(opacity=0.3).encode(
+    bars = alt.Chart(working_times).mark_bar().encode(
+        x=alt.X('day:N',
+                sort=days,
+                title="Day of Week"
+                ),
+        y=alt.Y('GB:Q',
+                title="Mean GB Per Normal Day",
+                aggregate="mean"
+                ),
+    )
+    ci = alt.Chart(working_times).mark_errorbar(extent="ci").encode(
+        x=alt.X('day:N',
+                sort=days,
+                title="Day of Week",
+                ),
+        y=alt.Y('GB:Q',
+                title="(95% Bootstrap CI)",
+                ),
+    )
+    mean_and_ci = bars + ci
+
+    mean_and_ci.save(
+        "renders/bytes_per_day_of_week_exclude_outage_mean_ci.png",
+        scale_factor=2,
+    )
+
+    overplot = alt.Chart(grouped_flows).mark_point(opacity=0.3).encode(
         x=alt.X('day:N',
                 sort=days,
                 title="Day of Week"
@@ -87,8 +113,15 @@ def make_plot(infile):
             "outage",
             title="Condition",
         )
-    ).save(
+    )
+
+    overplot.save(
         "renders/bytes_per_day_of_week_overplot.png",
+        scale_factor=2,
+    )
+
+    (mean_and_ci | overplot).resolve_scale(y="shared").save(
+        "renders/bytes_per_day_of_week_compound.png",
         scale_factor=2,
     )
 
@@ -125,6 +158,6 @@ if __name__ == "__main__":
 
     if platform.altair_support:
         print("Performing vis operations")
-        chart = make_plot(graph_temporary_file)
+        make_plot(graph_temporary_file)
 
     print("Done!")
