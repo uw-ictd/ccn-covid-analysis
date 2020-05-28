@@ -215,10 +215,10 @@ def make_org_plot(infile):
         color=alt.value("#FFFFFF")
     )
 
-    # Group into other category
-    number_of_main_categories = 19
+    # Group into other orgs
+    number_of_main_orgs = 9
     sorted_flows = grouped_flows.groupby("org").sum().sort_values("bytes_total", ascending=False)
-    orgs_to_other = sorted_flows.index[number_of_main_categories:]
+    orgs_to_other = sorted_flows.index[number_of_main_orgs:]
     number_othered = len(orgs_to_other)
 
     # Create a separate frame with only the main flows and the aggregated other.
@@ -269,7 +269,7 @@ def make_org_plot(infile):
         color=alt.Color(
             "org",
             title="Organization (By Total)",
-            scale=alt.Scale(scheme="category20"),
+            scale=alt.Scale(scheme="accent"),
             sort=legend_sort_list,
             ),
         order=alt.Order("order"),
@@ -289,7 +289,7 @@ def make_org_plot(infile):
     )
 
     # Create a separate frame for just the other flows
-    main_flows = sorted_flows.index[:number_of_main_categories]
+    main_flows = sorted_flows.index[:number_of_main_orgs]
     others = grouped_flows.copy().reset_index().set_index("org")
     others = others.drop(main_flows).reset_index()
 
