@@ -1,6 +1,7 @@
 import altair as alt
 import bok.dask_infra
 import bok.pd_infra
+import bok.platform
 import numpy as np
 import pandas as pd
 
@@ -127,7 +128,18 @@ def _assign_protocol_plain_name(proto, port):
 
 
 if __name__ == "__main__":
-    client = bok.dask_infra.setup_dask_client()
+    platform = bok.platform.read_config()
+
     graph_temporary_file = "scratch/graphs/bytes_per_protocol_trends"
-    reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
-    chart = make_plot(graph_temporary_file)
+
+    if platform.large_compute_support:
+        print("Running compute")
+        client = bok.dask_infra.setup_dask_client()
+        reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
+        client.close()
+        print("Done with compute")
+
+    if platform.altair_support:
+        chart = make_plot(graph_temporary_file)
+
+    print("Done!")
