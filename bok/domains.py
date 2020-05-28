@@ -4,16 +4,16 @@
 import re
 
 GOOGLE_REGEXES = {
-    r'^www\.google\..*$': "Main Site",  # co.id, com.au, .com, .no, .cn etc.
-    r'^google\..*$': "Main Site",
+    r'^www\.google\..*$': "Non-video Content",  # co.id, com.au, .com, .no, .cn etc.
+    r'^google\..*$': "Non-video Content",
     r'^apis.google.com$': "API",
     r'^.*app-measurement\.com$': "API",  # Firebase Stats
     r'^suggestqueries\.google\.com$': "API",  # Search completion
     r'^www\.googleapis\.com$': "API",
-    r'^maps\.googleapis\.com$': "Location API",
-    r'^mobilemaps-pa\.googleapis\.com$': "Location API",
-    r'^geomobileservices.*\.googleapis\.com$': "Location API",
-    r'^semanticlocation.*\.googleapis\.com$': "Location API",
+    r'^maps\.googleapis\.com$': "API",  # Location API
+    r'^mobilemaps-pa\.googleapis\.com$': "API",  # Location API
+    r'^geomobileservices.*\.googleapis\.com$': "API",  # Location API
+    r'^semanticlocation.*\.googleapis\.com$': "API",  # Location API
     r'^cloudconfig\.googleapis\.com$': "API",
     r'^footprints-pa\.googleapis\.com$': "API",
     r'^clientservices\.googleapis\.com$': "API",
@@ -39,7 +39,7 @@ GOOGLE_REGEXES = {
     r'^(?:(?!yt).)*ggpht\.com$': "Non-video Content",  # HTTPS everywhere lists it as related to google code and google user content.
     r'^.*gvt[0-9]*\.com$': "Mixed CDN",  # Video transcoding? and/or Chrome?
     # r'^fonts\.gstatic\.com': "Static",
-    r'^connectivitycheck\.gstatic\.com$': "Device Services",
+    r'^connectivitycheck\.gstatic\.com$': "API",  # Implemented as a static site but basically a check api
     r'^android\.clients\.google\.com$': "Software or Updates",
     r'^play\.googleapis\.com$': "Software or Updates",
     r'^android\.googleapis\.com$': "Software or Updates",
@@ -81,11 +81,11 @@ GOOGLE_REGEXES = {
 }
 
 FACEBOOK_REGEXES = {
-    r'^.*www\.facebook\.com$': "Main Site",
-    r'^web\.facebook\.com$': "Main Site",
-    r'^facebook\.com$': "Main Site",
-    r'^m\.facebook\.com$': "Main Site",
-    r'^mobile\.facebook\.com$': "Main Site",
+    r'^.*www\.facebook\.com$': "Social Media",
+    r'^web\.facebook\.com$': "Social Media",
+    r'^facebook\.com$': "Social Media",
+    r'^m\.facebook\.com$': "Social Media",
+    r'^mobile\.facebook\.com$': "Social Media",
     r'^.*video.*\.facebook\.com$': "Video",
     r'^.*video.*\.fbcdn\.net$': "Video",
     r'^static.*\.fbcdn\.net$': "Non-video Content",  # Static
@@ -95,7 +95,7 @@ FACEBOOK_REGEXES = {
     r'^lookaside.*\.facebook\.com$': "Non-video Content",
     r'^platform-lookaside.*\.fbsbx\.com$': "Non-video Content",
     r'^.*api\.facebook\.com$': "API",
-    r'^.*graph\.facebook\.com$': "API",
+    r'^.*graph\.facebook\.com$': "Social Media",  # An api, but about social media integration, so will classify as social media
     r'^portal\.fb\.com$': "API",
     r'^connect\.facebook\.net$': "Authentication",  # Partner site embeddable sdk
     r'^connect\.facebook\.com$': "Authentication",  # Partner site embeddable sdk
@@ -123,8 +123,8 @@ FACEBOOK_REGEXES = {
     r'^edge-turnservice.*\.facebook\.com$': "Messaging",
     r'^whatsapp.*\.fbcdn\.net$': "Messaging",
     r'^.*whatsapp.*\.facebook\.com$': "Messaging",
-    r'^instagram.*\.fbcdn\.net': "Non-video Content",
-    r'^instagram.*\.facebook\.com': "Non-video Content",
+    r'^instagram.*\.fbcdn\.net': "Social Media",
+    r'^instagram.*\.facebook\.com': "Social Media",
 }
 
 
@@ -146,6 +146,9 @@ class FqdnProcessor(object):
                 match_regex = regex
 
         if match_regex is not None:
+            if match_regex == "Authentication":
+                return "API"
+
             return self.google_re[match_regex.pattern]
         else:
             # Catch other small APIs after processing the main list
@@ -163,6 +166,12 @@ class FqdnProcessor(object):
                 match_regex = regex
 
         if match_regex is not None:
+            if match_regex in ["Mixed CDN", "Non-video Content"]:
+                return "Social Media"
+
+            if match_regex == "Authentication":
+                return "API"
+
             return self.facebook_re[match_regex.pattern]
         else:
             return "Unknown (Not Mapped)"
@@ -179,40 +188,34 @@ class FqdnProcessor(object):
         if 'fbcdn' in fqdn or 'facebook' in fqdn or 'fbsbx' in fqdn or "fb.com" in fqdn or "accountkit.com" in fqdn:
             return "Facebook", self._process_facebook_category(fqdn)
 
-        # if 'whatsapp' in fqdn:
-        #     return "WhatsApp", "Messaging"
+        if 'whatsapp' in fqdn:
+            return "WhatsApp", "Messaging"
 
-        # if 'twimg' in fqdn or 'twitter' in fqdn:
-        #     return "Twitter", "Messaging"
+        if 'twimg' in fqdn or 'twitter' in fqdn:
+            if "video" in fqdn:
+                return "Twitter", "Video"
+            else:
+                return "Twitter", "Social Media"
 
-        # if 'instagram' in fqdn:
-        #     return "Instagram", "Non-video Content"
+        if 'instagram' in fqdn:
+            return "Instagram", "Social Media"
 
         if 'wikipedia' in fqdn:
             return "Wikipedia", "Non-video Content"
 
-        # if 'akamai' in fqdn:
-        #     return "Akamai", "Mixed CDN"
-
         if 'amazonaws' in fqdn or 'aws.com' in fqdn:
             return "Amazon Web Services", "IAAS"
         elif 'amazon' in fqdn:
-            return "Amazon", "Shopping"
-
-        # if 'cloudfront' in fqdn:
-        #     return "Cloudfront", "Mixed CDN"
-
-        # if 'cloudflare' in fqdn:
-        #     return "Cloudflare", "Mixed CDN"
+            return "Amazon", "Non-video Content"
 
         if "livestream818.com" in fqdn:
             return "818 Religious Conference", "Video"
 
         if "network.bokondini" in fqdn:
-            return "Local Services", "Shopping"
+            return "Local Services", "Local Services"
 
         if "content.bokondini" in fqdn:
-            return "Local Services", "Video"
+            return "Local Services", "Local Services"
 
         if "xvideos-cdn.com" in fqdn or "xvideos.com" in fqdn:
             return "xvideos", "Adult Video"
@@ -224,7 +227,7 @@ class FqdnProcessor(object):
             return "TRG Games", "Games"
 
         if "nearme.com.cn" in fqdn:  # Redirects to oppo mobile
-            return "Oppo", "Location API"
+            return "Oppo", "API" # Location API
 
         if "coloros.com" in fqdn:
             # Oppo fork of android
@@ -233,16 +236,19 @@ class FqdnProcessor(object):
         if "oppomobile.com" in fqdn:
             return "Oppo", "Software or Updates"
 
-        if "igamecj.com" in fqdn:  # Appears to be a PUBG pirate download
+        if "igamecj.com" in fqdn or "file-igamecj.akamaized.net" in fqdn:  # Appears to be a PUBG pirate download
             return "IgameCJ", "Games"
 
         if "vivoglobal.com" in fqdn or "vivo.com" in fqdn:
             return "Vivo", "Software or Updates"
 
+        if "vidio.com" in fqdn or "vidio-com.akamaized.net" in fqdn or "vidio.static6.com" in fqdn:
+            return "Vidio", "Video"
+
         if "tudoo.mobi" in fqdn:
             return "Tudoo", "Video"
 
-        if "tiktokcdn.com" in fqdn or "tiktokv.com" in fqdn or "muscdn.com" in fqdn or "log-tb.sgsnssdk.com" in fqdn:  # muscdn -> musicly!
+        if "tiktokcdn.com" in fqdn or "tiktokv.com" in fqdn or "muscdn.com" in fqdn or "tiktokcdn-com" in fqdn or "byteoversea.com" in fqdn or "musical.ly" in fqdn:  # muscdn -> musicly!
             return "TikTok", "Video"
 
         if "topbuzzcdn.com" in fqdn:
@@ -280,7 +286,7 @@ class FqdnProcessor(object):
             return "Azure (Microsoft)", "IAAS"
 
         if "tokopedia.net" in fqdn:
-            return "Tokopedia", "Shopping"
+            return "Tokopedia", "Non-video Content"
 
         if "9appsdownloading.com" in fqdn or "9appsinstall.com" in fqdn:
             return "UC Browser", "Software or Updates"
@@ -340,7 +346,7 @@ class FqdnProcessor(object):
             return "Hiido", "Files"
 
         if "cf.shopee.co.id" in fqdn or "shopeemobile.com" in fqdn or "shopee.co.id" in fqdn:
-            return "Shopee", "Shopping"
+            return "Shopee", "Non-video Content"
 
         if "amplitude.com" in fqdn:
             return "Amplitude", "Ad Network"
@@ -348,10 +354,10 @@ class FqdnProcessor(object):
         if "ivideosmart.com" in fqdn:
             return "iVideoSmart", "Ad Network"
 
-        if "mangatoon.100sta.com" in fqdn or "mangatoon.mobi" in fqdn:
+        if "mangatoon.100sta.com" in fqdn or "mangatoon.mobi" in fqdn or "mangatoon.akamaized.net" in fqdn:
             return "Mangatoon", "Non-video Content"
 
-        if "ushareit.com" in fqdn:  # Chinese file sharing app
+        if "ushareit" in fqdn:  # Chinese file sharing app
             return "UshareIt", "Files"
 
         if "au.ff.avast.com" in fqdn:
@@ -475,7 +481,7 @@ class FqdnProcessor(object):
             return "Linode", "IAAS"
 
         if "bukalapak.com" in fqdn:
-            return "Bukalapak", "Shopping"
+            return "Bukalapak", "Non-video Content"
 
         if "adtilt.com" in fqdn:
             return "Adtilt", "Ad Network"
@@ -497,5 +503,14 @@ class FqdnProcessor(object):
 
         if "blogspot.com" in fqdn:
             return "Blogspot", "Non-video Content"
+
+        if 'akamai' in fqdn:
+            return "Akamai", "Mixed CDN"
+
+        if 'cloudfront' in fqdn:
+            return "AWS Cloudfront", "Mixed CDN"
+
+        if 'cloudflare' in fqdn:
+            return "Cloudflare", "Mixed CDN"
 
         return "Unknown (Not Mapped)", "Unknown (Not Mapped)"
