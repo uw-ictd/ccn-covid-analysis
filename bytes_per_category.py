@@ -65,68 +65,57 @@ def make_category_plot(infile):
     # Now get the up and down sorts
     cat_totals = grouped_flows.groupby("category").sum().reset_index()
     sort_down_order = cat_totals.sort_values("bytes_down", ascending=True).set_index("bytes_down").reset_index()
-    sort_down_order["down_order"] = sort_down_order.index
+    sort_down_order["order"] = sort_down_order.index
+    sort_down_order["direction"] = "Downlink"
 
     sort_up_order = cat_totals.sort_values("bytes_up", ascending=True).set_index("bytes_up").reset_index()
-    sort_up_order["up_order"] = sort_up_order.index
+    sort_up_order["order"] = sort_up_order.index
+    sort_up_order["direction"] = "Uplink"
 
-    # Merge the sort orders back into the larger dataset
-    grouped_flows = grouped_flows.merge(sort_down_order[["category", "down_order"]], on="category")
-    grouped_flows = grouped_flows.merge(sort_up_order[["category", "up_order"]], on="category")
+    orders = sort_down_order.append(sort_up_order)
 
     grouped_flows["Downlink"] = grouped_flows["bytes_down"] / (1000**3)
     grouped_flows["Uplink"] = grouped_flows["bytes_up"] / (1000**3)
 
-    area = alt.Chart(grouped_flows).mark_area().encode(
+    # Melt the dataset for faceting
+    links = grouped_flows.melt(id_vars=["category", "start_bin"],
+                                       value_vars=["Downlink", "Uplink"],
+                                       var_name="direction",
+                                       value_name="GB").set_index("category")
+
+    # Merge the sort orders back into the larger dataset
+    faceted_flows = links.merge(orders, on=["category", "direction"])
+
+    print(faceted_flows)
+
+    area = alt.Chart().mark_area().encode(
         x=alt.X("start_bin:T",
                 title="Time",
                 axis=alt.Axis(labels=True),
                 ),
-        y=alt.Y("sum(Downlink):Q",
-                title="Share of Downlink Traffic Per Week",
+        y=alt.Y("sum(GB):Q",
+                title="Share of Traffic Per Week",
                 stack="normalize"
                 ),
-        # shape="direction",
         color=alt.Color(
             "category",
             title="Category (by total)",
             scale=alt.Scale(scheme="tableau20"),
             sort=sort_list,
         ),
-        order=alt.Order("down_order"),
+        order=alt.Order("order"),
     )
 
     (area + outage_annotation).properties(
         width=500,
+    ).facet(
+        column=alt.Column(
+            'direction:N',
+            title="",
+            ),
+        data=faceted_flows,
     ).save(
-        "renders/bytes_per_category_cat_down_weekly_stream.png",
-        scale_factor=2,
-    )
-
-    area = alt.Chart(grouped_flows).mark_area().encode(
-        x=alt.X("start_bin:T",
-                title="Time",
-                axis=alt.Axis(labels=True),
-                ),
-        y=alt.Y("sum(Uplink):Q",
-                title="Share of Uplink Traffic Per Week",
-                stack="normalize",
-                ),
-        # shape="direction",
-        color=alt.Color(
-            "category",
-            title="Category (by total)",
-            scale=alt.Scale(scheme="tableau20"),
-            # Keep the colors consistent between the category charts.
-            sort=sort_list,
-        ),
-        order=alt.Order("up_order"),
-    )
-
-    (area + outage_annotation).properties(
-        width=500,
-    ).save(
-        "renders/bytes_per_category_cat_up_weekly_stream.png",
+        "renders/bytes_per_category_cat_facet.png",
         scale_factor=2,
     )
 
