@@ -47,7 +47,7 @@ def make_category_plot(infile):
     outage_info = pd.DataFrame([{"start": bok.constants.OUTAGE_START, "end": bok.constants.OUTAGE_END}])
     outage_annotation = alt.Chart(outage_info).mark_rect(
         opacity=0.7,
-        cornerRadius=2,
+        # cornerRadius=2,
         strokeWidth=2,
         # stroke="black"
     ).encode(
@@ -78,15 +78,15 @@ def make_category_plot(infile):
     grouped_flows["Uplink"] = grouped_flows["bytes_up"] / (1000**3)
 
     # Melt the dataset for faceting
-    links = grouped_flows.melt(id_vars=["category", "start_bin"],
-                                       value_vars=["Downlink", "Uplink"],
-                                       var_name="direction",
-                                       value_name="GB").set_index("category")
+    links = grouped_flows.melt(
+        id_vars=["category", "start_bin"],
+        value_vars=["Downlink", "Uplink"],
+        var_name="direction",
+        value_name="GB"
+    ).set_index("category")
 
     # Merge the sort orders back into the larger dataset
     faceted_flows = links.merge(orders, on=["category", "direction"])
-
-    print(faceted_flows)
 
     area = alt.Chart().mark_area().encode(
         x=alt.X("start_bin:T",
@@ -99,7 +99,7 @@ def make_category_plot(infile):
                 ),
         color=alt.Color(
             "category",
-            title="Category (by total)",
+            title="Category (By Total)",
             scale=alt.Scale(scheme="tableau20"),
             sort=sort_list,
         ),
@@ -206,7 +206,7 @@ def make_org_plot(infile):
     outage_info = pd.DataFrame([{"start": bok.constants.OUTAGE_START, "end": bok.constants.OUTAGE_END}])
     outage_annotation = alt.Chart(outage_info).mark_rect(
         opacity=0.7,
-        cornerRadius=2,
+        # cornerRadius=2,
         strokeWidth=2,
         # stroke="black"
     ).encode(
