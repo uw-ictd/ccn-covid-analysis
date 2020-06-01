@@ -15,6 +15,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.vscode/
 
 # Compute platform config
 platform-conf.toml
