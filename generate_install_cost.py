@@ -6,7 +6,7 @@ import numpy as np
 BTS_COST = 6600
 ANTENNA_COST = 516
 SIM_COST = 650
-MONTHLY_VSAT = 300
+MONTHLY_VSAT = 800
 MONTHS = 13
 
 #13 months
