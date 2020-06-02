@@ -6,14 +6,27 @@ data_prefix = "data/clean/traceroutes/"
 keywords_to_remove = [" ms", "(", ")", "\n"]
 
 def make_traceroute_latency_plot(df):
-    plot = altair.Chart(df).mark_line().encode(
+    line_plot = altair.Chart(df).mark_line().encode(
         x=altair.X("hop",
                    title="hop #",
                    axis=altair.Axis(labels=True)),
         y=altair.Y("latency:Q",
                    title="total latency (ms)"),
-        color="unique_name",
-    ).properties(
+        color="domain",
+        detail="unique_name",
+    )
+
+    dot_plot = altair.Chart(df).mark_point().encode(
+        x=altair.X("hop",
+                   title="hop #",
+                   axis=altair.Axis(labels=True)),
+        y=altair.Y("latency:Q",
+                   title="total latency (ms)"),
+        color="dataset",
+        detail="unique_name",
+    )
+
+    (dot_plot + line_plot).properties(
         width=500,
     ).configure_title(
         fontSize=20,
@@ -53,8 +66,7 @@ def parse_traceroute(file, data):
                 domain = tokens[2]
             else:
                 line = remove_keywords_from_string(line, keywords_to_remove)
-                # TODO: Update this!
-                data["dataset"].append("test")
+                data["dataset"].append("Community Network")
                 data["domain"].append(domain)
                 data["last_hop"].append(int(i == len(lines) - 1))
                 data["unique_name"].append("") # Set to empty string for now; will be updated later
