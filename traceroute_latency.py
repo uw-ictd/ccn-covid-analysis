@@ -12,7 +12,7 @@ def make_traceroute_latency_plot(df):
                    axis=altair.Axis(labels=True)),
         y=altair.Y("latency:Q",
                    title="total latency (ms)"),
-        color="domain",
+        color="dataset",
         detail="unique_name",
     )
 
@@ -22,7 +22,7 @@ def make_traceroute_latency_plot(df):
                    axis=altair.Axis(labels=True)),
         y=altair.Y("latency:Q",
                    title="total latency (ms)"),
-        color="dataset",
+        color="domain",
         detail="unique_name",
     )
 
