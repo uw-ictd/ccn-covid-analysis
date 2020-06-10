@@ -173,9 +173,12 @@ def make_time_at_zero_plots(user_balance_frame):
         ),
         y=alt.Y(
             "fraction_at_zero",
-            title="Fraction of Total Time with 0 Credit Balance",
+            title="Fraction of Active Time with 0 Credit Balance",
         ),
-        color="corrected",
+        color=alt.Color(
+            "corrected",
+            title="Nonzero Start"
+        ),
     ).save("renders/purchase_currency_balance_per_user.png", scale_factor=2.0)
 
     df = compute_cdf(df, "fraction_at_zero", "user")
