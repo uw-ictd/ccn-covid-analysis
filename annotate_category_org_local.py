@@ -10,6 +10,9 @@ import bok.dask_infra
 import bok.domains
 import bok.platform
 
+from collections import namedtuple
+_StunFlow = namedtuple("StunFlow", ["expiration", "flow", "is_setup"])
+
 
 def _categorize_user(in_path, out_path):
     """Run categorization over the input parquet file and write to the output
@@ -52,30 +55,47 @@ def _categorize_user(in_path, out_path):
 
 
 def _process_cohort_into_out_chunk(cohort, stun_state, out_chunk):
+    flow_continue_threshold = datetime.timedelta(seconds=5)
+
+    # The next stun state takes effect after this cohort of flows with tied timestamps is processed.
+    next_stun_state = stun_state.copy()
     for cohort_flow in cohort:
         augmented_flow = cohort_flow._asdict()
         if not (cohort_flow.protocol == 17 and cohort_flow.dest_port == 3478):
             # See if this flow is actually a stun flow
-            for stun_flow in stun_state:
-                if cohort_flow.user_port == stun_flow.user_port:
+            for stun_record in stun_state:
+                stun_flow = stun_record.flow
+                if ((stun_record.is_setup and (cohort_flow.user_port == stun_flow.user_port)) or
+                    ((cohort_flow.user_port == stun_flow.user_port) and
+                     (cohort_flow.dest_port == stun_flow.dest_port) and
+                     (cohort_flow.user_ip == stun_flow.user_ip) and
+                     (cohort_flow.dest_ip == stun_flow.dest_ip))):
                     if ((cohort_flow.category == "Unknown (No DNS)") or
-                            (cohort_flow.category == "Unknown (Not Mapped)")):
+                        (cohort_flow.category == "Unknown (Not Mapped)") or
+                            ("emome-ip.hinet.net" in cohort_flow.fqdn)):  # These appear to be generic dns records for users within Chunghwa Telecom (in Taiwan)
                         augmented_flow["category"] = "Peer to Peer"
                         augmented_flow["org"] = "ICE Peer (Unknown Org)"
-                    elif "emome-ip.hinet.net" in cohort_flow.fqdn:
-                        # These appear to be generic dns records for users
-                        # within Chunghwa Telecom (in Taiwan)
-                        augmented_flow["category"] = "Peer to Peer"
-                        augmented_flow["org"] = "ICE Peer (Unknown Org)"
+                        # Don't want to add stun flows back accidentally
+                        if stun_flow != cohort_flow:
+                            expiration_time = cohort_flow.end + flow_continue_threshold
+                            next_stun_state.add(
+                                _StunFlow(expiration_time, cohort_flow, is_setup=False)
+                            )
                     elif "turnservice" in cohort_flow.fqdn or "facebook" in cohort_flow.fqdn:
                         augmented_flow["category"] = "Messaging"
+                        # Don't want to add stun flows back accidentally
+                        if stun_flow != cohort_flow:
+                            expiration_time = cohort_flow.end + flow_continue_threshold
+                            next_stun_state.add(
+                                _StunFlow(expiration_time, cohort_flow, is_setup=False)
+                            )
                     else:
                         # There is a bit of noise from port reuse.
                         print("Not overriding existing category", cohort_flow.category)
                         print(cohort_flow.fqdn)
 
         out_chunk.append(augmented_flow)
-    return out_chunk
+    return out_chunk, next_stun_state
 
 
 def _augment_user_flows_with_stun_state(in_path, out_path):
@@ -113,7 +133,7 @@ def _augment_user_flows_with_stun_state(in_path, out_path):
             # Expire old stun requests
             valid_stun_state = set()
             for stun_flow in stun_state:
-                if (current_timestamp - stun_flow.Index) < expiry_threshold:
+                if stun_flow.expiration > current_timestamp:
                     valid_stun_state.add(stun_flow)
             stun_state = valid_stun_state
 
@@ -121,10 +141,14 @@ def _augment_user_flows_with_stun_state(in_path, out_path):
             for cohort_flow in current_timestamp_cohort:
                 if cohort_flow.protocol == 17 and cohort_flow.dest_port == 3478:
                     # This flow is ICE (STUN/TURN)!
-                    stun_state.add(cohort_flow)
+                    # Define the expiration of ICE setup flows from their start time
+                    exiration_time = cohort_flow.Index + expiry_threshold
+                    stun_state.add(_StunFlow(exiration_time, cohort_flow, is_setup=True))
 
             # Augment all other flows in the cohort
-            out_chunk = _process_cohort_into_out_chunk(current_timestamp_cohort, stun_state, out_chunk)
+            out_chunk, stun_state = _process_cohort_into_out_chunk(
+                current_timestamp_cohort, stun_state, out_chunk
+            )
 
             if len(out_chunk) >= max_rows_per_division:
                 new_frame = dask.dataframe.from_pandas(
@@ -142,7 +166,9 @@ def _augment_user_flows_with_stun_state(in_path, out_path):
             current_timestamp_cohort = {flow}
 
     # Handle the dangling cohort and chunk on loop termination
-    out_chunk = _process_cohort_into_out_chunk(current_timestamp_cohort, stun_state, out_chunk)
+    out_chunk, stun_state = _process_cohort_into_out_chunk(
+        current_timestamp_cohort, stun_state, out_chunk
+    )
 
     if len(out_chunk) > 0:
         new_frame = dask.dataframe.from_pandas(
