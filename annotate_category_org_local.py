@@ -51,6 +51,33 @@ def _categorize_user(in_path, out_path):
     return bok.dask_infra.clean_write_parquet(frame, out_path, compute=False)
 
 
+def _process_cohort_into_out_chunk(cohort, stun_state, out_chunk):
+    for cohort_flow in cohort:
+        augmented_flow = cohort_flow._asdict()
+        if not (cohort_flow.protocol == 17 and cohort_flow.dest_port == 3478):
+            # See if this flow is actually a stun flow
+            for stun_flow in stun_state:
+                if cohort_flow.user_port == stun_flow.user_port:
+                    if ((cohort_flow.category == "Unknown (No DNS)") or
+                            (cohort_flow.category == "Unknown (Not Mapped)")):
+                        augmented_flow["category"] = "Peer to Peer"
+                        augmented_flow["org"] = "ICE Peer (Unknown Org)"
+                    elif "emome-ip.hinet.net" in cohort_flow.fqdn:
+                        # These appear to be generic dns records for users
+                        # within Chunghwa Telecom (in Taiwan)
+                        augmented_flow["category"] = "Peer to Peer"
+                        augmented_flow["org"] = "ICE Peer (Unknown Org)"
+                    elif "turnservice" in cohort_flow.fqdn or "facebook" in cohort_flow.fqdn:
+                        augmented_flow["category"] = "Messaging"
+                    else:
+                        # There is a bit of noise from port reuse.
+                        print("Not overriding existing category", cohort_flow.category)
+                        print(cohort_flow.fqdn)
+
+        out_chunk.append(augmented_flow)
+    return out_chunk
+
+
 def _augment_user_flows_with_stun_state(in_path, out_path):
     """Iterate over the flows and track STUN/TURN state for the user
 
@@ -97,68 +124,25 @@ def _augment_user_flows_with_stun_state(in_path, out_path):
                     stun_state.add(cohort_flow)
 
             # Augment all other flows in the cohort
-            for cohort_flow in current_timestamp_cohort:
-                augmented_flow = cohort_flow._asdict()
-                if not (cohort_flow.protocol == 17 and cohort_flow.dest_port == 3478):
-                    # See if this flow is actually a stun flow
-                    for stun_flow in stun_state:
-                        if cohort_flow.user_port == stun_flow.user_port:
-                            if ((cohort_flow.category == "Unknown (No DNS)") or
-                                    (cohort_flow.category == "Unknown (Not Mapped)")):
-                                augmented_flow["category"] = "Peer to Peer"
-                                augmented_flow["org"] = "ICE Peer (Unknown Org)"
-                            elif "emome-ip.hinet.net" in cohort_flow.fqdn:
-                                # These appear to be generic dns records for users
-                                # within Chunghwa Telecom (in Taiwan)
-                                augmented_flow["category"] = "Peer to Peer"
-                                augmented_flow["org"] = "ICE Peer (Unknown Org)"
-                            elif "turnservice" in cohort_flow.fqdn or "facebook" in cohort_flow.fqdn:
-                                augmented_flow["category"] = "Messaging"
-                            else:
-                                # There is a bit of noise from port reuse.
-                                print("Not overriding existing category", cohort_flow.category)
-                                print(cohort_flow.fqdn)
+            out_chunk = _process_cohort_into_out_chunk(current_timestamp_cohort, stun_state, out_chunk)
 
-                out_chunk.append(augmented_flow)
-                if len(out_chunk) >= max_rows_per_division:
-                    new_frame = dask.dataframe.from_pandas(
-                        pd.DataFrame(out_chunk),
-                        chunksize=max_rows_per_division,
-                    )
-                    if out_frame is None:
-                        out_frame = new_frame
-                    else:
-                        out_frame = out_frame.append(new_frame)
-                    out_chunk = list()
+            if len(out_chunk) >= max_rows_per_division:
+                new_frame = dask.dataframe.from_pandas(
+                    pd.DataFrame(out_chunk),
+                    chunksize=max_rows_per_division,
+                )
+                if out_frame is None:
+                    out_frame = new_frame
+                else:
+                    out_frame = out_frame.append(new_frame)
+                out_chunk = list()
 
             # Reset the cohort with a new lead flow from the current iteration
             current_timestamp = flow_start_time
             current_timestamp_cohort = {flow}
 
-    # Handle the dangling cohort on loop termination
-    for cohort_flow in current_timestamp_cohort:
-        augmented_flow = cohort_flow._asdict()
-        if not (cohort_flow.protocol == 17 and cohort_flow.dest_port == 3478):
-            # See if this flow is actually a stun flow
-            for stun_flow in stun_state:
-                if cohort_flow.user_port == stun_flow.user_port:
-                    if ((cohort_flow.category == "Unknown (No DNS)") or
-                            (cohort_flow.category == "Unknown (Not Mapped)")):
-                        augmented_flow["category"] = "Peer to Peer"
-                        augmented_flow["org"] = "ICE Peer (Unknown Org)"
-                    elif "emome-ip.hinet.net" in cohort_flow.fqdn:
-                        # These appear to be generic dns records for users
-                        # within Chunghwa Telecom (in Taiwan)
-                        augmented_flow["category"] = "Peer to Peer"
-                        augmented_flow["org"] = "ICE Peer (Unknown Org)"
-                    elif "turnservice" in cohort_flow.fqdn or "facebook" in cohort_flow.fqdn:
-                        augmented_flow["category"] = "Messaging"
-                    else:
-                        # There is a bit of noise from port reuse.
-                        print("Not overriding existing category", cohort_flow.category)
-                        print(cohort_flow.fqdn)
-
-        out_chunk.append(augmented_flow)
+    # Handle the dangling cohort and chunk on loop termination
+    out_chunk = _process_cohort_into_out_chunk(current_timestamp_cohort, stun_state, out_chunk)
 
     if len(out_chunk) > 0:
         new_frame = dask.dataframe.from_pandas(
