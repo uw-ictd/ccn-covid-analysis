@@ -50,13 +50,14 @@ def setup_tuned_dask_client(per_worker_memory_GB, system_memory_GB, system_proce
 
         # Allocate extra processors to threads
         thread_count = int(system_processors/worker_count)
+        memory_limit = "{}GB".format(per_worker_memory_GB)
         print("Operating with {} workers, {} threads per worker, and {} memory".format(
             worker_count, thread_count, per_worker_memory_GB
         ))
         # The memory limit parameter is undocumented and applies to each worker.
         cluster = dask.distributed.LocalCluster(n_workers=worker_count,
                                                 threads_per_worker=thread_count,
-                                                memory_limit=per_worker_memory_GB)
+                                                memory_limit=memory_limit)
 
         # Less aggressively write to disk than in the constrained case,
         # but still don't kill worker processes if they stray and rely on the
