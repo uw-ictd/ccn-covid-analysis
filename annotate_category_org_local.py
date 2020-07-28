@@ -105,7 +105,7 @@ def _augment_user_flows_with_stun_state(in_path, out_path):
     """
     flow_frame = bok.dask_infra.read_parquet(in_path)
     # Bookeeping for building a new frame
-    max_rows_per_division = 10000
+    max_rows_per_division = 100000
     out_chunk = list()
     out_frame = None
 
@@ -154,6 +154,7 @@ def _augment_user_flows_with_stun_state(in_path, out_path):
                 new_frame = dask.dataframe.from_pandas(
                     pd.DataFrame(out_chunk),
                     chunksize=max_rows_per_division,
+                    sort=False
                 )
                 if out_frame is None:
                     out_frame = new_frame
@@ -185,7 +186,7 @@ def _augment_user_flows_with_stun_state(in_path, out_path):
         return
 
     out_frame = out_frame.rename(columns={"Index": "start"})
-    out_frame = out_frame.set_index("start").repartition(partition_size="64M",
+    out_frame = out_frame.set_index("start").repartition(partition_size="128M",
                                                          force=True)
     out_frame = out_frame.categorize(columns=["fqdn_source", "org", "category"])
 
@@ -212,7 +213,7 @@ def augment_all_user_flows(in_parent_directory, out_parent_directory, client):
 def stun_augment_all_user_flows(in_parent_directory, out_parent_directory, client):
     users_in_flow_log = sorted(os.listdir(in_parent_directory))
     tokens = []
-    max_parallel_users = 10
+    max_parallel_users = 20
     for i, user in enumerate(users_in_flow_log):
         print("Doing STUN state tracking for user:", user)
         in_user_directory = os.path.join(in_parent_directory, user)
