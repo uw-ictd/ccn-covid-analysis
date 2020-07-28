@@ -213,7 +213,7 @@ def augment_all_user_flows(in_parent_directory, out_parent_directory, client):
 def stun_augment_all_user_flows(in_parent_directory, out_parent_directory, client):
     users_in_flow_log = sorted(os.listdir(in_parent_directory))
     tokens = []
-    max_parallel_users = 20
+    max_parallel_users = 60
     for i, user in enumerate(users_in_flow_log):
         print("Doing STUN state tracking for user:", user)
         in_user_directory = os.path.join(in_parent_directory, user)
@@ -286,7 +286,7 @@ if __name__ == "__main__":
     merged_out_directory = "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
 
     if platform.large_compute_support:
-        client = bok.dask_infra.setup_dask_client()
+        client = bok.dask_infra.setup_tuned_dask_client(10, platform.max_memory_gigabytes, platform.max_processors)
         print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
 
         # Regular flow is below

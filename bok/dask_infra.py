@@ -11,28 +11,60 @@ import shutil
 def setup_dask_client():
     """Setup and configure a dask client for the local system
     """
+    return setup_tuned_dask_client(1, 3, 4)
 
+
+def setup_tuned_dask_client(per_worker_memory_GB, system_memory_GB, system_processors):
     # Compression sounds nice, but results in spikes on decompression
     # that can lead to unstable RAM use and overflow.
     dask.config.set({"dataframe.shuffle-compression": False})
     dask.config.set({"distributed.scheduler.allowed-failures": 50})
     dask.config.set({"distributed.scheduler.work-stealing": True})
 
-    # Aggressively write to disk but don't kill worker processes if
-    # they stray. With a small number of workers each worker killed is
-    # big loss. The OOM killer will take care of the overall system.
-    dask.config.set({"distributed.worker.memory.target": 0.2})
-    dask.config.set({"distributed.worker.memory.spill": 0.4})
-    dask.config.set({"distributed.worker.memory.pause": 0.6})
-    dask.config.set({"distributed.worker.memory.terminate": False})
+    if per_worker_memory_GB >= system_memory_GB:
+        # We are operating on a constrained system
+        memory_limit = "{}GB".format(system_memory_GB)
+        print("Operating constrained with {} processors, {} threads, and {} memory".format(
+            1, system_processors, memory_limit
+        ))
 
-    # The memory limit parameter is undocumented and applies to each worker.
-    # ------------------------------------------------
-    # Dask tuning, currently set for a 8GB RAM laptop
-    # ------------------------------------------------
-    cluster = dask.distributed.LocalCluster(n_workers=3,
-                                            threads_per_worker=1,
-                                            memory_limit='3GB')
+        # The memory limit parameter is undocumented and applies to each worker.
+        cluster = dask.distributed.LocalCluster(n_workers=1,
+                                                threads_per_worker=system_processors,
+                                                memory_limit=memory_limit)
+
+        # Aggressively write to disk but don't kill worker processes if
+        # they stray. With a small number of workers each worker killed is
+        # big loss. The OOM killer will take care of the overall system.
+        dask.config.set({"distributed.worker.memory.target": 0.3})
+        dask.config.set({"distributed.worker.memory.spill": 0.4})
+        dask.config.set({"distributed.worker.memory.pause": 0.6})
+        dask.config.set({"distributed.worker.memory.terminate": False})
+    else:
+        # Run as many workers available with the required amount of memory per worker
+        worker_count = int(system_memory_GB/per_worker_memory_GB)
+        if worker_count <= 0:
+            raise ValueError("tuning operation failure")
+
+        worker_count = min(system_processors, worker_count)
+
+        # Allocate extra processors to threads
+        thread_count = int(system_processors/worker_count)
+        print("Operating with {} workers, {} threads per worker, and {} memory".format(
+            worker_count, thread_count, per_worker_memory_GB
+        ))
+        # The memory limit parameter is undocumented and applies to each worker.
+        cluster = dask.distributed.LocalCluster(n_workers=worker_count,
+                                                threads_per_worker=thread_count,
+                                                memory_limit=per_worker_memory_GB)
+
+        # Less aggressively write to disk than in the constrained case,
+        # but still don't kill worker processes if they stray and rely on the
+        # OOM killer if there is a runaway process.
+        dask.config.set({"distributed.worker.memory.target": 0.5})
+        dask.config.set({"distributed.worker.memory.spill": 0.8})
+        dask.config.set({"distributed.worker.memory.pause": 0.9})
+        dask.config.set({"distributed.worker.memory.terminate": False})
 
     return dask.distributed.Client(cluster)
 
