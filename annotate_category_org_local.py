@@ -113,7 +113,7 @@ def _augment_user_flows_with_stun_state(in_path, out_path):
     # Consider stun activity stale after 5 minutes. This could technically
     # miss repeated calls. There is a tradeoff though since increasing the
     # time increases the chance of incidental reuse of the port on the client.
-    expiry_threshold = datetime.timedelta(minutes=5)
+    expiry_threshold = datetime.timedelta(minutes=1)
     current_timestamp = None
     current_timestamp_cohort = set()
     for i, flow in enumerate(flow_frame.itertuples()):
