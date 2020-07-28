@@ -65,12 +65,10 @@ def _process_cohort_into_out_chunk(cohort, stun_state, out_chunk):
             # See if this flow is actually a stun flow
             for stun_record in stun_state:
                 stun_flow = stun_record.flow
-                print("stun flow", stun_flow)
-                print("cohort flow", cohort_flow)
                 if ((stun_record.is_setup and (cohort_flow.user_port == stun_flow.user_port)) or
                     ((cohort_flow.user_port == stun_flow.user_port) and
                      (cohort_flow.dest_port == stun_flow.dest_port) and
-                     (cohort_flow.user_ip == stun_flow.user_ip) and
+                     (cohort_flow.protocol == stun_flow.protocol) and
                      (cohort_flow.dest_ip == stun_flow.dest_ip))):
                     if ((cohort_flow.category == "Unknown (No DNS)") or
                         (cohort_flow.category == "Unknown (Not Mapped)") or
