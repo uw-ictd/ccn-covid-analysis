@@ -67,51 +67,98 @@ def _augment_user_flows_with_stun_state(in_path, out_path):
     # miss repeated calls. There is a tradeoff though since increasing the
     # time increases the chance of incidental reuse of the port on the client.
     expiry_threshold = datetime.timedelta(minutes=5)
+    current_timestamp = None
+    current_timestamp_cohort = set()
     for i, flow in enumerate(flow_frame.itertuples()):
         flow_start_time = flow.Index
-        augmented_flow = flow._asdict()
 
-        # Expire old stun requests
-        valid_stun_state = set()
-        for stun_flow in stun_state:
-            if (flow_start_time - stun_flow.Index) < expiry_threshold:
-                valid_stun_state.add(stun_flow)
-        stun_state = valid_stun_state
+        if current_timestamp is None:
+            current_timestamp = flow_start_time
 
-        if flow.protocol == 17 and flow.dest_port == 3478:
-            # This flow is ICE (STUN/TURN)!
-            stun_state.add(flow)
+        # Build a list of all flows tied at the current time, since the
+        # timestamps are not very precise and the ordering is not stable.
+        if flow_start_time == current_timestamp:
+            current_timestamp_cohort.add(flow)
         else:
+            # Do all processing of the built timestamp cohort first,
+            # then address the flow from this iteration.
+
+            # Expire old stun requests
+            valid_stun_state = set()
+            for stun_flow in stun_state:
+                if (current_timestamp - stun_flow.Index) < expiry_threshold:
+                    valid_stun_state.add(stun_flow)
+            stun_state = valid_stun_state
+
+            # Find any stun flows at the timestamp first before any other processing
+            for cohort_flow in current_timestamp_cohort:
+                if cohort_flow.protocol == 17 and cohort_flow.dest_port == 3478:
+                    # This flow is ICE (STUN/TURN)!
+                    stun_state.add(cohort_flow)
+
+            # Augment all other flows in the cohort
+            for cohort_flow in current_timestamp_cohort:
+                augmented_flow = cohort_flow._asdict()
+                if not (cohort_flow.protocol == 17 and cohort_flow.dest_port == 3478):
+                    # See if this flow is actually a stun flow
+                    for stun_flow in stun_state:
+                        if cohort_flow.user_port == stun_flow.user_port:
+                            if ((cohort_flow.category == "Unknown (No DNS)") or
+                                    (cohort_flow.category == "Unknown (Not Mapped)")):
+                                augmented_flow["category"] = "Peer to Peer"
+                                augmented_flow["org"] = "ICE Peer (Unknown Org)"
+                            elif "emome-ip.hinet.net" in cohort_flow.fqdn:
+                                # These appear to be generic dns records for users
+                                # within Chunghwa Telecom (in Taiwan)
+                                augmented_flow["category"] = "Peer to Peer"
+                                augmented_flow["org"] = "ICE Peer (Unknown Org)"
+                            elif "turnservice" in cohort_flow.fqdn or "facebook" in cohort_flow.fqdn:
+                                augmented_flow["category"] = "Messaging"
+                            else:
+                                # There is a bit of noise from port reuse.
+                                print("Not overriding existing category", cohort_flow.category)
+                                print(cohort_flow.fqdn)
+
+                out_chunk.append(augmented_flow)
+                if len(out_chunk) >= max_rows_per_division:
+                    new_frame = dask.dataframe.from_pandas(
+                        pd.DataFrame(out_chunk),
+                        chunksize=max_rows_per_division,
+                    )
+                    if out_frame is None:
+                        out_frame = new_frame
+                    else:
+                        out_frame = out_frame.append(new_frame)
+                    out_chunk = list()
+
+            # Reset the cohort with a new lead flow from the current iteration
+            current_timestamp = flow_start_time
+            current_timestamp_cohort = {flow}
+
+    # Handle the dangling cohort on loop termination
+    for cohort_flow in current_timestamp_cohort:
+        augmented_flow = cohort_flow._asdict()
+        if not (cohort_flow.protocol == 17 and cohort_flow.dest_port == 3478):
             # See if this flow is actually a stun flow
             for stun_flow in stun_state:
-                if flow.user_port == stun_flow.user_port:
-                    if ((flow.category == "Unknown (No DNS)") or
-                            (flow.category == "Unknown (Not Mapped)")):
+                if cohort_flow.user_port == stun_flow.user_port:
+                    if ((cohort_flow.category == "Unknown (No DNS)") or
+                            (cohort_flow.category == "Unknown (Not Mapped)")):
                         augmented_flow["category"] = "Peer to Peer"
                         augmented_flow["org"] = "ICE Peer (Unknown Org)"
-                    elif "emome-ip.hinet.net" in flow.fqdn:
+                    elif "emome-ip.hinet.net" in cohort_flow.fqdn:
                         # These appear to be generic dns records for users
                         # within Chunghwa Telecom (in Taiwan)
                         augmented_flow["category"] = "Peer to Peer"
                         augmented_flow["org"] = "ICE Peer (Unknown Org)"
-                    elif "turnservice" in flow.fqdn or "facebook" in flow.fqdn:
+                    elif "turnservice" in cohort_flow.fqdn or "facebook" in cohort_flow.fqdn:
                         augmented_flow["category"] = "Messaging"
                     else:
                         # There is a bit of noise from port reuse.
-                        print("Not overriding existing category", flow.category)
-                        print(flow.fqdn)
+                        print("Not overriding existing category", cohort_flow.category)
+                        print(cohort_flow.fqdn)
 
         out_chunk.append(augmented_flow)
-        if len(out_chunk) >= max_rows_per_division:
-            new_frame = dask.dataframe.from_pandas(
-                pd.DataFrame(out_chunk),
-                chunksize=max_rows_per_division,
-            )
-            if out_frame is None:
-                out_frame = new_frame
-            else:
-                out_frame = out_frame.append(new_frame)
-            out_chunk = list()
 
     if len(out_chunk) > 0:
         new_frame = dask.dataframe.from_pandas(
@@ -232,14 +279,11 @@ if __name__ == "__main__":
         print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
 
         # Regular flow is below
-        augment_all_user_flows(in_parent_directory, annotated_parent_directory, client)
+        # augment_all_user_flows(in_parent_directory, annotated_parent_directory, client)
         stun_augment_all_user_flows(annotated_parent_directory, stun_annotated_parent_directory, client)
         merge_parquet_frames(stun_annotated_parent_directory, merged_out_directory)
 
         # print("Temporary computation to find large domains.")
-        # augment_all_user_flows(in_parent_directory, annotated_parent_directory, client)
-        # #stun_augment_all_user_flows(annotated_parent_directory, stun_annotated_parent_directory, client)
-        # merge_parquet_frames(annotated_parent_directory, "scratch/flows/unmapped_typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
         # _print_heavy_hitter_unmapped_domains("scratch/flows/unmapped_typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
 
         client.close()
