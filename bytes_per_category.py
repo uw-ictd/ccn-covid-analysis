@@ -345,7 +345,7 @@ if __name__ == "__main__":
 
     graph_temporary_file = "scratch/graphs/bytes_per_category"
     if platform.large_compute_support:
-        client = bok.dask_infra.setup_tuned_dask_client(6, platform.max_memory_gigabytes, platform.max_processors)
+        client = bok.dask_infra.setup_tuned_dask_client(10, platform.max_memory_gigabytes, platform.max_processors)
         reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
         client.close()
 
