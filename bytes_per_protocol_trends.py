@@ -8,7 +8,8 @@ import pandas as pd
 
 def reduce_to_pandas(outfile, dask_client):
     flows = bok.dask_infra.read_parquet(
-        "data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start")[["protocol", "dest_port", "bytes_up", "bytes_down"]]
+        "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
+    )[["protocol", "dest_port", "bytes_up", "bytes_down"]]
 
     # Compress to days
     flows = flows.reset_index()
