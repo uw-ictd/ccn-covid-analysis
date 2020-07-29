@@ -269,7 +269,7 @@ def make_org_plot(infile):
         color=alt.Color(
             "org",
             title="Organization (By Total)",
-            scale=alt.Scale(scheme="accent"),
+            scale=alt.Scale(scheme="paired"),
             sort=legend_sort_list,
             ),
         order=alt.Order("order"),

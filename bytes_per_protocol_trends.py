@@ -1,8 +1,8 @@
 import altair as alt
+import bok.constants
 import bok.dask_infra
 import bok.pd_infra
 import bok.platform
-import numpy as np
 import pandas as pd
 
 
@@ -42,31 +42,87 @@ def make_plot(infile):
     print(test.sort_values("bytes_total"))
 
     # Consolidate by week instead of by day
-    grouped_flows = grouped_flows[["start_bin", "bytes_total", "name"]].groupby([pd.Grouper(key="start_bin", freq="W-MON"), "name"]).sum()
+    grouped_flows = grouped_flows[["start_bin", "bytes_total", "bytes_up", "bytes_down", "name"]].groupby([pd.Grouper(key="start_bin", freq="W-MON"), "name"]).sum()
 
     grouped_flows = grouped_flows.reset_index()
 
     print(grouped_flows)
 
-    grouped_flows["GB"] = grouped_flows["bytes_total"] / (1000**3)
-    plot = alt.Chart(grouped_flows).mark_area().encode(
+    # Generate an outage annotation overlay
+    outage_info = pd.DataFrame([{"start": bok.constants.OUTAGE_START, "end": bok.constants.OUTAGE_END}])
+    outage_annotation = alt.Chart(outage_info).mark_rect(
+        opacity=0.7,
+        # cornerRadius=2,
+        strokeWidth=2,
+        # stroke="black"
+    ).encode(
+        x=alt.X("start"),
+        x2=alt.X2("end"),
+        color=alt.value("#FFFFFF")
+    )
+
+    # Figure out legend sorting order by total amount.
+    proto_totals = grouped_flows.groupby("name").sum().reset_index()
+    legend_sort_order = proto_totals.sort_values("bytes_total", ascending=True).set_index("bytes_total").reset_index()
+    sort_list = legend_sort_order["name"].tolist()
+    sort_list.reverse()
+
+    # Now get the up and down sorts
+    proto_totals = grouped_flows.groupby("name").sum().reset_index()
+    sort_down_order = proto_totals.sort_values("bytes_down", ascending=True).set_index("bytes_down").reset_index()
+    sort_down_order["order"] = sort_down_order.index
+    sort_down_order["direction"] = "Downlink"
+
+    sort_up_order = proto_totals.sort_values("bytes_up", ascending=True).set_index("bytes_up").reset_index()
+    sort_up_order["order"] = sort_up_order.index
+    sort_up_order["direction"] = "Uplink"
+
+    orders = sort_down_order.append(sort_up_order)
+
+    grouped_flows["Downlink"] = grouped_flows["bytes_down"] / (1000**3)
+    grouped_flows["Uplink"] = grouped_flows["bytes_up"] / (1000**3)
+
+    # Melt the dataset for faceting
+    links = grouped_flows.melt(
+        id_vars=["name", "start_bin"],
+        value_vars=["Downlink", "Uplink"],
+        var_name="direction",
+        value_name="GB"
+    ).set_index("name")
+
+    # Merge the sort orders back into the larger dataset
+    faceted_flows = links.merge(orders, on=["name", "direction"])
+
+    area = alt.Chart().mark_area().encode(
         x=alt.X("start_bin:T",
                 title="Time",
                 axis=alt.Axis(labels=True),
                 ),
         y=alt.Y("sum(GB):Q",
-                title="Fraction of Traffic Per Week(GB)",
-                stack="normalize",
+                title="Share of Traffic Per Week",
+                stack="normalize"
                 ),
-        # shape="direction",
-        color="name",
-        detail="name",
-    ).properties(
-        # title="Local Service Use",
+        color=alt.Color(
+            "name",
+            title="Protocol (By Total)",
+            scale=alt.Scale(scheme="tableau10"),
+            sort=sort_list,
+        ),
+        order=alt.Order("order"),
+    )
+
+    (area + outage_annotation).properties(
         width=500,
-    ).save("renders/bytes_per_protocol_trends_normalized.png",
-           scale_factor=2
-           )
+    ).facet(
+        column=alt.Column(
+            'direction:N',
+            title="",
+        ),
+        data=faceted_flows,
+    ).save(
+        "renders/bytes_per_protocol_trends_normalized_facet.png",
+        scale_factor=2,
+    )
 
     plot = alt.Chart(grouped_flows).mark_area().encode(
         x=alt.X("start_bin:T",
