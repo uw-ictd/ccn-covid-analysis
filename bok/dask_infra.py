@@ -51,8 +51,8 @@ def setup_tuned_dask_client(per_worker_memory_GB, system_memory_GB, system_proce
         # Allocate extra processors to threads
         thread_count = int(system_processors/worker_count)
         memory_limit = "{}GB".format(per_worker_memory_GB)
-        print("Operating with {} workers, {} threads per worker, and {} memory".format(
-            worker_count, thread_count, per_worker_memory_GB
+        print("Operating with {} workers, with {} threads and {} of memory per worker.".format(
+            worker_count, thread_count, memory_limit
         ))
         # The memory limit parameter is undocumented and applies to each worker.
         cluster = dask.distributed.LocalCluster(n_workers=worker_count,
