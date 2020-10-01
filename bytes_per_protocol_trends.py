@@ -191,7 +191,7 @@ if __name__ == "__main__":
 
     if platform.large_compute_support:
         print("Running compute")
-        client = bok.dask_infra.setup_tuned_dask_client(10, platform.max_memory_gigabytes, platform.max_processors)
+        client = bok.dask_infra.setup_platform_tuned_dask_client(10, platform)
         reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
         client.close()
         print("Done with compute")

@@ -286,7 +286,7 @@ if __name__ == "__main__":
     merged_out_directory = "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
 
     if platform.large_compute_support:
-        client = bok.dask_infra.setup_tuned_dask_client(10, platform.max_memory_gigabytes, platform.max_processors)
+        client = bok.dask_infra.setup_platform_tuned_dask_client(10, platform)
         print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
 
         # Regular flow is below

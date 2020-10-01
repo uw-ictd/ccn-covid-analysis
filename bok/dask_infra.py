@@ -14,6 +14,17 @@ def setup_dask_client():
     return setup_tuned_dask_client(1, 3, 4, temporary_directory=None)
 
 
+def setup_platform_tuned_dask_client(per_worker_memory_GB, platform):
+    """Setup dask client configured for the platform and task memory requirement
+    """
+    return setup_tuned_dask_client(
+        per_worker_memory_GB,
+        platform.max_memory_gigabytes,
+        platform.max_processors,
+        platform.temp_directory,
+    )
+
+
 def setup_tuned_dask_client(per_worker_memory_GB, system_memory_GB, system_processors, temporary_directory):
     # Compression sounds nice, but results in spikes on decompression
     # that can lead to unstable RAM use and overflow.
