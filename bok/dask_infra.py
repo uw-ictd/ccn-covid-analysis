@@ -4,6 +4,7 @@
 import dask.config
 import dask.distributed
 import dask.dataframe
+import logging
 import os
 import shutil
 
@@ -43,7 +44,10 @@ def setup_tuned_dask_client(per_worker_memory_GB, system_memory_GB, system_proce
         # The memory limit parameter is undocumented and applies to each worker.
         cluster = dask.distributed.LocalCluster(n_workers=1,
                                                 threads_per_worker=system_processors,
-                                                memory_limit=memory_limit)
+                                                memory_limit=memory_limit,
+                                                silence_logs=logging.CRITICAL,
+                                                local_directory=temporary_directory,
+                                                )
 
         # Aggressively write to disk but don't kill worker processes if
         # they stray. With a small number of workers each worker killed is
@@ -69,7 +73,10 @@ def setup_tuned_dask_client(per_worker_memory_GB, system_memory_GB, system_proce
         # The memory limit parameter is undocumented and applies to each worker.
         cluster = dask.distributed.LocalCluster(n_workers=worker_count,
                                                 threads_per_worker=thread_count,
-                                                memory_limit=memory_limit)
+                                                memory_limit=memory_limit,
+                                                silence_logs=logging.CRITICAL,
+                                                local_directory=temporary_directory,
+                                                )
 
         # Less aggressively write to disk than in the constrained case,
         # but still don't kill worker processes if they stray and rely on the
