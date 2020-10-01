@@ -12,6 +12,8 @@ import numpy as np
 import pandas as pd
 
 import bok.dask_infra
+import bok.pd_infra
+import bok.platform
 
 # Configs
 day_intervals = 7
@@ -52,19 +54,30 @@ def get_throughput_data(flows):
 
     return query
 
-if __name__ == "__main__":
+
+# Gets the start and end of the date in the dataset.
+def get_date_range():
     client = bok.dask_infra.setup_dask_client()
+
+    # Import the flows dataset
+    #
+    # Importantly, dask is lazy and doesn't actually import the whole thing,
+    # but just keeps track of where the file shards live on disk.
 
     flows = dask.dataframe.read_parquet("data/clean/flows/typical_TM_DIV_none_INDEX_user", engine="fastparquet")
     print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
 
+    # Gets the max date in the flows dataset
+    max_date = flows.reset_index()["start"].max()
+    max_date = max_date.compute()
+    print("max date: ", max_date)
+
+
+def reduce_to_pandas(outfile, dask_client):
+    flows = bok.dask_infra.read_parquet("data/clean/flows/typical_TM_DIV_none_INDEX_user")
+
     # Get the user data
     throughput = get_throughput_data(flows)
-
-    bok.dask_infra.clean_write_parquet(throughput, "scratch/graphs/bytes_per_week")
-
-    throughput = dask.dataframe.read_parquet("scratch/graphs/bytes_per_week",
-                                             engine="fastparquet")
 
     # Get the data in a form that is easily plottable
     throughput = throughput.rename(columns={"bytes_up": "Up",
@@ -86,6 +99,11 @@ if __name__ == "__main__":
     # Compute the query
     throughput = throughput.compute()
 
+    bok.pd_infra.clean_write_parquet(throughput, outfile)
+
+
+def make_plot(infile):
+    throughput = bok.pd_infra.read_parquet(infile)
     # Fix Plotting
     throughput["GB"] = throughput["bytes"] / (1000**3)
 
@@ -110,19 +128,18 @@ if __name__ == "__main__":
     )
 
 
-# Gets the start and end of the date in the dataset.
-def get_date_range():
-    client = bok.dask_infra.setup_dask_client()
+if __name__ == "__main__":
+    platform = bok.platform.read_config()
 
-    # Import the flows dataset
-    #
-    # Importantly, dask is lazy and doesn't actually import the whole thing,
-    # but just keeps track of where the file shards live on disk.
+    graph_temporary_file = "scratch/graphs/bytes_per_week"
+    if platform.large_compute_support:
+        print("Running compute tasks")
+        client = bok.dask_infra.setup_platform_tuned_dask_client(20, platform)
+        reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
+        client.close()
 
-    flows = dask.dataframe.read_parquet("data/clean/flows/typical_TM_DIV_none_INDEX_user", engine="fastparquet")
-    print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
+    if platform.altair_support:
+        print("Running vis tasks")
+        make_plot(graph_temporary_file)
 
-    # Gets the max date in the flows dataset
-    max_date = flows.reset_index()["start"].max()
-    max_date = max_date.compute()
-    print("max date: ", max_date)
+    print("Done!")
