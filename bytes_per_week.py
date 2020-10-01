@@ -56,32 +56,53 @@ def get_throughput_data(flows):
 
 
 def reduce_to_pandas(outfile, dask_client):
-    flows = bok.dask_infra.read_parquet("data/clean/flows/typical_TM_DIV_none_INDEX_user")
+    typical = bok.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["bytes_up", "bytes_down"]]
+    p_to_p = bok.dask_infra.read_parquet("data/clean/flows/p2p_TM_DIV_none_INDEX_start")[["bytes_b_to_a", "bytes_a_to_b"]]
+    p_to_p["bytes_local"] = p_to_p["bytes_a_to_b"] + p_to_p["bytes_b_to_a"]
+    print(p_to_p)
 
-    # Get the user data
-    throughput = get_throughput_data(flows)
+    combined = typical.append(p_to_p).fillna(0)
+    print(combined)
+
+    # Compress to days
+    combined["day_bin"] = combined.index.dt.floor("d")
+    combined = combined.reset_index().set_index("day_bin")
+
+    # Do the grouping
+    combined = combined.groupby(["day_bin"]).sum()
+
+    print("just grouped")
+    print(combined)
+    combined = combined.reset_index()
+
+    print("just reset")
+    print(combined)
 
     # Get the data in a form that is easily plottable
-    throughput = throughput.rename(columns={"bytes_up": "Up",
-                                            "bytes_down": "Down",
-                                            "total_bytes": "Total",
-                                            })
-    throughput = throughput.melt(id_vars=["date"],
-                                 value_vars=["Up", "Down", "Total"],
-                                 var_name="throughput_type",
-                                 value_name="bytes")
+    combined = combined.rename(columns={"bytes_up": "Up",
+                                        "bytes_down": "Down",
+                                        "bytes_local": "Local",
+                                        })
+    combined = combined.melt(id_vars=["day_bin"],
+                             value_vars=["Up", "Down", "Local"],
+                             var_name="throughput_type",
+                             value_name="bytes")
+
+    print("post melt")
+    print(combined)
 
     # Reset the types of the dataframe
     types = {
-        "date": "object",
+        "day_bin": "datetime64",
         "throughput_type": "category",
         "bytes": "int64"
     }
-    throughput = throughput.astype(types)
-    # Compute the query
-    throughput = throughput.compute()
 
-    bok.pd_infra.clean_write_parquet(throughput, outfile)
+    combined = combined.astype(types).compute()
+
+    print("computed", combined)
+
+    bok.pd_infra.clean_write_parquet(combined, outfile)
 
 
 def make_plot(infile):
