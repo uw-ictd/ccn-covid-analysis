@@ -11,15 +11,16 @@ import shutil
 def setup_dask_client():
     """Setup and configure a dask client for the local system
     """
-    return setup_tuned_dask_client(1, 3, 4)
+    return setup_tuned_dask_client(1, 3, 4, temporary_directory=None)
 
 
-def setup_tuned_dask_client(per_worker_memory_GB, system_memory_GB, system_processors):
+def setup_tuned_dask_client(per_worker_memory_GB, system_memory_GB, system_processors, temporary_directory):
     # Compression sounds nice, but results in spikes on decompression
     # that can lead to unstable RAM use and overflow.
     dask.config.set({"dataframe.shuffle-compression": False})
     dask.config.set({"distributed.scheduler.allowed-failures": 50})
     dask.config.set({"distributed.scheduler.work-stealing": True})
+    dask.config.set({"dask.temporary-directory": temporary_directory})
 
     if per_worker_memory_GB >= system_memory_GB:
         # We are operating on a constrained system
