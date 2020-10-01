@@ -55,24 +55,6 @@ def get_throughput_data(flows):
     return query
 
 
-# Gets the start and end of the date in the dataset.
-def get_date_range():
-    client = bok.dask_infra.setup_dask_client()
-
-    # Import the flows dataset
-    #
-    # Importantly, dask is lazy and doesn't actually import the whole thing,
-    # but just keeps track of where the file shards live on disk.
-
-    flows = dask.dataframe.read_parquet("data/clean/flows/typical_TM_DIV_none_INDEX_user", engine="fastparquet")
-    print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
-
-    # Gets the max date in the flows dataset
-    max_date = flows.reset_index()["start"].max()
-    max_date = max_date.compute()
-    print("max date: ", max_date)
-
-
 def reduce_to_pandas(outfile, dask_client):
     flows = bok.dask_infra.read_parquet("data/clean/flows/typical_TM_DIV_none_INDEX_user")
 
