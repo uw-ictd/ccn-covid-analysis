@@ -111,18 +111,27 @@ def make_plot(infile):
     # Fix plotting scale
     throughput["GB"] = throughput["bytes"] / (1000**3)
 
+    # Generate a dense dataframe with all days and directions
+    date_range = pd.DataFrame({"day_bin": pd.date_range(bok.constants.MIN_DATE, bok.constants.MAX_DATE, freq="1D")})
+    category_range = pd.DataFrame({"throughput_type": ["Up", "Down", "Local"]}, dtype="category")
+    dense_index = bok.pd_infra.cartesian_product(date_range, category_range)
+
+    throughput = dense_index.merge(
+        throughput,
+        how="left",
+        left_on=["day_bin", "throughput_type"],
+        right_on=["day_bin", "throughput_type"]
+    ).fillna(value={"bytes": 0, "GB": 0})
+
     throughput_windowed = throughput.set_index("day_bin").sort_index()
-    print(throughput_windowed)
+
     throughput_windowed = throughput_windowed.groupby(
-        "throughput_type"
+        ["throughput_type"]
     ).rolling(
-        window=7,
-        center=True,
+        window="7D",
     ).mean().reset_index()
 
-    print(throughput_windowed)
-
-    points = altair.Chart(throughput).mark_point(opacity=0.3).encode(
+    points = altair.Chart(throughput).mark_point(opacity=0.5).encode(
         x=altair.X("day_bin:T",
                    title="Time",
                    axis=altair.Axis(
@@ -133,9 +142,17 @@ def make_plot(infile):
         y=altair.Y("GB:Q",
                    title="GB Total Per Day"
                    ),
-        color=altair.Color("throughput_type",
-                           sort=["Down", "Up", "Local"]
-                           ),
+        color=altair.Color(
+            "throughput_type",
+            sort=["Down", "Up", "Local"],
+        ),
+        shape=altair.Shape(
+            "throughput_type",
+            sort=["Down", "Up", "Local"],
+            legend=altair.Legend(
+                title="Daily Total GB",
+            ),
+        )
     )
 
     lines = altair.Chart(throughput_windowed).mark_line().encode(
@@ -149,9 +166,14 @@ def make_plot(infile):
         y=altair.Y("GB:Q",
                    title="GB Total Per Day"
                    ),
-        color=altair.Color("throughput_type",
-                           sort=["Down", "Up", "Local"]
-                           ),
+        color=altair.Color(
+            "throughput_type",
+            sort=["Down", "Up", "Local"],
+            legend=altair.Legend(
+                title="7-Day Moving Average",
+                symbolType="stroke",
+                ),
+            ),
     )
 
     (points + lines).properties(

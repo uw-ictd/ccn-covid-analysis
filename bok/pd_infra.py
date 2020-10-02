@@ -35,3 +35,10 @@ def read_parquet(path):
     """Read a parquet file with common options standardized in the project
     """
     return pd.read_parquet(path, engine="fastparquet")
+
+
+def cartesian_product(left, right):
+    """Generate a cartesian product of left/right at O(N*M) size!"""
+    temp_left = left.assign(temp_key=1)
+    temp_right = right.assign(temp_key=1)
+    return temp_left.merge(temp_right, on="temp_key").drop("temp_key", axis=1)
