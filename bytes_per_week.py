@@ -107,24 +107,54 @@ def reduce_to_pandas(outfile, dask_client):
 
 def make_plot(infile):
     throughput = bok.pd_infra.read_parquet(infile)
-    # Fix Plotting
+
+    # Fix plotting scale
     throughput["GB"] = throughput["bytes"] / (1000**3)
 
-    altair.Chart(throughput).mark_line().encode(
-        x=altair.X("date:O",
-                   title="Week",
+    throughput_windowed = throughput.set_index("day_bin").sort_index()
+    print(throughput_windowed)
+    throughput_windowed = throughput_windowed.groupby(
+        "throughput_type"
+    ).rolling(
+        window=7,
+        center=True,
+    ).mean().reset_index()
+
+    print(throughput_windowed)
+
+    points = altair.Chart(throughput).mark_point(opacity=0.3).encode(
+        x=altair.X("day_bin:T",
+                   title="Time",
                    axis=altair.Axis(
                        labelSeparation=5,
                        labelOverlap="parity",
                    ),
                    ),
         y=altair.Y("GB:Q",
-                   title="GB Total Per Week"
+                   title="GB Total Per Day"
                    ),
         color=altair.Color("throughput_type",
-                           sort=["Total", "Down", "Up"]
+                           sort=["Down", "Up", "Local"]
                            ),
-    ).properties(
+    )
+
+    lines = altair.Chart(throughput_windowed).mark_line().encode(
+        x=altair.X("day_bin:T",
+                   title="Time",
+                   axis=altair.Axis(
+                       labelSeparation=5,
+                       labelOverlap="parity",
+                   ),
+                   ),
+        y=altair.Y("GB:Q",
+                   title="GB Total Per Day"
+                   ),
+        color=altair.Color("throughput_type",
+                           sort=["Down", "Up", "Local"]
+                           ),
+    )
+
+    (points + lines).properties(
         width=500
     ).save(
         "renders/bytes_per_week.png", scale_factor=2
@@ -137,7 +167,7 @@ if __name__ == "__main__":
     graph_temporary_file = "scratch/graphs/bytes_per_week"
     if platform.large_compute_support:
         print("Running compute tasks")
-        client = bok.dask_infra.setup_platform_tuned_dask_client(20, platform)
+        client = bok.dask_infra.setup_platform_tuned_dask_client(7, platform)
         reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
         client.close()
 
