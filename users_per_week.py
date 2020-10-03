@@ -95,10 +95,6 @@ def reduce_to_pandas(outfile, dask_client):
     transactions = dask.dataframe.read_csv("data/clean/first_time_user_transactions.csv")
     registered_users = get_registered_users_query(transactions).compute()
 
-    print("----------------------------------------------------------------")
-    print(active_users)
-    print(registered_users)
-    print("JOINING NOW")
     # Join the active and registered users together
     users = active_users.merge(registered_users,
                                how="outer",
@@ -115,38 +111,31 @@ def reduce_to_pandas(outfile, dask_client):
 def make_plot(infile):
     users = bok.pd_infra.read_parquet(infile)
 
-    # # Ignore cohorts that are past the max date
-    # query = query.query("cohort >= 0")
+    users = users.rename(columns={"cohort": "date", "user_active": "Active", "user_registered": "Registered"})
+    users = users.set_index("date").sort_index()
+    users["Registered"] = users["Registered"].fillna(method="ffill")
+    users = users.reset_index()
 
-    print("starting date sthuff")
-    # Map each cohort to a date
-    users = users.assign(date_range=get_date)
+    # Limit graphs to the study period
+    users = users.loc[users["date"] < bok.constants.MAX_DATE]
 
     # Get the data in a form that is easily plottable
-    users = users.melt(id_vars=["date_range"], value_vars=["user_active", "user_registered"], var_name="user_type", value_name="num_users")
+    users = users.melt(id_vars=["date"], value_vars=["Active", "Registered"], var_name="user_type", value_name="num_users")
     # Reset the types of the dataframe
     types = {
-        "date_range": "object",
+        "date": "datetime64",
         "user_type": "category",
         "num_users": "int64"
     }
     users = users.astype(types)
 
-    users = users.set_index("date_range").sort_values("date_range")
+    users = users.set_index("date").sort_index()
     users = users.reset_index()
     users = users.loc[users.index > 19]
 
-    def rename_user_type(user_type):
-        if user_type == "user_active":
-            return "Active"
-        else:
-            return "Registered"
-
-    users["pretty_type"] = users["user_type"].apply(rename_user_type)
-
     altair.Chart(users).mark_line().encode(
-        x=altair.X("date_range:O",
-                   title="Date (Binned by Week)",
+        x=altair.X("date:T",
+                   title="Time",
                    axis=altair.Axis(
                        labelSeparation=5,
                        labelOverlap="parity",
@@ -155,7 +144,7 @@ def make_plot(infile):
         y=altair.Y("num_users",
                    title="User Count",
                    ),
-        color=altair.Color("pretty_type",
+        color=altair.Color("user_type",
                            title="",
                            sort=["Registered", "Active"]
                            ),
