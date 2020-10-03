@@ -35,31 +35,29 @@ def get_date(x):
 def get_active_users_query(df):
     # Map each start to a cohort
     df = df.reset_index()
-    df["cohort"] = df["start"].dt.floor("d")
+    df["day"] = df["start"].dt.floor("d")
 
     # Group by cohorts and get the all the users
     # Count the number of unique users per cohort
-    df = df.groupby("cohort")["user"].nunique()
+    df = df.groupby("day")["user"].nunique()
 
     # Convert to dataframe
     df = df.to_frame()
-    # Get the cohort column back
+    # Get the day column back
     df = df.reset_index()
 
     return df
+
 
 def get_registered_users_query(transactions):
     # Set down the types for the dataframe
     types = {
         'start': 'datetime64[ns]',
-        "action": "object",
         "user": "object",
-        "amount": "int64",
-        "price": "int64"
     }
 
     # Update the types in the dataframe
-    query = transactions.astype(types)
+    query = transactions.astype(types)[["start", "user"]].copy()
     query = query.set_index("start")
     # Abuse cumsum to get a counter, since the users are already
     # distinct and sorted.
@@ -69,7 +67,6 @@ def get_registered_users_query(transactions):
 
     # Compute the number of users at each week, and store in the
     # "user" column
-    query = query.resample("1w").last()
     query = query.drop("user", axis="columns").rename(columns={"count": "user"})
     # For weeks that had no new users added, use the total from previous weeks.
     query["user"] = query["user"].fillna(method="ffill")
@@ -77,12 +74,24 @@ def get_registered_users_query(transactions):
     # Get the start column back
     query = query.reset_index()
     # Map each start to a cohort
-    query["cohort"] = query["start"].dt.floor("d")
+    query["day"] = query["start"].dt.floor("d")
 
     return query
 
 
 def reduce_to_pandas(outfile, dask_client):
+    transactions = dask.dataframe.read_csv("data/clean/first_time_user_transactions.csv")[["start", "user"]]
+    registered_users = get_registered_users_query(transactions).compute()
+
+    # Generate a dense dataframe with all days
+    date_range = pd.DataFrame({"day": pd.date_range(bok.constants.MIN_DATE, bok.constants.MAX_DATE, freq="1D")})
+    registered_users = date_range.merge(
+        registered_users,
+        how="left",
+        left_on="day",
+        right_on="day",
+    ).fillna(method="ffill").dropna()
+
     # Import the flows dataset
     #
     # Importantly, dask is lazy and doesn't actually import the whole thing,
@@ -92,14 +101,11 @@ def reduce_to_pandas(outfile, dask_client):
     # Compute the active users query into a realized pandas frame.
     active_users = get_active_users_query(flows).compute()
 
-    transactions = dask.dataframe.read_csv("data/clean/first_time_user_transactions.csv")
-    registered_users = get_registered_users_query(transactions).compute()
-
     # Join the active and registered users together
     users = active_users.merge(registered_users,
-                               how="outer",
-                               left_on="cohort",
-                               right_on="cohort",
+                               how="right",
+                               left_on="day",
+                               right_on="day",
                                suffixes=('_active', '_registered'))
 
     # For cohorts with no active users, fill zero.
@@ -111,7 +117,7 @@ def reduce_to_pandas(outfile, dask_client):
 def make_plot(infile):
     users = bok.pd_infra.read_parquet(infile)
 
-    users = users.rename(columns={"cohort": "date", "user_active": "Active", "user_registered": "Registered"})
+    users = users.rename(columns={"day": "date", "user_active": "Active", "user_registered": "Registered"})
     users = users.set_index("date").sort_index()
     users["Registered"] = users["Registered"].fillna(method="ffill")
     users = users.reset_index()
@@ -119,19 +125,25 @@ def make_plot(infile):
     # Limit graphs to the study period
     users = users.loc[users["date"] < bok.constants.MAX_DATE]
 
+    # Compute a rolling average
+    users["Active 7-Day Average"] = users["Active"].rolling(
+        window=7,
+    ).mean()
+
     # Get the data in a form that is easily plottable
-    users = users.melt(id_vars=["date"], value_vars=["Active", "Registered"], var_name="user_type", value_name="num_users")
+    users = users.melt(id_vars=["date"], value_vars=["Active", "Registered", "Active 7-Day Average"], var_name="user_type", value_name="num_users")
     # Reset the types of the dataframe
     types = {
         "date": "datetime64",
         "user_type": "category",
         "num_users": "int64"
     }
+    # Required since some rolling average entries are NaN before the average window is filled.
+    users = users.dropna()
     users = users.astype(types)
 
-    users = users.set_index("date").sort_index()
+    users = users.set_index("date").sort_values(["date", "num_users"])
     users = users.reset_index()
-    users = users.loc[users.index > 19]
 
     altair.Chart(users).mark_line().encode(
         x=altair.X("date:T",
