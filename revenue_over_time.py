@@ -2,88 +2,86 @@
 """
 
 import altair
-import bok.constants
-import bok.dask_infra
-import dask.config
-import dask.dataframe
-import dask.distributed
 import datetime
-import math
 import numpy as np
 import pandas as pd
 
-# Configs
-day_intervals = 7
-# IMPORTANT: Run get_data_range() to update these values when loading in a new dataset!
-max_date = bok.constants.MAX_DATE
-
-def get_month_year(x):
-    return x["start"].apply(lambda x_1: datetime.datetime(year=x_1.year, month=x_1.month, day=1), meta=('start', 'datetime64[ns]'))
+import bok.constants
+import bok.dask_infra
+import bok.platform
+import bok.pd_infra
 
 
-def get_date(x):
-    return x["start"].apply(lambda x_1: datetime.datetime(year=x_1.year, month=x_1.month, day=x_1.day), meta=('start', 'datetime64[ns]'))
+def make_expenses():
+    maintenance = pd.DataFrame({"timestamp": pd.date_range(bok.constants.MIN_DATE, bok.constants.MAX_DATE, freq="1M")})
+    # Monthly power system maintenance
+    maintenance = maintenance.assign(amount_idr=1300000)
+    maintenance["amount_usd"] = maintenance["amount_idr"] * bok.constants.IDR_TO_USD
 
-def get_revenue_query(transactions):
-    # Set down the types for the dataframe
-    types = {
-        "start": 'datetime64',
-        "price": "int64",
-    }
+    vsat = pd.DataFrame({"timestamp": pd.date_range(bok.constants.MIN_DATE, bok.constants.MAX_DATE, freq="1M")})
+    vsat = vsat.assign(amount_usd=300)
 
-    # Update the types in the dataframe
-    query = transactions.astype(types)
-    # Map each start to a cohort
-    query = query.assign(date=get_date)
-    # Group by cohorts and get the all the users
-    query = query.groupby("date")["price"]
-    # Count the number of unique users per cohort
-    query = query.sum()
-    # Convert query back into a dataframe
-    query = query.reset_index()
-    # Do a rolling average of the days
-    query["rolling_avg"] = query.iloc[:,1].rolling(window=30, win_type="blackman").mean()
-    # Drop all NA values
-    query = query.dropna(how="any")
+    initial = pd.DataFrame({
+        "timestamp": [bok.constants.MIN_DATE, bok.constants.OUTAGE_END],
+        "amount_usd": [9334, 1000],
+    })
 
-    return query
+    expenses = initial.append(vsat).append(maintenance[["timestamp", "amount_usd"]])
+    expenses = expenses.assign(kind="Cumulative Costs")
+
+    return expenses
+
+
+def reduce_to_pandas(outfile, dask_client):
+    transactions = bok.dask_infra.read_parquet("data/clean/transactions_TM").compute()
+    purchases = transactions.loc[(transactions["kind"] == "purchase") | (transactions["kind"] == "admin_topup")]
+    purchases = purchases[["timestamp", "amount_idr", "kind"]]
+    bok.pd_infra.clean_write_parquet(purchases, outfile)
+
+
+def make_plot(infile):
+    purchases = bok.pd_infra.read_parquet(infile)
+    purchases["amount_usd"] = purchases["amount_idr"] * bok.constants.IDR_TO_USD
+    purchases = purchases.loc[purchases["kind"] == "admin_topup"]
+    purchases = purchases.replace({"admin_topup": "Cumulative Revenue"})
+
+    finances = purchases.append(make_expenses())
+
+    finances = finances.set_index("timestamp").sort_index().reset_index()
+    finances["amount_cum"] = finances.groupby("kind").cumsum()["amount_usd"]
+
+    altair.Chart(finances).mark_line(interpolate='step-after').encode(
+        x=altair.X("timestamp:T",
+                   title="Time",
+                   ),
+        y=altair.Y("amount_cum",
+                   title="Amount (USD)",
+                   ),
+        color=altair.Color("kind",
+                           title="",
+                           ),
+    ).properties(
+        width=500
+    ).save(
+        "renders/revenue_over_time.png",
+        scale_factor=2,
+    )
+
 
 if __name__ == "__main__":
-    client = bok.dask_infra.setup_dask_client()
+    platform = bok.platform.read_config()
+    # pd.set_option('display.max_columns', None)
 
-    flows = bok.dask_infra.read_parquet("data/clean/flows")
-    length = len(flows)
-    transactions = dask.dataframe.read_csv("data/clean/first_time_user_transactions.csv")
-    print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
-    print("Processing {} flows".format(length))
+    graph_temporary_file = "scratch/graphs/revenue_vs_time"
+    if platform.large_compute_support:
+        print("Running compute tasks")
+        print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
+        client = bok.dask_infra.setup_platform_tuned_dask_client(8, platform)
+        reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
+        client.close()
 
-    # Get the user data
-    revenue = get_revenue_query(transactions)
-    # Get the data in a form that is easily plottable
-    revenue = revenue.melt(id_vars=["date"], value_vars=["rolling_avg"], var_name="time", value_name="revenue (rupiah)")
-    # Reset the types of the dataframe
-    types = {
-        "date": "datetime64",
-        "revenue (rupiah)": "int64"
-    }
-    revenue = revenue.astype(types)
-    # Compute the query
-    revenue = revenue.compute()
-    print(revenue)
+    if platform.altair_support:
+        print("Running vis tasks")
+        make_plot(graph_temporary_file)
 
-    altair.Chart(revenue).mark_line().encode(
-        x="date:T",
-        y="revenue (rupiah)",
-    ).serve()
-    
-
-# Gets the start and end of the date in the dataset. 
-def get_date_range():
-    client = bok.dask_infra.setup_dask_client()
-
-    flows = dask.dataframe.read_parquet("data/clean/flows", engine="pyarrow")
-
-    # Gets the max date in the flows dataset
-    max_date = flows.reset_index()["start"].max()
-    max_date = max_date.compute()
-    print("max date: ", max_date)
+    print("Done!")
