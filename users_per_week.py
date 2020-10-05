@@ -145,7 +145,7 @@ def make_plot(infile):
     users = users.set_index("date").sort_values(["date", "num_users"])
     users = users.reset_index()
 
-    altair.Chart(users).mark_line().encode(
+    altair.Chart(users).mark_line(interpolate='step-after').encode(
         x=altair.X("date:T",
                    title="Time",
                    axis=altair.Axis(
