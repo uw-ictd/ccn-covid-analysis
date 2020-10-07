@@ -7,6 +7,7 @@ import pandas as pd
 import bok.constants
 import bok.dask_infra
 import bok.pd_infra
+import bok.platform
 
 
 # Module specific format options
@@ -32,6 +33,14 @@ def reduce_flows_to_pandas(in_path, out_path):
     user_range_frame = first_active.merge(last_active,
                                      left_index=True,
                                      right_index=True)
+
+    flow_frame["day_bin"] = flow_frame["start"].dt.floor("d")
+    user_days = flow_frame.groupby(["user", "day_bin"]).sum()
+    user_days = user_days.assign(days_online=1)
+    user_days = user_days.groupby("user").sum()
+    print(user_days)
+
+    user_range_frame = user_range_frame.merge(user_days, left_index=True, right_index=True)
 
     user_range_frame = user_range_frame.compute()
     bok.pd_infra.clean_write_parquet(user_range_frame, out_path)
@@ -105,9 +114,22 @@ def compute_user_deltas(flow_range_intermediate_file, active_delta_out_file):
 
 
 if __name__ == "__main__":
-    client = bok.dask_infra.setup_dask_client()
+    platform = bok.platform.read_config()
+
     flow_source_file = "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
-    flow_range_file = "scratch/graphs/user_active_deltas"
+    temporary_file = "scratch/graphs/compute_user_active_time"
     delta_out_file = "data/clean/user_active_deltas.parquet"
-    reduce_flows_to_pandas(flow_source_file, flow_range_file)
-    compute_user_deltas(flow_range_file, delta_out_file)
+    if platform.large_compute_support:
+        print("Running compute tasks")
+        print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
+        client = bok.dask_infra.setup_platform_tuned_dask_client(per_worker_memory_GB=10, platform=platform)
+        reduce_flows_to_pandas(flow_source_file, temporary_file)
+        client.close()
+
+    compute_user_deltas(temporary_file, delta_out_file)
+
+    print("Done!")
+
+
+
+
