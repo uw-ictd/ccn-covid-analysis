@@ -341,7 +341,7 @@ def make_category_quantiles_plot(infile):
     user_totals["normalized_days_online"] = np.minimum(
         user_totals["days_online"], user_totals["days_active"]) / user_totals["days_active"]
 
-    user_totals["quantile"] = pd.cut(user_totals["rank_daily"], 169)
+    user_totals["quantile"] = pd.cut(user_totals["rank_daily"], 10)
 
     # Merge the user quantile information back into the flows, and then group by category
     quantile_flows = user_category_total.merge(user_totals[["user", "quantile", "days_online"]], on="user", how="inner")
@@ -350,11 +350,7 @@ def make_category_quantiles_plot(infile):
     quantile_totals["quantile_str"] = quantile_totals["quantile"].apply(lambda x: str(x))
     # Weights users who were online a lot of days more heavily than directly averaging the totals
     quantile_totals["normalized_bytes_total"] = quantile_totals["bytes_total"] / quantile_totals["days_online"]
-    print(cat_sort_order)
     quantile_totals = quantile_totals.merge(cat_sort_order[["category", "rank"]], on="category", how="inner")
-    print(quantile_totals)
-
-    # quantile_totals = quantile_totals[(quantile_totals["category"] != "Video") & (quantile_totals["category"] != "Adult Video")]
 
     # This might not be showing exactly what I want to show, since in merging
     # users some users that dominate video could be overrepresented. Maybe
@@ -379,11 +375,37 @@ def make_category_quantiles_plot(infile):
     ).properties(
         width=500,
     ).save(
-        "renders/quantile_daily_bytes.png",
+        "renders/bytes_per_average_online_day_per_quantile_bar.png",
         scale_factor=2,
     )
 
-    print(user_totals)
+    # This might not be showing exactly what I want to show, since in merging
+    # users some users that dominate video could be overrepresented. Maybe
+    # want to merge on the fraction of traffic to each part from each user?
+    # Are users counted equally or are bytes counted equally...
+    alt.Chart(quantile_totals[["category", "quantile_str", "bytes_total", "rank", "normalized_bytes_total"]]).mark_point().encode(
+        x="quantile_str:N",
+        y=alt.Y(
+            "normalized_bytes_total",
+            #stack="normalize",
+            sort=cat_sort_list,
+            title="average bytes per online day"
+        ),
+        color=alt.Color(
+            "category:N",
+            scale=alt.Scale(scheme="tableau20"),
+            sort=cat_sort_list,
+        ),
+        order=alt.Order(
+            "rank",
+            sort="descending",
+        ),
+    ).properties(
+        width=500,
+    ).save(
+        "renders/bytes_per_average_online_day_per_quantile_line.png",
+        scale_factor=2,
+    )
 
 
 if __name__ == "__main__":
@@ -401,8 +423,8 @@ if __name__ == "__main__":
         pd.set_option('display.max_columns', None)
         make_category_quantiles_plot(graph_temporary_file)
 
-        make_category_plot(graph_temporary_file)
-        make_org_plot(graph_temporary_file)
+        # make_category_plot(graph_temporary_file)
+        # make_org_plot(graph_temporary_file)
         # make_category_plot_separate_top_n(graph_temporary_file)
 
     print("Done!")
