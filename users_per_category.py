@@ -302,6 +302,90 @@ def make_org_plot(infile):
     )
 
 
+def make_category_quantiles_plot(infile):
+    grouped_flows = bok.pd_infra.read_parquet(infile)
+    grouped_flows = grouped_flows.reset_index()
+    grouped_flows["bytes_total"] = grouped_flows["bytes_up"] + grouped_flows["bytes_down"]
+    user_category_total = grouped_flows[["user", "category", "bytes_total"]].groupby(
+        ["user", "category"]
+    ).sum().reset_index()
+
+    # Filter users by time in network to eliminate early incomplete samples
+    user_active_ranges = bok.pd_infra.read_parquet(
+        "data/clean/user_active_deltas.parquet")[["user", "days_since_first_active", "days_active", "days_online"]]
+    # Drop users that joined less than a week ago.
+    users_to_analyze = user_active_ranges.loc[
+        user_active_ranges["days_since_first_active"] > 7
+        ]
+    # Drop users active for less than one day
+    users_to_analyze = users_to_analyze.loc[
+        users_to_analyze["days_active"] > 1,
+    ]
+
+    # Sort categories by total amount of bytes.
+    cat_totals = grouped_flows.groupby("category").sum().reset_index()
+    cat_sort_order = cat_totals.sort_values("bytes_total", ascending=False).set_index("bytes_total").reset_index()
+    cat_sort_order["rank"] = cat_sort_order["bytes_total"].rank(method="min", ascending=False)
+    cat_sort_list = cat_sort_order["category"].tolist()
+
+    # Group users by quantiles of their daily use.
+    user_totals = user_category_total.groupby("user").sum().reset_index()
+    user_totals = user_totals.merge(users_to_analyze, on="user", how="inner")
+    user_totals["avg_daily_bytes"] = user_totals["bytes_total"] / user_totals["days_online"]
+    user_totals["rank_total"] = user_totals["bytes_total"].rank(method="min", pct=True)
+
+    user_totals["rank_daily"] = user_totals["avg_daily_bytes"].rank(method="min", pct=True)
+    # take the minimum of days online and days active, since active is
+    # partial-day aware, but online rounds up to whole days. Can be up to 2-e
+    # days off if the user joined late in the day and was last active early.
+    user_totals["normalized_days_online"] = np.minimum(
+        user_totals["days_online"], user_totals["days_active"]) / user_totals["days_active"]
+
+    user_totals["quantile"] = pd.cut(user_totals["rank_daily"], 169)
+
+    # Merge the user quantile information back into the flows, and then group by category
+    quantile_flows = user_category_total.merge(user_totals[["user", "quantile", "days_online"]], on="user", how="inner")
+    quantile_totals = quantile_flows.groupby(["quantile", "category"]).sum()
+    quantile_totals = quantile_totals.reset_index()
+    quantile_totals["quantile_str"] = quantile_totals["quantile"].apply(lambda x: str(x))
+    # Weights users who were online a lot of days more heavily than directly averaging the totals
+    quantile_totals["normalized_bytes_total"] = quantile_totals["bytes_total"] / quantile_totals["days_online"]
+    print(cat_sort_order)
+    quantile_totals = quantile_totals.merge(cat_sort_order[["category", "rank"]], on="category", how="inner")
+    print(quantile_totals)
+
+    # quantile_totals = quantile_totals[(quantile_totals["category"] != "Video") & (quantile_totals["category"] != "Adult Video")]
+
+    # This might not be showing exactly what I want to show, since in merging
+    # users some users that dominate video could be overrepresented. Maybe
+    # want to merge on the fraction of traffic to each part from each user?
+    # Are users counted equally or are bytes counted equally...
+    alt.Chart(quantile_totals[["category", "quantile_str", "bytes_total", "rank", "normalized_bytes_total"]]).mark_bar().encode(
+        x="quantile_str:N",
+        y=alt.Y(
+            "normalized_bytes_total",
+            stack="normalize",
+            sort=cat_sort_list,
+        ),
+        color=alt.Color(
+            "category:N",
+            scale=alt.Scale(scheme="tableau20"),
+            sort=cat_sort_list,
+        ),
+        order=alt.Order(
+            "rank",
+            sort="descending",
+        ),
+    ).properties(
+        width=500,
+    ).save(
+        "renders/quantile_daily_bytes.png",
+        scale_factor=2,
+    )
+
+    print(user_totals)
+
+
 if __name__ == "__main__":
     platform = bok.platform.read_config()
     graph_temporary_file = "scratch/graphs/users_per_category"
@@ -314,6 +398,9 @@ if __name__ == "__main__":
 
     if platform.altair_support:
         print("Running vis tasks")
+        pd.set_option('display.max_columns', None)
+        make_category_quantiles_plot(graph_temporary_file)
+
         make_category_plot(graph_temporary_file)
         make_org_plot(graph_temporary_file)
         # make_category_plot_separate_top_n(graph_temporary_file)
