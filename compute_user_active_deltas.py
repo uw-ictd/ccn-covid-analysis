@@ -79,9 +79,15 @@ def _choose_latest(row):
         return row["last_purchase"], "Purchase"
 
 
+def _count_gap_days(row, gap_day_frame):
+    count = len(gap_day_frame[(gap_day_frame["day"] >= row["earliest"]) & (gap_day_frame["day"] <= row["latest"])])
+    return count
+
+
 def compute_user_deltas(flow_range_intermediate_file, active_delta_out_file):
     flow_ranges = bok.pd_infra.read_parquet(flow_range_intermediate_file)
     purchase_ranges = compute_purchase_range_frame()
+    network_gap_days = compute_full_gap_days("data/clean/log_gaps_TM.parquet")
 
     # Merge on user
     flow_ranges = flow_ranges.reset_index()
@@ -107,6 +113,10 @@ def compute_user_deltas(flow_range_intermediate_file, active_delta_out_file):
     user_ranges["days_active"] = \
         user_ranges["delta_active"].dt.total_seconds() / float(86400)  # (seconds per day)
 
+    # Count impactful gap days
+    user_ranges["outage_impact_days"] = user_ranges.apply(lambda row: _count_gap_days(row, network_gap_days), axis=1)
+    user_ranges["optimistic_days_online"] = user_ranges["days_online"] + user_ranges["outage_impact_days"]
+
     # Drop un-needed intermediate columns
     user_ranges = user_ranges.drop(["start", "end", "first_purchase", "last_purchase"], axis="columns")
 
@@ -117,9 +127,9 @@ def compute_full_gap_days(log_gaps_file):
     """Compute a dataframe with all of the days the network was completely offline"""
     gap_df = bok.pd_infra.read_parquet(log_gaps_file)
     gap_df["gap_duration"] = gap_df["end"] - gap_df["start"]
-    print(gap_df)
+
     long_gaps = gap_df.loc[gap_df["gap_duration"] > datetime.timedelta(days=1)]
-    print(long_gaps)
+
     gap_days = None
     # Generate filler date ranges
     for gap in long_gaps.iloc:
@@ -135,14 +145,13 @@ def compute_full_gap_days(log_gaps_file):
             gap_days = gap_days.append(df)
 
     gap_days = gap_days.set_index("day").sort_index().reset_index()
-    print(gap_days)
+    return gap_days
 
 
 if __name__ == "__main__":
     platform = bok.platform.read_config()
 
     flow_source_file = "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
-    log_gap_source_file = "data/clean/log_gaps_TM.parquet"
     temporary_file = "scratch/graphs/compute_user_active_time"
     delta_out_file = "data/clean/user_active_deltas.parquet"
     if platform.large_compute_support:
@@ -152,8 +161,6 @@ if __name__ == "__main__":
         reduce_flows_to_pandas(flow_source_file, temporary_file)
         client.close()
 
-    explore_gaps(log_gap_source_file)
-    raise NotImplementedError("ded")
     compute_user_deltas(temporary_file, delta_out_file)
 
     print("Done!")
