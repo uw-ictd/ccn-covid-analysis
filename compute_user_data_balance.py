@@ -11,13 +11,6 @@ import bok.pd_infra
 import bok.platform
 
 
-# Module specific format options
-pd.set_option('display.max_columns', None)
-pd.set_option('display.max_colwidth', None)
-pd.set_option('display.width', None)
-pd.set_option('display.max_rows', 40)
-
-
 def compute_user_data_purchase_histories():
     """Compute the running ledger of total data purchased by each user
     """
@@ -439,6 +432,12 @@ def make_plot(inpath):
 if __name__ == "__main__":
     platform = bok.platform.read_config()
 
+    # Module specific format options
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.max_colwidth', None)
+    pd.set_option('display.width', None)
+    pd.set_option('display.max_rows', 40)
+
     grouped_flows_and_purchases_file = "scratch/filtered_flows_and_purchases_TM_DIV_none_INDEX_start"
     split_tared_balance_file = "scratch/tared_user_data_balance_TM_DIV_user_INDEX_start"
     merged_balance_file = "scratch/tared_user_data_balance_TM_DIF_none_INDEX_start"
@@ -446,7 +445,7 @@ if __name__ == "__main__":
 
     if platform.large_compute_support:
         print("Running compute subcommands")
-        client = bok.dask_infra.setup_dask_client()
+        client = bok.dask_infra.setup_platform_tuned_dask_client(per_worker_memory_GB=10, platform=platform)
         # compute_filtered_purchase_and_use_intermediate(grouped_flows_and_purchases_file, client)
         tare_all_users(grouped_flows_and_purchases_file, split_tared_balance_file, client)
         bok.dask_infra.merge_parquet_frames(split_tared_balance_file, merged_balance_file, index_column="timestamp")
