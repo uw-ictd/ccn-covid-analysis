@@ -2,10 +2,12 @@
 """
 
 import altair
-import bok.dask_infra
-import bok.pd_infra
 import numpy as np
 import pandas as pd
+
+import bok.dask_infra
+import bok.pd_infra
+import bok.platform
 
 
 def reduce_to_pandas(outfile, dask_client):
@@ -95,8 +97,24 @@ def make_plot(infile):
 
 
 if __name__ == "__main__":
-    client = bok.dask_infra.setup_dask_client()
+    platform = bok.platform.read_config()
+
+    # Module specific format options
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.max_colwidth', None)
+    pd.set_option('display.width', None)
+    pd.set_option('display.max_rows', 40)
+
     graph_temporary_file = "scratch/graphs/local_vs_nonlocal_tput_resample_week"
-    reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
-    chart = make_plot(graph_temporary_file)
-    chart.save("renders/local_traffic.png", scale_factor=2)
+
+    if platform.large_compute_support:
+        print("Running compute subcommands")
+        client = bok.dask_infra.setup_platform_tuned_dask_client(per_worker_memory_GB=10, platform=platform)
+        reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
+        client.close()
+
+    if platform.altair_support:
+        chart = make_plot(graph_temporary_file)
+        chart.save("renders/local_traffic.png", scale_factor=2)
+
+    print("Done!")
