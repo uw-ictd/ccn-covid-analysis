@@ -113,10 +113,36 @@ def compute_user_deltas(flow_range_intermediate_file, active_delta_out_file):
     bok.pd_infra.clean_write_parquet(user_ranges, active_delta_out_file)
 
 
+def compute_full_gap_days(log_gaps_file):
+    """Compute a dataframe with all of the days the network was completely offline"""
+    gap_df = bok.pd_infra.read_parquet(log_gaps_file)
+    gap_df["gap_duration"] = gap_df["end"] - gap_df["start"]
+    print(gap_df)
+    long_gaps = gap_df.loc[gap_df["gap_duration"] > datetime.timedelta(days=1)]
+    print(long_gaps)
+    gap_days = None
+    # Generate filler date ranges
+    for gap in long_gaps.iloc:
+        df = pd.DataFrame({"day": pd.date_range(gap.start, gap.end, freq="1D")})
+        df["day"] = df["day"].dt.floor("d")
+        # Drop the first entry for the partial first log day. If a gap starts
+        # right at midnight, tough luck by this definition of full days -\_O_/-
+        df = df.iloc[1:]
+
+        if gap_days is None:
+            gap_days = df
+        else:
+            gap_days = gap_days.append(df)
+
+    gap_days = gap_days.set_index("day").sort_index().reset_index()
+    print(gap_days)
+
+
 if __name__ == "__main__":
     platform = bok.platform.read_config()
 
     flow_source_file = "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
+    log_gap_source_file = "data/clean/log_gaps_TM.parquet"
     temporary_file = "scratch/graphs/compute_user_active_time"
     delta_out_file = "data/clean/user_active_deltas.parquet"
     if platform.large_compute_support:
@@ -126,6 +152,8 @@ if __name__ == "__main__":
         reduce_flows_to_pandas(flow_source_file, temporary_file)
         client.close()
 
+    explore_gaps(log_gap_source_file)
+    raise NotImplementedError("ded")
     compute_user_deltas(temporary_file, delta_out_file)
 
     print("Done!")
