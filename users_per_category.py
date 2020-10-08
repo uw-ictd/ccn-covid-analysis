@@ -335,12 +335,6 @@ def make_category_quantiles_plots(infile):
     user_totals["rank_total"] = user_totals["bytes_total"].rank(method="min", pct=True)
 
     user_totals["rank_daily"] = user_totals["avg_daily_bytes"].rank(method="min", pct=True)
-    # take the minimum of days online and days active, since active is
-    # partial-day aware, but online rounds up to whole days. Can be up to 2-e
-    # days off if the user joined late in the day and was last active early.
-    user_totals["normalized_days_online"] = np.minimum(
-        user_totals["days_online"], user_totals["days_active"]) / user_totals["days_active"]
-
     user_totals["quantile"] = pd.cut(user_totals["rank_daily"], 10)
 
     # Merge the user quantile information back into the flows, and then group by category
@@ -438,12 +432,6 @@ def make_category_per_user_plots(infile):
     user_totals = user_totals.merge(users_to_analyze, on="user", how="inner")
     user_totals["user_total_bytes_avg_online_day"] = user_totals["bytes_total"] / user_totals["days_online"]
     user_totals["user_rank"] = user_totals["user_total_bytes_avg_online_day"].rank(method="min")
-
-    # take the minimum of days online and days active, since active is
-    # partial-day aware, but online rounds up to whole days. Can be up to 2-e
-    # days off if the user joined late in the day and was last active early.
-    user_totals["normalized_days_online"] = np.minimum(
-        user_totals["days_online"], user_totals["days_active"]) / user_totals["days_active"]
 
     user_category_total = user_category_total.merge(
         user_totals[["user", "user_rank", "days_online", "user_total_bytes_avg_online_day"]],
