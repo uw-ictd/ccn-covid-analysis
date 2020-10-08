@@ -56,21 +56,29 @@ def make_ul_dl_scatter_plot(infile):
     user_totals["normalized_days_online"] = np.minimum(
         user_totals["days_online"], user_totals["days_active"]) / user_totals["days_active"]
 
+    user_totals["MB_avg_per_online_day"] = user_totals["bytes_avg_per_online_day"] / (1000**3)
+    user_totals["ul ratio"] = user_totals["bytes_up"] / user_totals["bytes_total"]
+    user_totals["dl ratio"] = user_totals["bytes_down"] / user_totals["bytes_total"]
+
     graph_frame = user_totals.melt(id_vars="rank_daily", value_vars=["bytes_up_avg_per_online_day", "bytes_down_avg_per_online_day", "bytes_avg_per_online_day"], var_name="direction", value_name="amount")
 
-    alt.Chart(graph_frame).mark_point().encode(
-        x="rank_daily:N",
+    scatter = alt.Chart(user_totals).mark_point().encode(
+        x=alt.X(
+            "MB_avg_per_online_day:Q",
+            title="User's Average MB Per Day Online",
+        ),
         y=alt.Y(
-            "amount",
+            "ul ratio:Q",
+            title="Uplink/Total Bytes Ratio"
         ),
-        color=alt.Color(
-            "direction:N",
-            #scale=alt.Scale(scheme="tableau20"),
-        ),
-        order=alt.Order(
-            "rank",
-            sort="descending",
-        ),
+    )
+
+    (scatter +
+     scatter.transform_regression(
+         "MB_avg_per_online_day",
+         "ul ratio",
+         method="linear"
+     ).mark_line(color="orange")
     ).properties(
         width=500,
     ).save(
@@ -96,6 +104,6 @@ if __name__ == "__main__":
         pd.set_option('display.width', None)
         pd.set_option('display.max_rows', None)
         make_ul_dl_scatter_plot(graph_temporary_file)
-        make_ul_dl_cdf(graph_temporary_file)
+        # ToDo Need to add statistical analysis of the trend.
 
     print("Done!")
