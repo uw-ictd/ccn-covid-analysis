@@ -54,7 +54,7 @@ def _categorize_user(in_path, out_path):
 
     # Assign remaining unknown by ip
     frame["category"] = frame.apply(
-        lambda row: _assign_org_from_ip(row["dest_ip"], row["category"]),
+        lambda row: _assign_category_from_ip(row["dest_ip"], row["category"]),
         axis="columns",
         meta=("category", object)
     )
@@ -70,16 +70,22 @@ def _categorize_user(in_path, out_path):
 
 def _assign_org_from_ip(ip, current):
     if current != "Unknown (No DNS)":
-        if ("157.240.25." in ip) or ("157.240.24." in ip) or ("157.240.2." in ip):
-            return "Facebook"
-    return current
+        return current
+
+    if ("157.240.25." in ip) or ("157.240.24." in ip) or ("157.240.2." in ip):
+        return "Facebook"
+    else:
+        return current
 
 
 def _assign_category_from_ip(ip, current):
     if current != "Unknown (No DNS)":
-        if ("157.240.25." in ip) or ("157.240.24." in ip) or ("157.240.2." in ip):
-            return "Unknown (Not Mapped)"
-    return current
+        return current
+
+    if ("157.240.25." in ip) or ("157.240.24." in ip) or ("157.240.2." in ip):
+        return "Unknown (Not Mapped)"
+    else:
+        return current
 
 
 def _process_cohort_into_out_chunk(cohort, stun_state, out_chunk):
@@ -325,7 +331,7 @@ if __name__ == "__main__":
         print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
 
         # Regular flow is below
-        # augment_all_user_flows(in_parent_directory, annotated_parent_directory, client)
+        augment_all_user_flows(in_parent_directory, annotated_parent_directory, client)
         stun_augment_all_user_flows(annotated_parent_directory, stun_annotated_parent_directory, client)
         merge_parquet_frames(stun_annotated_parent_directory, merged_out_directory)
 
