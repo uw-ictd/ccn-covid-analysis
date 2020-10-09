@@ -16,7 +16,9 @@ def reduce_to_pandas(outfile, dask_client):
         "data/clean/flows/p2p_TM_DIV_none_INDEX_start"
     )[["bytes_a_to_b", "bytes_b_to_a"]]
     p2p["bytes_total"] = p2p["bytes_a_to_b"] + p2p["bytes_b_to_a"]
-    p2p.assign(category="Peer to Peer")
+    p2p = p2p.assign(category="Peer to Peer")
+    p2p = p2p.categorize(columns=["category"])
+    p2p = p2p.reset_index()
     p2p = p2p[["start", "category", "bytes_total"]]
 
     flows = typical.append(p2p)
