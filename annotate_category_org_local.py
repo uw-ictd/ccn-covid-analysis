@@ -45,6 +45,20 @@ def _categorize_user(in_path, out_path):
         "ICE (STUN/TURN)",
     )
 
+    # Assign remaining unknown by ip
+    frame["org"] = frame.apply(
+        lambda row: _assign_org_from_ip(row["dest_ip"], row["org"]),
+        axis="columns",
+        meta=("org", object)
+    )
+
+    # Assign remaining unknown by ip
+    frame["category"] = frame.apply(
+        lambda row: _assign_org_from_ip(row["dest_ip"], row["category"]),
+        axis="columns",
+        meta=("category", object)
+    )
+
     # Lastly assign local by IP type
     frame["local"] = frame.apply(
         lambda row: _annotate_local(row["dest_ip"]),
@@ -52,6 +66,20 @@ def _categorize_user(in_path, out_path):
         meta=("local", bool))
 
     return bok.dask_infra.clean_write_parquet(frame, out_path, compute=False)
+
+
+def _assign_org_from_ip(ip, current):
+    if current != "Unknown (No DNS)":
+        if ("157.240.25." in ip) or ("157.240.24." in ip) or ("157.240.2." in ip):
+            return "Facebook"
+    return current
+
+
+def _assign_category_from_ip(ip, current):
+    if current != "Unknown (No DNS)":
+        if ("157.240.25." in ip) or ("157.240.24." in ip) or ("157.240.2." in ip):
+            return "Unknown (Not Mapped)"
+    return current
 
 
 def _process_cohort_into_out_chunk(cohort, stun_state, out_chunk):
@@ -70,9 +98,11 @@ def _process_cohort_into_out_chunk(cohort, stun_state, out_chunk):
                      (cohort_flow.dest_port == stun_flow.dest_port) and
                      (cohort_flow.protocol == stun_flow.protocol) and
                      (cohort_flow.dest_ip == stun_flow.dest_ip))):
-                    if ((cohort_flow.category == "Unknown (No DNS)") or
-                        (cohort_flow.category == "Unknown (Not Mapped)") or
-                            ("emome-ip.hinet.net" in cohort_flow.fqdn)):  # These appear to be generic dns records for users within Chunghwa Telecom (in Taiwan)
+                    if ((((cohort_flow.category == "Unknown (No DNS)") or
+                          (cohort_flow.category == "Unknown (Not Mapped)")) and
+                         ("Unknown" in cohort_flow.org)) or
+                        ("emome-ip.hinet.net" in cohort_flow.fqdn)):
+                        # These appear to be generic dns records for users within Chunghwa Telecom (in Taiwan)
                         augmented_flow["category"] = "Peer to Peer"
                         augmented_flow["org"] = "ICE Peer (Unknown Org)"
                         # Don't want to add stun flows back accidentally
@@ -81,8 +111,8 @@ def _process_cohort_into_out_chunk(cohort, stun_state, out_chunk):
                             next_stun_state.add(
                                 _StunFlow(expiration_time, cohort_flow, is_setup=False)
                             )
-                    elif "turnservice" in cohort_flow.fqdn or "facebook" in cohort_flow.fqdn:
-                        augmented_flow["category"] = "Messaging"
+                    elif "turnservice" in cohort_flow.fqdn or "facebook" in cohort_flow.fqdn or "Facebook" == cohort_flow.org:
+                        augmented_flow["category"] = "ICE (STUN/TURN)"
                         # Don't want to add stun flows back accidentally
                         if stun_flow != cohort_flow:
                             expiration_time = cohort_flow.end + flow_continue_threshold
@@ -110,7 +140,7 @@ def _augment_user_flows_with_stun_state(in_path, out_path):
     out_frame = None
 
     stun_state = set()
-    # Consider stun activity stale after 5 minutes. This could technically
+    # Consider stun activity stale after 1 minutes. This could technically
     # miss repeated calls. There is a tradeoff though since increasing the
     # time increases the chance of incidental reuse of the port on the client.
     expiry_threshold = datetime.timedelta(minutes=1)
@@ -286,7 +316,7 @@ if __name__ == "__main__":
     merged_out_directory = "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
 
     if platform.large_compute_support:
-        client = bok.dask_infra.setup_platform_tuned_dask_client(10, platform)
+        client = bok.dask_infra.setup_platform_tuned_dask_client(20, platform)
         print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
 
         # Regular flow is below

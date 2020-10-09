@@ -76,7 +76,7 @@ GOOGLE_REGEXES = {
     r'^mail\.google\.com$': "Messaging",
     r'^inbox\.google\.com$': "Messaging",
     r'^hangouts\.google\..*$': "Messaging",
-    r'^.*mtalk.*\.google\.com$': "Messaging",
+    r'^.*mtalk.*\.google\.com$': "API", # Mobile notification service
     r'^instantmessaging-pa\.googleapis\.com$': "Messaging",
     r'^.*gmail\.com$': "Messaging",
 }
