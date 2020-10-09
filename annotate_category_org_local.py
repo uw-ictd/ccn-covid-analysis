@@ -111,7 +111,12 @@ def _process_cohort_into_out_chunk(cohort, stun_state, out_chunk):
                             next_stun_state.add(
                                 _StunFlow(expiration_time, cohort_flow, is_setup=False)
                             )
-                    elif "turnservice" in cohort_flow.fqdn or "facebook" in cohort_flow.fqdn or "Facebook" == cohort_flow.org:
+                    elif ("turnservice" in cohort_flow.fqdn or
+                          "facebook" in cohort_flow.fqdn or
+                          "Facebook" == cohort_flow.org or
+                          cohort_flow.category == "Unknown (Not Mapped)" or
+                          cohort_flow.category == "API"):
+                        # Update the category for stun flows from known orgs otherwise unclassified or generic.
                         augmented_flow["category"] = "ICE (STUN/TURN)"
                         # Don't want to add stun flows back accidentally
                         if stun_flow != cohort_flow:
