@@ -5,6 +5,7 @@ import altair as alt
 import numpy as np
 import pandas as pd
 
+import bok.constants
 import bok.dask_infra
 import bok.pd_infra
 import bok.platform
@@ -104,27 +105,44 @@ def anomaly_flows_reduce_to_pandas(outpath, dask_client):
 def anomaly_flows_make_plot(inpath):
     anomaly_flows = bok.pd_infra.read_parquet(inpath).reset_index()
 
-    # Remove unanswered ssdp queries
-    print(len(anomaly_flows), "anomaly flows including ssdp queries")
-    anomaly_flows = anomaly_flows.loc[~((anomaly_flows["b_port"] == 1900) &
-                                        (anomaly_flows["bytes_b_to_a"] == 0))]
-    print(len(anomaly_flows), "after removal of ssdp")
+    # Classify the anomalies
+    anomaly_flows = anomaly_flows.assign(kind="Unknown")
+    anomaly_flows["kind"] = anomaly_flows["kind"].mask(
+        ((anomaly_flows["b_port"] == 1900) & (anomaly_flows["bytes_b_to_a"] == 0)),
+        other="SSDP Query (No Answer)"
+    )
+    anomaly_flows["kind"] = anomaly_flows["kind"].mask(
+        ((anomaly_flows["bytes_b_to_a"] != 0) & (anomaly_flows["kind"] == "Unknown")),
+        other="Unanswered"
+    )
 
-    anomaly_flows = anomaly_flows.loc[anomaly_flows["bytes_b_to_a"] != 0]
-    print(len(anomaly_flows), "after removal of unanswered flows")
-
+    # Aggregate by day for plotting
     anomaly_flows["day_bin"] = anomaly_flows["start"].dt.floor("d")
-    anomaly_flows = anomaly_flows.groupby(["day_bin"]).sum()
+    anomaly_flows = anomaly_flows.groupby(["day_bin", "kind"]).sum()
     anomaly_flows["bytes_total"] = anomaly_flows["bytes_a_to_b"] + anomaly_flows["bytes_b_to_a"]
     anomaly_flows = anomaly_flows.reset_index()
 
-    alt.Chart(anomaly_flows).mark_line().encode(
-        x=alt.X('day_bin:T',
-                title="Time"
-                ),
-        y=alt.Y('bytes_total',
-                title="Total Bytes per Day",
-                ),
+    # Densify the samples with zeros for days with no observed flows
+    dense_index = bok.pd_infra.cartesian_product(
+        pd.DataFrame({"day_bin": pd.date_range(bok.constants.MIN_DATE, bok.constants.MAX_DATE)}),
+        pd.DataFrame({"kind": anomaly_flows["kind"].unique()})
+    )
+
+    anomaly_flows = dense_index.merge(anomaly_flows, on=["day_bin", "kind"], how="left").fillna(0)
+
+    alt.Chart(anomaly_flows).mark_point(opacity=0.5).encode(
+        x=alt.X(
+            'day_bin:T',
+            title="Time"
+        ),
+        y=alt.Y(
+            'bytes_total',
+            title="Total Bytes per Day",
+        ),
+        color=alt.Color(
+            "kind:N",
+        ),
+        shape="kind:N",
     ).save("renders/local_traffic_anomalies.png", scale_factor=2.0)
 
 
