@@ -112,7 +112,7 @@ def anomaly_flows_make_plot(inpath):
         other="SSDP Query (No Answer)"
     )
     anomaly_flows["kind"] = anomaly_flows["kind"].mask(
-        ((anomaly_flows["bytes_b_to_a"] != 0) & (anomaly_flows["kind"] == "Unknown")),
+        ((anomaly_flows["bytes_b_to_a"] == 0) & (anomaly_flows["kind"] == "Unknown")),
         other="Unanswered"
     )
 
@@ -146,6 +146,112 @@ def anomaly_flows_make_plot(inpath):
     ).save("renders/local_traffic_anomalies.png", scale_factor=2.0)
 
 
+def p2p_flows_reduce_to_pandas(outpath, dask_client):
+    p2p_flows = bok.dask_infra.read_parquet("data/clean/flows/p2p_TM_DIV_none_INDEX_start")
+    bok.pd_infra.clean_write_parquet(p2p_flows.compute(), outpath)
+
+
+def _canonical_order(a, b):
+    """Orders two comparable objects into a deterministic tuple"""
+    if a <= b:
+        return a, b
+    else:
+        return b, a
+
+
+def p2p_flows_make_plot(inpath):
+    p2p_flows = bok.pd_infra.read_parquet(inpath).reset_index()
+
+    # Classify the flows
+    p2p_flows = p2p_flows.assign(kind="Two-Way")
+    p2p_flows["kind"] = p2p_flows["kind"].mask(
+        ((p2p_flows["bytes_a_to_b"] == 0) | (p2p_flows["bytes_b_to_a"] == 0)),
+        other="One-Way"
+    )
+
+    # ToDo Analyze the source of these probing flows
+    spray_flows = p2p_flows.loc[p2p_flows["kind"] == "One-Way"]
+
+    p2p_flows = p2p_flows.loc[p2p_flows["kind"] == "Two-Way"]
+    p2p_flows["bytes_total"] = p2p_flows["bytes_a_to_b"] + p2p_flows["bytes_b_to_a"]
+    p2p_flows["key_x"] = p2p_flows.apply(lambda row: _canonical_order(row["user_a"], row["user_b"])[0], axis=1)
+    p2p_flows["key_y"] = p2p_flows.apply(lambda row: _canonical_order(row["user_a"], row["user_b"])[1], axis=1)
+
+    # Aggregate by day for plotting
+    p2p_flows["day_bin"] = p2p_flows["start"].dt.floor("d")
+    p2p_flows = p2p_flows.groupby(["day_bin", "kind", "key_x", "key_y"]).sum()
+    p2p_flows = p2p_flows.reset_index()
+
+    # Densify the samples with zeros for days with no observed flows
+    dense_index = bok.pd_infra.cartesian_product(
+        pd.DataFrame({"day_bin": pd.date_range(bok.constants.MIN_DATE, bok.constants.MAX_DATE)}),
+        pd.DataFrame({"kind": p2p_flows["kind"].unique()})
+    )
+
+    # p2p_flows = dense_index.merge(p2p_flows, on=["day_bin", "kind"], how="left").fillna(0)
+
+    alt.Chart(p2p_flows).mark_point(opacity=0.5).encode(
+        x=alt.X(
+            'day_bin:T',
+            title="Time"
+        ),
+        y=alt.Y(
+            'bytes_total',
+            title="Total Bytes per Day",
+        ),
+        color=alt.Color(
+            "key_x:N",
+        ),
+        shape="kind:N",
+    ).save("renders/local_traffic_p2p.png", scale_factor=2.0)
+
+    src_users = p2p_flows.groupby(["kind", "key_x", "key_y"]).agg({"bytes_total": "sum",
+                                                                   "day_bin": "count",
+                                                                   })
+    print(src_users)
+    src_users = src_users.reset_index()
+
+    src_users["average_bytes"] = src_users["bytes_total"] / src_users["day_bin"]
+
+    # all_involved_users = p2p_flows["user_a"].append(p2p_flows["user_b"]).unique()
+    # dense_user_combinations = bok.pd_infra.cartesian_product(
+    #     pd.DataFrame({"key_x": all_involved_users}),
+    #     pd.DataFrame({"key_y": all_involved_users})
+    # )
+    # src_users = dense_user_combinations.merge(src_users, on=["key_x", "key_y"], how="left").fillna(0)
+
+    base = alt.Chart(src_users).encode(
+        x=alt.X(
+            'key_x:N',
+            title="User 1"
+        ),
+        y=alt.Y(
+            'key_y:N',
+            title="User 2",
+        ),
+    )
+    heatmap = base.mark_circle().encode(
+        color=alt.Color(
+            "average_bytes:Q",
+            scale=alt.Scale(scheme="viridis"),
+        ),
+        size=alt.Size(
+            "bytes_total:Q",
+            scale=alt.Scale(range=[300, 2000]),
+        )
+    )
+    text = base.mark_text(baseline="middle").encode(
+        text="day_bin",
+        color=alt.condition(
+            alt.datum.average_bytes > 5 * (1000**2),
+            alt.value("black"),
+            alt.value("white"),
+        ),
+    )
+
+    (heatmap + text).save("renders/local_traffic_p2p_by_user.png", scale_factor=2.0)
+
+
 if __name__ == "__main__":
     platform = bok.platform.read_config()
 
@@ -157,15 +263,18 @@ if __name__ == "__main__":
 
     graph_temporary_file = "scratch/graphs/local_vs_nonlocal_tput_resample_week"
     anomaly_temporary_file = "scratch/graphs/local_traffic_anomalies"
+    p2p_temporary_file = "scratch/graphs/local_traffic_p2p"
 
     if platform.large_compute_support:
         print("Running compute subcommands")
         client = bok.dask_infra.setup_platform_tuned_dask_client(per_worker_memory_GB=10, platform=platform)
         reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
         anomaly_flows_reduce_to_pandas(outpath=anomaly_temporary_file, dask_client=client)
+        p2p_flows_reduce_to_pandas(outpath=p2p_temporary_file, dask_client=client)
         client.close()
 
     if platform.altair_support:
+        p2p_flows_make_plot(p2p_temporary_file)
         anomaly_flows_make_plot(anomaly_temporary_file)
         chart = make_plot(graph_temporary_file)
         chart.save("renders/local_traffic.png", scale_factor=2)
