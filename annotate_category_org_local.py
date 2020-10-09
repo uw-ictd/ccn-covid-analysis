@@ -327,18 +327,17 @@ if __name__ == "__main__":
     merged_out_directory = "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
 
     if platform.large_compute_support:
-        client = bok.dask_infra.setup_platform_tuned_dask_client(20, platform)
         print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
 
-        # Regular flow is below
-        augment_all_user_flows(in_parent_directory, annotated_parent_directory, client)
-        stun_augment_all_user_flows(annotated_parent_directory, stun_annotated_parent_directory, client)
-        merge_parquet_frames(stun_annotated_parent_directory, merged_out_directory)
+        with bok.dask_infra.setup_platform_tuned_dask_client(8, platform) as client:
+            augment_all_user_flows(in_parent_directory, annotated_parent_directory, client)
+
+        with bok.dask_infra.setup_platform_tuned_dask_client(20, platform) as client:
+            stun_augment_all_user_flows(annotated_parent_directory, stun_annotated_parent_directory, client)
+            merge_parquet_frames(stun_annotated_parent_directory, merged_out_directory)
 
         # print("Temporary computation to find large domains.")
         # _print_heavy_hitter_unmapped_domains("scratch/flows/unmapped_typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
-
-        client.close()
 
     print("Finished heavy compute operations")
     print("Exited")
