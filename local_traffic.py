@@ -1,7 +1,7 @@
 """ Compute local vs external throughput, binned by a configurable time interval
 """
 
-import altair
+import altair as alt
 import numpy as np
 import pandas as pd
 
@@ -12,7 +12,7 @@ import bok.platform
 
 def reduce_to_pandas(outfile, dask_client):
     flows = bok.dask_infra.read_parquet(
-        "data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start"
+        "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
     )[["bytes_up", "bytes_down", "local"]]
 
     peer_flows = bok.dask_infra.read_parquet(
@@ -72,12 +72,12 @@ def make_plot(infile):
     flows = flows.loc[(flows["direction"] == "Upload to Local Server") | (flows["direction"] == "Download from Local Server") | (flows["direction"] == "Peer to Peer")]
 
     flows["MB"] = flows["amount"] / (1000**2)
-    plot = altair.Chart(flows).mark_area().encode(
-        x=altair.X("start:T",
+    plot = alt.Chart(flows).mark_area().encode(
+        x=alt.X("start:T",
                    title="Time",
-                   axis=altair.Axis(labels=True),
+                   axis=alt.Axis(labels=True),
                    ),
-        y=altair.Y("sum(MB):Q",
+        y=alt.Y("sum(MB):Q",
                    title="Sum of Amount Per Week(MB)",
                    ),
         # shape="direction",
@@ -96,6 +96,38 @@ def make_plot(infile):
     return plot
 
 
+def anomaly_flows_reduce_to_pandas(outpath, dask_client):
+    anomaly_flows = bok.dask_infra.read_parquet("data/clean/flows/nouser_TM_DIV_none_INDEX_start")
+    bok.pd_infra.clean_write_parquet(anomaly_flows.compute(), outpath)
+
+
+def anomaly_flows_make_plot(inpath):
+    anomaly_flows = bok.pd_infra.read_parquet(inpath).reset_index()
+
+    # Remove unanswered ssdp queries
+    print(len(anomaly_flows), "anomaly flows including ssdp queries")
+    anomaly_flows = anomaly_flows.loc[~((anomaly_flows["b_port"] == 1900) &
+                                        (anomaly_flows["bytes_b_to_a"] == 0))]
+    print(len(anomaly_flows), "after removal of ssdp")
+
+    anomaly_flows = anomaly_flows.loc[anomaly_flows["bytes_b_to_a"] != 0]
+    print(len(anomaly_flows), "after removal of unanswered flows")
+
+    anomaly_flows["day_bin"] = anomaly_flows["start"].dt.floor("d")
+    anomaly_flows = anomaly_flows.groupby(["day_bin"]).sum()
+    anomaly_flows["bytes_total"] = anomaly_flows["bytes_a_to_b"] + anomaly_flows["bytes_b_to_a"]
+    anomaly_flows = anomaly_flows.reset_index()
+
+    alt.Chart(anomaly_flows).mark_line().encode(
+        x=alt.X('day_bin:T',
+                title="Time"
+                ),
+        y=alt.Y('bytes_total',
+                title="Total Bytes per Day",
+                ),
+    ).save("renders/local_traffic_anomalies.png", scale_factor=2.0)
+
+
 if __name__ == "__main__":
     platform = bok.platform.read_config()
 
@@ -106,14 +138,17 @@ if __name__ == "__main__":
     pd.set_option('display.max_rows', 40)
 
     graph_temporary_file = "scratch/graphs/local_vs_nonlocal_tput_resample_week"
+    anomaly_temporary_file = "scratch/graphs/local_traffic_anomalies"
 
     if platform.large_compute_support:
         print("Running compute subcommands")
         client = bok.dask_infra.setup_platform_tuned_dask_client(per_worker_memory_GB=10, platform=platform)
         reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
+        anomaly_flows_reduce_to_pandas(outpath=anomaly_temporary_file, dask_client=client)
         client.close()
 
     if platform.altair_support:
+        anomaly_flows_make_plot(anomaly_temporary_file)
         chart = make_plot(graph_temporary_file)
         chart.save("renders/local_traffic.png", scale_factor=2)
 
