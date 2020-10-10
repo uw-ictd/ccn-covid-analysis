@@ -40,7 +40,7 @@ def make_totals_plot(infile):
     grouped_flows = bok.pd_infra.read_parquet(infile)
     grouped_flows = grouped_flows.reset_index()
 
-    grouped_flows["GB"] = grouped_flows["bytes_total"] / (1000**3)
+    grouped_flows["MB"] = grouped_flows["bytes_total"] / (1000**2)
     working_times = grouped_flows.loc[(grouped_flows["day_bin"] < "2019-07-30") | (grouped_flows["day_bin"] > "2019-08-31")]
     grouped_flows["outage"] = "Outage"
     grouped_flows.loc[(grouped_flows["day_bin"] < "2019-07-30") | (grouped_flows["day_bin"] > "2019-08-31"), "outage"] = "Normal"
@@ -49,8 +49,8 @@ def make_totals_plot(infile):
         x=alt.X('hour:O',
                 title="Hour of the Day"
                 ),
-        y=alt.Y('GB:Q',
-                title="GB Per Hour"
+        y=alt.Y('MB:Q',
+                title="MB Per Hour"
                 ),
     ).save(
         "renders/bytes_per_time_of_day_boxplot_exclude_outage.png",
@@ -61,8 +61,8 @@ def make_totals_plot(infile):
         x=alt.X('hour:O',
                 title="Hour of the Day"
                 ),
-        y=alt.Y('GB:Q',
-                title="GB Per Hour"
+        y=alt.Y('MB:Q',
+                title="MB Per Hour"
                 ),
         color=alt.Color(
             "outage",
@@ -73,21 +73,23 @@ def make_totals_plot(infile):
         scale_factor=2,
     )
 
-    aggregate = working_times.groupby(["hour"]).agg({"GB": ["mean", lambda x: x.quantile(0.90), lambda x: x.quantile(0.99)]})
+    # Sum across categories, then compute statistics across all days.
+    aggregate = working_times.groupby(["hour", "day_bin"]).sum()
+    aggregate = aggregate.groupby(["hour"]).agg({"MB": ["mean", lambda x: x.quantile(0.90), lambda x: x.quantile(0.99)]})
     # Flatten column names
     aggregate = aggregate.reset_index()
     aggregate.columns = [' '.join(col).strip() for col in aggregate.columns.values]
     aggregate = aggregate.rename(
-        columns={"GB mean": "Mean",
-                 "GB <lambda_0>": "90th Percentile",
-                 "GB <lambda_1>": "99th Percentile",
+        columns={"MB mean": "Mean",
+                 "MB <lambda_0>": "90th Percentile",
+                 "MB <lambda_1>": "99th Percentile",
                  })
 
     aggregate = aggregate.melt(
         id_vars=["hour"],
         value_vars=["Mean", "90th Percentile", "99th Percentile"],
         var_name="type",
-        value_name="GB"
+        value_name="MB"
     )
 
     print(aggregate)
@@ -96,8 +98,8 @@ def make_totals_plot(infile):
         x=alt.X('hour:O',
                 title="Hour of the Day"
                 ),
-        y=alt.Y('GB:Q',
-                title="GB Per Hour"
+        y=alt.Y('MB:Q',
+                title="MB Per Hour"
                 ),
         color=alt.Color(
             "type",
@@ -109,8 +111,8 @@ def make_totals_plot(infile):
         x=alt.X('hour:O',
                 title="Hour of the Day"
                 ),
-        y=alt.Y('GB:Q',
-                title="GB Per Hour"
+        y=alt.Y('MB:Q',
+                title="MB Per Hour"
                 ),
         color=alt.Color(
             "type",
@@ -158,50 +160,70 @@ def make_category_plot(inpath):
         value_name="MB"
     )
 
-    print(aggregate)
-    # Create a hybrid chart to fix legend issue with line chart and shape
-    lines = alt.Chart(aggregate).mark_line().encode(
+    aggregate = aggregate.loc[aggregate["type"] == "Mean"]
+
+    alt.Chart(aggregate).mark_line().encode(
         x=alt.X('hour:O',
                 title="Hour of the Day"
                 ),
         y=alt.Y('MB:Q',
-                title="MB Per Hour Per Category"
+                title="Avg MB Per Hour Per Category"
                 ),
         color=alt.Color(
-            "Category:N",
-            legend=None,
+            "category:N",
+            scale=alt.Scale(scheme="tableau20"),
         ),
-        stroke=alt.Stroke(
-            "type",
-        )
-    )
-
-    points = alt.Chart(aggregate).mark_point(size=100).encode(
-        x=alt.X('hour:O',
-                title="Hour of the Day"
-                ),
-        y=alt.Y('GB:Q',
-                title="GB Per Hour"
-                ),
-        color=alt.Color(
-            "Category:N",
+        strokeDash=alt.StrokeDash(
+            "category:N",
         ),
-        shape=alt.Shape(
-            "type",
-            title=""
-        ),
-    )
-
-    alt.layer(
-        points, lines
-    ).resolve_scale(
-        color='independent',
-        shape='independent'
     ).save(
         "renders/bytes_per_time_of_day_category_lines.png",
         scale_factor=2,
     )
 
+
+def make_change_vs_average_plot(inpath):
+    grouped_flows = bok.pd_infra.read_parquet(inpath)
+    grouped_flows = grouped_flows.reset_index()
+
+    grouped_flows["MB"] = grouped_flows["bytes_total"] / (1000**2)
+    working_times = grouped_flows.loc[(grouped_flows["day_bin"] < "2019-07-30") | (grouped_flows["day_bin"] > "2019-08-31")]
+
+    aggregate = working_times.groupby(["hour", "category"]).agg({"MB": ["mean"]})
+    # Flatten column names
+    aggregate = aggregate.reset_index()
+    aggregate.columns = [' '.join(col).strip() for col in aggregate.columns.values]
+    aggregate = aggregate.rename(columns={"MB mean": "hour_mean"})
+
+    category_average = working_times.groupby(["category"]).mean()
+    print(category_average)
+    category_average = category_average.reset_index()[["category", "MB"]]
+    category_average = category_average.rename(columns={"MB": "category_mean_MB"})
+
+    aggregate = aggregate.merge(category_average, on="category")
+    aggregate["percent_change_vs_mean"] = (aggregate["hour_mean"] - aggregate["category_mean_MB"]) / aggregate["category_mean_MB"]
+    aggregate["percent_change_vs_mean"] = aggregate["percent_change_vs_mean"] * 100
+
+    print(aggregate)
+
+    alt.Chart(aggregate).mark_line().encode(
+        x=alt.X('hour:O',
+                title="Hour of the Day"
+                ),
+        y=alt.Y('percent_change_vs_mean:Q',
+                title="Percent Change of Hourly Mean to Overall Mean per Category"
+                ),
+        color=alt.Color(
+            "category:N",
+            scale=alt.Scale(scheme="tableau20"),
+        ),
+        strokeDash=alt.StrokeDash(
+            "category:N",
+        ),
+    ).save(
+        "renders/bytes_per_time_of_day_category_relative_shift.png",
+        scale_factor=2,
+    )
 
 
 if __name__ == "__main__":
@@ -216,7 +238,8 @@ if __name__ == "__main__":
 
     if platform.altair_support:
         print("Running vis tasks")
-        make_totals_plot(infile=graph_temporary_file)
-        make_category_plot(inpath=graph_temporary_file)
+        make_change_vs_average_plot(inpath=graph_temporary_file)
+        # make_totals_plot(infile=graph_temporary_file)
+        # make_category_plot(inpath=graph_temporary_file)
 
     print("Done!")
