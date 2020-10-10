@@ -542,8 +542,8 @@ if __name__ == "__main__":
         make_category_quantiles_plots(graph_temporary_file)
         make_category_per_user_plots(graph_temporary_file)
 
-        # make_category_plot(graph_temporary_file)
-        # make_org_plot(graph_temporary_file)
-        # make_category_plot_separate_top_n(graph_temporary_file)
+        make_category_plot(graph_temporary_file)
+        make_org_plot(graph_temporary_file)
+        make_category_plot_separate_top_n(graph_temporary_file)
 
     print("Done!")
