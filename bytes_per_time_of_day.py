@@ -189,29 +189,24 @@ def make_change_vs_average_plot(inpath):
     grouped_flows["MB"] = grouped_flows["bytes_total"] / (1000**2)
     working_times = grouped_flows.loc[(grouped_flows["day_bin"] < "2019-07-30") | (grouped_flows["day_bin"] > "2019-08-31")]
 
-    aggregate = working_times.groupby(["hour", "category"]).agg({"MB": ["mean"]})
-    # Flatten column names
+    aggregate = working_times.groupby(["hour", "category"]).agg({"MB": "sum"})
     aggregate = aggregate.reset_index()
-    aggregate.columns = [' '.join(col).strip() for col in aggregate.columns.values]
-    aggregate = aggregate.rename(columns={"MB mean": "hour_mean"})
+    category_total = working_times.groupby(["category"]).sum()
+    category_total = category_total.reset_index()[["category", "MB"]]
+    category_total = category_total.rename(columns={"MB": "category_total_MB"})
 
-    category_average = working_times.groupby(["category"]).mean()
-    print(category_average)
-    category_average = category_average.reset_index()[["category", "MB"]]
-    category_average = category_average.rename(columns={"MB": "category_mean_MB"})
-
-    aggregate = aggregate.merge(category_average, on="category")
-    aggregate["percent_change_vs_mean"] = (aggregate["hour_mean"] - aggregate["category_mean_MB"]) / aggregate["category_mean_MB"]
-    aggregate["percent_change_vs_mean"] = aggregate["percent_change_vs_mean"] * 100
+    aggregate = aggregate.merge(category_total, on="category")
+    aggregate["byte_density"] = aggregate["MB"] / aggregate["category_total_MB"]
 
     print(aggregate)
+    print(category_total)
 
     alt.Chart(aggregate).mark_line().encode(
         x=alt.X('hour:O',
                 title="Hour of the Day"
                 ),
-        y=alt.Y('percent_change_vs_mean:Q',
-                title="Percent Change of Hourly Mean to Overall Mean per Category"
+        y=alt.Y('byte_density:Q',
+                title="Fraction of Category Bytes Per Hour"
                 ),
         color=alt.Color(
             "category:N",
