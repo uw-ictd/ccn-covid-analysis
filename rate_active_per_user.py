@@ -1,13 +1,14 @@
 import altair as alt
-import bok.dask_infra
-import bok.pd_infra
 import numpy as np
 import pandas as pd
 
+import bok.dask_infra
+import bok.pd_infra
+import bok.platform
 
-def reduce_to_pandas(outfile, dask_client):
+def reduce_to_pandas(outpath, dask_client):
     flows = bok.dask_infra.read_parquet(
-        "data/clean/flows/typical_fqdn_category_org_local_TM_DIV_none_INDEX_start")[["user", "bytes_up", "bytes_down"]]
+        "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["user", "bytes_up", "bytes_down"]]
 
     flows["bytes_total"] = flows["bytes_up"] + flows["bytes_down"]
 
@@ -19,9 +20,10 @@ def reduce_to_pandas(outfile, dask_client):
     # Do the grouping
     flows = flows.groupby(["start_bin", "user"]).sum()
 
+    flows = flows.reset_index()[["start_bin", "user", "bytes_total"]]
     flows = flows.compute()
 
-    bok.pd_infra.clean_write_parquet(flows, outfile)
+    bok.pd_infra.clean_write_parquet(flows, outpath)
 
 
 def compute_cdf(frame, value_column, base_column):
@@ -33,57 +35,67 @@ def compute_cdf(frame, value_column, base_column):
     return stats_frame
 
 
-def make_plot(infile):
-    grouped_flows = bok.pd_infra.read_parquet(infile)
-    grouped_flows = grouped_flows.reset_index()
+def make_plot(inpath):
+    flows = bok.pd_infra.read_parquet(inpath)
+    flows = flows.reset_index()
 
-    grouped_flows["GB"] = grouped_flows["bytes_total"] / (1000**3)
-    working_times = grouped_flows.loc[(grouped_flows["start_bin"] < "2019-07-30") | (grouped_flows["start_bin"] > "2019-08-31")]
-    grouped_flows["outage"] = "Outage"
-    grouped_flows.loc[(grouped_flows["start_bin"] < "2019-07-30") | (grouped_flows["start_bin"] > "2019-08-31"), "outage"] = "Normal"
+    activity = bok.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")
+    # take the minimum of days online and days active, since active is
+    # partial-day aware, but online rounds up to whole days. Can be up to 2-e
+    # days off if the user joined late in the day and was last active early.
+    activity["optimistic_online_ratio"] = np.minimum(
+        activity["optimistic_days_online"], activity["days_active"]) / activity["days_active"]
 
+    flows["MB"] = flows["bytes_total"] / (1000**2)
+    user_total = flows[["user", "MB"]]
+    user_total = user_total.groupby(["user"]).sum().reset_index()
+    df = user_total.merge(activity[["user", "optimistic_online_ratio", "optimistic_days_online"]], on="user")
+    df["MB_per_online_day"] = df["MB"] / df["optimistic_days_online"]
 
-    aggregate = clean_purchases.groupby(["user"]).agg({"time_since_last_purchase": ["mean", lambda x: x.quantile(0.90), lambda x: x.quantile(0.99)]})
-    # Flatten column names
-    aggregate = aggregate.reset_index()
-    aggregate.columns = [' '.join(col).strip() for col in aggregate.columns.values]
-    aggregate = aggregate.rename(
-        columns={"time_since_last_purchase mean": "mean",
-                 "time_since_last_purchase <lambda_0>": "q90",
-                 "time_since_last_purchase <lambda_1>": "q99",
-                 })
+    scatter = alt.Chart(df).mark_point().encode(
+        x=alt.X(
+            "optimistic_online_ratio",
+            title="Online Ratio",
+            scale=alt.Scale(type="linear", domain=(0, 1.0)),
+        ),
+        y=alt.Y(
+            "MB_per_online_day",
+            title="Mean MB per Day Online",
+        ),
 
-    # Compute a CDF since the specific user does not matter
-    stats_mean = compute_cdf(aggregate, "mean", "user")
-    stats_mean = stats_mean.rename(columns={"mean": "value"})
-    stats_mean["type"] = "User's Mean"
+    )
 
-    stats_q90 = compute_cdf(aggregate, "q90", "user")
-    stats_q90 = stats_q90.rename(columns={"q90": "value"})
-    stats_q90["type"] = "User's 90% Quantile"
+    regression = scatter.transform_regression(
+        "optimistic_online_ratio",
+        "MB_per_online_day",
+        method="linear",
+    ).mark_line(color="orange")
 
-    stats_q99 = compute_cdf(aggregate, "q99", "user")
-    stats_q99 = stats_q99.rename(columns={"q99": "value"})
-    stats_q99["type"] = "User's 99% Quantile"
-
-    stats_frame = stats_mean.append(stats_q90).append(stats_q99)
-
-    alt.Chart(stats_frame).mark_line(interpolate='step-after', clip=True).encode(
-        x=alt.X('value:Q',
-                scale=alt.Scale(type="linear", domain=(0.01, 80)),
-                title="GB per Active Day (Hours)"
-                ),
-        y=alt.Y('cdf',
-                title="Fraction of Users (CDF)",
-                scale=alt.Scale(type="linear", domain=(0, 1.0)),
-                ),
-        color="type",
-        strokeDash="type",
-    ).save("renders/bytes_per_active_day_per_user_cdf.png", scale_factor=2.0)
+    (scatter + regression).properties(
+        width=500,
+    ).save(
+        "renders/rate_active_per_user.png", scale_factor=2.0
+    )
 
 
 if __name__ == "__main__":
-    client = bok.dask_infra.setup_dask_client()
-    graph_temporary_file = "scratch/graphs/bytes_per_active_day_per_user"
-    reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
-    make_plot(graph_temporary_file)
+    platform = bok.platform.read_config()
+
+    # Module specific format options
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.max_colwidth', None)
+    pd.set_option('display.width', None)
+    pd.set_option('display.max_rows', 40)
+
+    graph_temporary_file = "scratch/graphs/rate_active_per_user"
+
+    if platform.large_compute_support:
+        print("Running compute subcommands")
+        client = bok.dask_infra.setup_platform_tuned_dask_client(per_worker_memory_GB=10, platform=platform)
+        reduce_to_pandas(outpath=graph_temporary_file, dask_client=client)
+        client.close()
+
+    if platform.altair_support:
+        make_plot(inpath=graph_temporary_file)
+
+    print("Done!")
