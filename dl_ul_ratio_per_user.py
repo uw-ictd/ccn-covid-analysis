@@ -16,18 +16,25 @@ import bok.platform
 
 def reduce_to_pandas(outfile, dask_client):
     flows = bok.dask_infra.read_parquet(
-        "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["user", "bytes_up", "bytes_down"]]
+        "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
+    )[["user", "bytes_up", "bytes_down", "category"]]
 
     # Do the grouping
-    flows = flows.groupby(["user"]).sum()
+    flows = flows.groupby(["user", "category"]).sum()
     flows = flows.compute()
 
     bok.pd_infra.clean_write_parquet(flows, outfile)
 
 
+def _assign_user_top_category(frame):
+    print(frame)
+
+
 def make_ul_dl_scatter_plot(infile):
     user_totals = bok.pd_infra.read_parquet(infile)
     user_totals = user_totals.reset_index()
+
+    user_totals = user_totals.groupby(["user"]).sum().reset_index()
     user_totals["bytes_total"] = user_totals["bytes_up"] + user_totals["bytes_down"]
 
     # Filter users by time in network to eliminate early incomplete samples
