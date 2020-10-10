@@ -4,6 +4,9 @@
 import altair as alt
 import numpy as np
 import pandas as pd
+from sklearn.linear_model import LinearRegression
+import statsmodels.api as sm
+from sklearn.metrics import r2_score
 
 import bok.dask_infra
 import bok.domains
@@ -56,35 +59,88 @@ def make_ul_dl_scatter_plot(infile):
     user_totals["normalized_days_online"] = np.minimum(
         user_totals["days_online"], user_totals["days_active"]) / user_totals["days_active"]
 
-    user_totals["MB_avg_per_online_day"] = user_totals["bytes_avg_per_online_day"] / (1000**3)
+    user_totals["MB_avg_per_online_day"] = user_totals["bytes_avg_per_online_day"] / (1000**2)
     user_totals["ul ratio"] = user_totals["bytes_up"] / user_totals["bytes_total"]
     user_totals["dl ratio"] = user_totals["bytes_down"] / user_totals["bytes_total"]
 
-    graph_frame = user_totals.melt(id_vars="rank_daily", value_vars=["bytes_up_avg_per_online_day", "bytes_down_avg_per_online_day", "bytes_avg_per_online_day"], var_name="direction", value_name="amount")
+    user_totals["log_ul_ratio"] = user_totals["ul ratio"].map(np.log)
+    user_totals["log_mb_per_day"] = user_totals["MB_avg_per_online_day"].map(np.log)
 
-    scatter = alt.Chart(user_totals).mark_point().encode(
+    # Perform Statistical Regression
+    # Reshape to generate column matrixes expected by sklearn
+    mb_array = user_totals["MB_avg_per_online_day"].values.reshape((-1, 1))
+    ul_ratio_array = user_totals["ul ratio"].values.reshape((-1, 1))
+    log_mb_array = user_totals["log_mb_per_day"].values.reshape((-1, 1))
+    log_ul_array = user_totals["log_ul_ratio"].values.reshape((-1, 1))
+    lin_regressor = LinearRegression()
+    lin_regressor.fit(mb_array, ul_ratio_array)
+    logt_regressor = LinearRegression()
+    logt_regressor.fit(log_mb_array, log_ul_array)
+
+    # Generate a regression plot
+    uniform_x = np.linspace(start=mb_array.min(), stop=mb_array.max(), num=1000, endpoint=True).reshape((-1, 1))
+    predictions = lin_regressor.predict(uniform_x)
+    log_x = np.log(uniform_x)
+    logt_predictions = logt_regressor.predict(log_x)
+    logt_predictions = np.exp(logt_predictions)
+
+    graph_frame = pd.DataFrame({"regressionX": uniform_x.flatten(), "predictions": predictions.flatten()})
+    graph_frame = graph_frame.assign(type="Linear")
+    graph_frame = graph_frame.append(user_totals)
+
+    logt_frame = pd.DataFrame({"regressionX": uniform_x.flatten(), "predictions": logt_predictions.flatten()})
+    logt_frame = logt_frame.assign(type="Semi-Log Transformed")
+    graph_frame = graph_frame.append(logt_frame)
+
+    scatter = alt.Chart(graph_frame).mark_point().encode(
         x=alt.X(
             "MB_avg_per_online_day:Q",
             title="User's Average MB Per Day Online",
+            # scale=alt.Scale(
+            #     type="log",
+            # ),
         ),
         y=alt.Y(
             "ul ratio:Q",
-            title="Uplink/Total Bytes Ratio"
+            title="Uplink/Total Bytes Ratio",
+            # scale=alt.Scale(
+            #     type="log",
+            # ),
         ),
     )
 
-    (scatter +
-     scatter.transform_regression(
-         "MB_avg_per_online_day",
-         "ul ratio",
-         method="linear"
-     ).mark_line(color="orange")
-    ).properties(
+    regression = scatter.mark_line(color="orange").encode(
+        x=alt.X(
+            "regressionX",
+            # scale=alt.Scale(
+            #     type="log",
+            # ),
+        ),
+        y=alt.Y(
+            "predictions",
+            # scale=alt.Scale(
+            #     type="log",
+            # ),
+        ),
+        strokeDash=alt.StrokeDash(
+            "type",
+        )
+    )
+
+    (scatter + regression).properties(
         width=500,
     ).save(
         "renders/dl_ul_ratio_per_user_scatter.png",
         scale_factor=2,
     )
+
+    X = user_totals["log_mb_per_day"]
+    Y = user_totals["log_ul_ratio"]
+    X2 = sm.add_constant(X)
+    est = sm.OLS(Y, X2)
+    est2 = est.fit()
+    print(est2.pvalues)
+    print(est2.summary())
 
 
 if __name__ == "__main__":
