@@ -60,7 +60,7 @@ def make_plot(infile):
         scale_factor=2,
     )
 
-    aggregate = working_times.groupby(["hour"]).agg({"user": ["mean", lambda x: x.quantile(0.90), lambda x: x.quantile(0.99)]})
+    aggregate = working_times.groupby(["hour"]).agg({"user": ["mean", lambda x: x.quantile(0.90), lambda x: x.quantile(0.99), "max"]})
     # Flatten column names
     aggregate = aggregate.reset_index()
     aggregate.columns = [' '.join(col).strip() for col in aggregate.columns.values]
@@ -68,11 +68,12 @@ def make_plot(infile):
         columns={"user mean": "Mean",
                  "user <lambda_0>": "90th Percentile",
                  "user <lambda_1>": "99th Percentile",
+                 "user max": "Max",
                  })
 
     aggregate = aggregate.melt(
         id_vars=["hour"],
-        value_vars=["Mean", "90th Percentile", "99th Percentile"],
+        value_vars=["Max", "99th Percentile", "90th Percentile", "Mean"],
         var_name="type",
         value_name="user"
     )
@@ -80,31 +81,38 @@ def make_plot(infile):
     print(aggregate)
     # Create a hybrid chart to fix legend issue with line chart and shape
     lines = alt.Chart(aggregate).mark_line().encode(
-        x=alt.X('hour:O',
-                title="Hour of the Day"
-                ),
-        y=alt.Y('user:Q',
-                title="Active User Count"
-                ),
+        x=alt.X(
+            'hour:O',
+            title="Hour of the Day",
+        ),
+        y=alt.Y(
+            'user:Q',
+            title="Active User Count",
+        ),
         color=alt.Color(
             "type",
             legend=None,
+            sort=None,
         ),
     )
 
-    points = alt.Chart(aggregate).mark_point(size=100).encode(
-        x=alt.X('hour:O',
-                title="Hour of the Day"
-                ),
-        y=alt.Y('user:Q',
-                title="Active User Count"
-                ),
+    points = lines.mark_point(size=100).encode(
+        x=alt.X(
+            'hour:O',
+            title="Hour of the Day",
+        ),
+        y=alt.Y(
+            'user:Q',
+            title="Active User Count",
+        ),
         color=alt.Color(
             "type",
+            sort=None,
         ),
         shape=alt.Shape(
             "type",
-            title=""
+            title="",
+            sort=None,
         ),
     )
 
