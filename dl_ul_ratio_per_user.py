@@ -26,16 +26,38 @@ def reduce_to_pandas(outfile, dask_client):
     bok.pd_infra.clean_write_parquet(flows, outfile)
 
 
-def _assign_user_top_category(frame):
-    print(frame)
+def _find_user_top_category(df):
+    """ Assigns each user a column with the label of their top category"""
+    df["total_bytes"] = df["bytes_up"] + df["bytes_down"]
+    df["category_and_amount"] = df.apply(lambda row: (row["category"], row["total_bytes"]), axis=1)
+
+    def _find_label_with_max_value(series):
+        # Some messy accessors because the series iterator returns (index, (category, amount))
+        return max(series.iteritems(), key=lambda x: x[1][1])[1][0]
+
+    user_top = df.groupby(["user"]).agg({"category_and_amount": _find_label_with_max_value})
+    user_top = user_top.rename(columns={"category_and_amount": "top_category"})
+    user_top = user_top.groupby(["user"]).first()
+    return user_top
 
 
 def make_ul_dl_scatter_plot(infile):
-    user_totals = bok.pd_infra.read_parquet(infile)
-    user_totals = user_totals.reset_index()
+    user_cat = bok.pd_infra.read_parquet(infile)
+    user_cat = user_cat.reset_index()
 
-    user_totals = user_totals.groupby(["user"]).sum().reset_index()
+    # Filter users to only users who made purchases in the network with registered ips
+    users = bok.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")[["user"]]
+    user_cat = users.merge(user_cat, on="user", how="left")
+
+    # Compute total bytes for each user across categories
+    user_totals = user_cat.groupby(["user"]).sum().reset_index()
     user_totals["bytes_total"] = user_totals["bytes_up"] + user_totals["bytes_down"]
+
+    user_cat = _find_user_top_category(user_cat)
+    print(user_cat)
+
+    user_totals = user_totals.merge(user_cat, on="user")
+    print(user_totals)
 
     # Filter users by time in network to eliminate early incomplete samples
     user_active_ranges = bok.pd_infra.read_parquet(
@@ -70,10 +92,33 @@ def make_ul_dl_scatter_plot(infile):
     user_totals["ul ratio"] = user_totals["bytes_up"] / user_totals["bytes_total"]
     user_totals["dl ratio"] = user_totals["bytes_down"] / user_totals["bytes_total"]
 
+    # Perform Regressions and Stats Analysis
+    # Log-transform to analyze exponential relationships with linear regression
     user_totals["log_ul_ratio"] = user_totals["ul ratio"].map(np.log)
     user_totals["log_mb_per_day"] = user_totals["MB_avg_per_online_day"].map(np.log)
 
-    # Perform Statistical Regression
+    # Print log stats info
+    x_log = user_totals["log_mb_per_day"]
+    y_log = user_totals["log_ul_ratio"]
+    x_log_with_const = sm.add_constant(x_log)
+    estimate = sm.OLS(y_log, x_log_with_const)
+    estimate_fit = estimate.fit()
+    print("Stats info for log-transformded OLS linear fit")
+    print("P value", estimate_fit.pvalues[1])
+    print("R squared", estimate_fit.rsquared)
+    print(estimate_fit.summary())
+
+    # Print direct linear regression stats info
+    x = user_totals["MB_avg_per_online_day"]
+    y = user_totals["ul ratio"]
+    x_with_const = sm.add_constant(x)
+    estimate = sm.OLS(y, x_with_const)
+    estimate_fit = estimate.fit()
+    print("Stats info for direct OLS linear fit")
+    print("P value", estimate_fit.pvalues[1])
+    print("R squared", estimate_fit.rsquared)
+    print(estimate_fit.summary())
+
     # Reshape to generate column matrixes expected by sklearn
     mb_array = user_totals["MB_avg_per_online_day"].values.reshape((-1, 1))
     ul_ratio_array = user_totals["ul ratio"].values.reshape((-1, 1))
@@ -91,15 +136,16 @@ def make_ul_dl_scatter_plot(infile):
     logt_predictions = logt_regressor.predict(log_x)
     logt_predictions = np.exp(logt_predictions)
 
-    graph_frame = pd.DataFrame({"regressionX": uniform_x.flatten(), "predictions": predictions.flatten()})
-    graph_frame = graph_frame.assign(type="Linear")
-    graph_frame = graph_frame.append(user_totals)
+    regression_frame = pd.DataFrame({"regressionX": uniform_x.flatten(), "predictions": predictions.flatten()})
+    regression_frame = regression_frame.assign(type="Linear (P<0.0001, R²=0.09)")
 
     logt_frame = pd.DataFrame({"regressionX": uniform_x.flatten(), "predictions": logt_predictions.flatten()})
-    logt_frame = logt_frame.assign(type="Semi-Log Transformed")
-    graph_frame = graph_frame.append(logt_frame)
+    logt_frame = logt_frame.assign(type="Log Transformed (P<0.0001, R²=0.19)")
+    regression_frame = regression_frame.append(logt_frame)
 
-    scatter = alt.Chart(graph_frame).mark_point().encode(
+    user_totals = user_totals.groupby(["user"]).first()
+
+    scatter = alt.Chart(user_totals).mark_point(opacity=0.9, strokeWidth=1.5).encode(
         x=alt.X(
             "MB_avg_per_online_day:Q",
             title="User's Average MB Per Day Online",
@@ -114,9 +160,18 @@ def make_ul_dl_scatter_plot(infile):
             #     type="log",
             # ),
         ),
+        # color=alt.Color(
+        #     "top_category",
+        #     scale=alt.Scale(scheme="category20"),
+        #     sort="descending",
+        # ),
+        # shape=alt.Shape(
+        #     "top_category",
+        #     sort="descending",
+        # )
     )
 
-    regression = scatter.mark_line(color="orange").encode(
+    regression = alt.Chart(regression_frame).mark_line(color="black", opacity=1).encode(
         x=alt.X(
             "regressionX",
             # scale=alt.Scale(
@@ -131,23 +186,23 @@ def make_ul_dl_scatter_plot(infile):
         ),
         strokeDash=alt.StrokeDash(
             "type",
+            title="Regression Type",
+            legend=alt.Legend(
+                orient="top-right",
+                fillColor="white",
+                labelLimit=500,
+                padding=10,
+                strokeColor="black",
+            )
         )
     )
 
-    (scatter + regression).properties(
+    (regression + scatter).properties(
         width=500,
     ).save(
         "renders/dl_ul_ratio_per_user_scatter.png",
         scale_factor=2,
     )
-
-    X = user_totals["log_mb_per_day"]
-    Y = user_totals["log_ul_ratio"]
-    X2 = sm.add_constant(X)
-    est = sm.OLS(Y, X2)
-    est2 = est.fit()
-    print(est2.pvalues)
-    print(est2.summary())
 
 
 if __name__ == "__main__":
@@ -165,7 +220,7 @@ if __name__ == "__main__":
         # Module specific format options
         pd.set_option('display.max_columns', None)
         pd.set_option('display.width', None)
-        pd.set_option('display.max_rows', None)
+        pd.set_option('display.max_rows', 40)
         make_ul_dl_scatter_plot(graph_temporary_file)
         # ToDo Need to add statistical analysis of the trend.
 
