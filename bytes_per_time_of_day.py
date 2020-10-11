@@ -46,24 +46,28 @@ def make_totals_plot(infile):
     grouped_flows.loc[(grouped_flows["day_bin"] < "2019-07-30") | (grouped_flows["day_bin"] > "2019-08-31"), "outage"] = "Normal"
 
     alt.Chart(working_times).mark_boxplot().encode(
-        x=alt.X('hour:O',
-                title="Hour of the Day"
-                ),
-        y=alt.Y('MB:Q',
-                title="MB Per Hour"
-                ),
+        x=alt.X(
+            'hour:O',
+            title="Hour of the Day",
+        ),
+        y=alt.Y(
+            'MB:Q',
+            title="MB Per Hour",
+        ),
     ).save(
         "renders/bytes_per_time_of_day_boxplot_exclude_outage.png",
         scale_factor=2,
     )
 
     alt.Chart(grouped_flows).mark_point(opacity=0.3).encode(
-        x=alt.X('hour:O',
-                title="Hour of the Day"
-                ),
-        y=alt.Y('MB:Q',
-                title="MB Per Hour"
-                ),
+        x=alt.X(
+            'hour:O',
+            title="Hour of the Day",
+        ),
+        y=alt.Y(
+            'MB:Q',
+            title="MB Per Hour",
+        ),
         color=alt.Color(
             "outage",
             title="Condition",
@@ -95,12 +99,14 @@ def make_totals_plot(infile):
     print(aggregate)
     # Create a hybrid chart to fix legend issue with line chart and shape
     lines = alt.Chart(aggregate).mark_line().encode(
-        x=alt.X('hour:O',
-                title="Hour of the Day"
-                ),
-        y=alt.Y('MB:Q',
-                title="MB Per Hour"
-                ),
+        x=alt.X(
+            'hour:O',
+            title="Hour of the Day",
+        ),
+        y=alt.Y(
+            'MB:Q',
+            title="MB Per Hour",
+        ),
         color=alt.Color(
             "type",
             legend=None,
@@ -108,18 +114,20 @@ def make_totals_plot(infile):
     )
 
     points = alt.Chart(aggregate).mark_point(size=100).encode(
-        x=alt.X('hour:O',
-                title="Hour of the Day"
-                ),
-        y=alt.Y('MB:Q',
-                title="MB Per Hour"
-                ),
+        x=alt.X(
+            'hour:O',
+            title="Hour of the Day",
+        ),
+        y=alt.Y(
+            'MB:Q',
+            title="MB Per Hour",
+        ),
         color=alt.Color(
             "type",
         ),
         shape=alt.Shape(
             "type",
-            title=""
+            title="",
         ),
     )
 
@@ -163,12 +171,14 @@ def make_category_plot(inpath):
     aggregate = aggregate.loc[aggregate["type"] == "Mean"]
 
     alt.Chart(aggregate).mark_line().encode(
-        x=alt.X('hour:O',
-                title="Hour of the Day"
-                ),
-        y=alt.Y('MB:Q',
-                title="Avg MB Per Hour Per Category"
-                ),
+        x=alt.X(
+            'hour:O',
+            title="Hour of the Day",
+        ),
+        y=alt.Y(
+            'MB:Q',
+            title="Avg MB Per Hour Per Category",
+        ),
         color=alt.Color(
             "category:N",
             scale=alt.Scale(scheme="tableau20"),
@@ -202,12 +212,14 @@ def make_change_vs_average_plot(inpath):
     print(category_total)
 
     alt.Chart(aggregate).mark_line().encode(
-        x=alt.X('hour:O',
-                title="Hour of the Day"
-                ),
-        y=alt.Y('byte_density:Q',
-                title="Fraction of Category Bytes Per Hour"
-                ),
+        x=alt.X(
+            'hour:O',
+            title="Hour of the Day",
+        ),
+        y=alt.Y(
+            'byte_density:Q',
+            title="Fraction of Category Bytes Per Hour",
+        ),
         color=alt.Color(
             "category:N",
             scale=alt.Scale(scheme="tableau20"),
