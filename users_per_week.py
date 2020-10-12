@@ -32,23 +32,6 @@ def get_date(x):
     return x["cohort"].apply(cohort_as_date_interval, meta=('cohort', 'object'))
 
 
-def get_active_users_query(df):
-    # Map each start to a cohort
-    df = df.reset_index()
-    df["day"] = df["start"].dt.floor("d")
-
-    # Group by cohorts and get the all the users
-    # Count the number of unique users per cohort
-    df = df.groupby("day")["user"].nunique()
-
-    # Convert to dataframe
-    df = df.to_frame()
-    # Get the day column back
-    df = df.reset_index()
-
-    return df
-
-
 def get_registered_users_query(transactions):
     # Set down the types for the dataframe
     types = {
@@ -80,8 +63,25 @@ def get_registered_users_query(transactions):
 
 
 def reduce_to_pandas(outfile, dask_client):
-    transactions = dask.dataframe.read_csv("data/clean/first_time_user_transactions.csv")[["start", "user"]]
-    registered_users = get_registered_users_query(transactions).compute()
+    # Import the flows dataset
+    #
+    # Importantly, dask is lazy and doesn't actually import the whole thing,
+    # but just keeps track of where the file shards live on disk.
+    df = bok.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+
+    df = df.reset_index()
+    df["day"] = df["start"].dt.floor("d")
+
+    # Group by cohorts and get the all the users
+    df = df.groupby(["day", "user"]).sum().reset_index()
+    df = df[["day", "user"]]
+
+    bok.pd_infra.clean_write_parquet(df.compute(), outfile)
+
+
+def make_plot(infile):
+    transactions = pd.read_csv("data/clean/first_time_user_transactions.csv")[["start", "user"]]
+    registered_users = get_registered_users_query(transactions)
 
     # Generate a dense dataframe with all days
     date_range = pd.DataFrame({"day": pd.date_range(bok.constants.MIN_DATE, bok.constants.MAX_DATE, freq="1D")})
@@ -92,14 +92,10 @@ def reduce_to_pandas(outfile, dask_client):
         right_on="day",
     ).fillna(method="ffill").dropna()
 
-    # Import the flows dataset
-    #
-    # Importantly, dask is lazy and doesn't actually import the whole thing,
-    # but just keeps track of where the file shards live on disk.
-    flows = bok.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+    user_days = bok.pd_infra.read_parquet(infile)
 
-    # Compute the active users query into a realized pandas frame.
-    active_users = get_active_users_query(flows).compute()
+    active_users = user_days.groupby("day")["user"].nunique()
+    active_users = active_users.to_frame().reset_index()
 
     # Join the active and registered users together
     users = active_users.merge(registered_users,
@@ -110,12 +106,6 @@ def reduce_to_pandas(outfile, dask_client):
 
     # For cohorts with no active users, fill zero.
     users["user_active"] = users["user_active"].fillna(value=0)
-
-    bok.pd_infra.clean_write_parquet(users, outfile)
-
-
-def make_plot(infile):
-    users = bok.pd_infra.read_parquet(infile)
 
     users = users.rename(columns={"day": "date", "user_active": "Active", "user_registered": "Registered"})
     users = users.set_index("date").sort_index()
@@ -170,7 +160,7 @@ if __name__ == "__main__":
     if platform.large_compute_support:
         print("Running compute tasks")
         print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
-        client = bok.dask_infra.setup_platform_tuned_dask_client(40, platform)
+        client = bok.dask_infra.setup_platform_tuned_dask_client(10, platform)
         reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
         client.close()
 
