@@ -97,31 +97,44 @@ def make_plot(infile):
     active_users = user_days.groupby("day")["user"].nunique()
     active_users = active_users.to_frame().reset_index()
 
+    # Group weekly to capture the total number of unique users across the entire week and account for intermittent use.
+    weekly_users = user_days.groupby(pd.Grouper(key="day", freq="W-MON"))["user"].nunique()
+    weekly_users = weekly_users.to_frame().reset_index().rename(columns={"user": "week_unique_users"})
+    week_range = pd.DataFrame({"day": pd.date_range(bok.constants.MIN_DATE, bok.constants.MAX_DATE, freq="W-MON")})
+    weekly_users = weekly_users.merge(week_range, on="day", how="outer")
+    weekly_users.fillna(0)
+    print(weekly_users)
+
     # Join the active and registered users together
     users = active_users.merge(registered_users,
                                how="right",
                                left_on="day",
                                right_on="day",
                                suffixes=('_active', '_registered'))
+    users = users.merge(weekly_users, how="outer", on="day")
 
     # For cohorts with no active users, fill zero.
     users["user_active"] = users["user_active"].fillna(value=0)
 
-    users = users.rename(columns={"day": "date", "user_active": "Active", "user_registered": "Registered"})
+    users = users.rename(columns={"day": "date", "user_active": "Unique Daily Active", "user_registered": "Registered", "week_unique_users": "Unique Weekly Active"})
     users = users.set_index("date").sort_index()
     users["Registered"] = users["Registered"].fillna(method="ffill")
+    users["Unique Weekly Active"] = users["Unique Weekly Active"].fillna(method="bfill")
     users = users.reset_index()
+    print(users)
 
     # Limit graphs to the study period
     users = users.loc[users["date"] < bok.constants.MAX_DATE]
 
     # Compute a rolling average
-    users["Active 7-Day Average"] = users["Active"].rolling(
+    users["Active 7-Day Average"] = users["Unique Daily Active"].rolling(
         window=7,
     ).mean()
 
     # Get the data in a form that is easily plottable
-    users = users.melt(id_vars=["date"], value_vars=["Active", "Registered", "Active 7-Day Average"], var_name="user_type", value_name="num_users")
+    users = users.melt(id_vars=["date"], value_vars=["Unique Daily Active", "Registered", "Unique Weekly Active"], var_name="user_type", value_name="num_users")
+    # Drop the rolling average... it wasn't useful
+    # users = users.melt(id_vars=["date"], value_vars=["Active", "Registered", "Active 7-Day Average", "Unique Weekly Active"], var_name="user_type", value_name="num_users")
     # Reset the types of the dataframe
     types = {
         "date": "datetime64",
@@ -146,15 +159,33 @@ def make_plot(infile):
         y=altair.Y("num_users",
                    title="User Count",
                    ),
-        color=altair.Color("user_type",
-                           title="",
-                           sort=["Registered", "Active"]
-                           ),
+        color=altair.Color(
+            "user_type",
+            title="",
+            sort=None,
+            legend=altair.Legend(
+                orient="top-left",
+                fillColor="white",
+                labelLimit=500,
+                padding=10,
+                strokeColor="black",
+            ),
+       ),
+        strokeDash=altair.StrokeDash(
+            "user_type",
+            sort=None,
+        ),
     ).properties(width=500).save("renders/users_per_week.png", scale_factor=2)
 
 
 if __name__ == "__main__":
     platform = bok.platform.read_config()
+
+    # Module specific format options
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.max_colwidth', None)
+    pd.set_option('display.width', None)
+    pd.set_option('display.max_rows', None)
 
     graph_temporary_file = "scratch/graphs/users_per_week"
     if platform.large_compute_support:
