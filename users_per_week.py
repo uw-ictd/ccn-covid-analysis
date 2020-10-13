@@ -116,10 +116,10 @@ def make_plot(infile):
     # For cohorts with no active users, fill zero.
     users["user_active"] = users["user_active"].fillna(value=0)
 
-    users = users.rename(columns={"day": "date", "user_active": "Unique Daily Active", "user_registered": "Registered", "week_unique_users": "Unique Weekly Active"})
+    users = users.rename(columns={"day": "date", "user_active": "Unique Daily Online", "user_registered": "Registered", "week_unique_users": "Unique Weekly Online"})
     users = users.set_index("date").sort_index()
     users["Registered"] = users["Registered"].fillna(method="ffill")
-    users["Unique Weekly Active"] = users["Unique Weekly Active"].fillna(method="bfill")
+    users["Unique Weekly Online"] = users["Unique Weekly Online"].fillna(method="bfill")
     users = users.reset_index()
     print(users)
 
@@ -127,12 +127,12 @@ def make_plot(infile):
     users = users.loc[users["date"] < bok.constants.MAX_DATE]
 
     # Compute a rolling average
-    users["Active 7-Day Average"] = users["Unique Daily Active"].rolling(
+    users["Active 7-Day Average"] = users["Unique Daily Online"].rolling(
         window=7,
     ).mean()
 
     # Get the data in a form that is easily plottable
-    users = users.melt(id_vars=["date"], value_vars=["Unique Daily Active", "Registered", "Unique Weekly Active"], var_name="user_type", value_name="num_users")
+    users = users.melt(id_vars=["date"], value_vars=["Unique Daily Online", "Registered", "Unique Weekly Online"], var_name="user_type", value_name="num_users")
     # Drop the rolling average... it wasn't useful
     # users = users.melt(id_vars=["date"], value_vars=["Active", "Registered", "Active 7-Day Average", "Unique Weekly Active"], var_name="user_type", value_name="num_users")
     # Reset the types of the dataframe
