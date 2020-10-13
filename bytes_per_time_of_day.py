@@ -79,7 +79,7 @@ def make_totals_plot(infile):
 
     # Sum across categories, then compute statistics across all days.
     aggregate = working_times.groupby(["hour", "day_bin"]).sum()
-    aggregate = aggregate.groupby(["hour"]).agg({"MB": ["mean", lambda x: x.quantile(0.90), lambda x: x.quantile(0.99)]})
+    aggregate = aggregate.groupby(["hour"]).agg({"MB": ["mean", lambda x: x.quantile(0.90), lambda x: x.quantile(0.99), "max"]})
     # Flatten column names
     aggregate = aggregate.reset_index()
     aggregate.columns = [' '.join(col).strip() for col in aggregate.columns.values]
@@ -87,11 +87,13 @@ def make_totals_plot(infile):
         columns={"MB mean": "Mean",
                  "MB <lambda_0>": "90th Percentile",
                  "MB <lambda_1>": "99th Percentile",
+                 "MB max": "Max",
                  })
 
     aggregate = aggregate.melt(
         id_vars=["hour"],
-        value_vars=["Mean", "90th Percentile", "99th Percentile"],
+        value_vars=["99th Percentile", "90th Percentile", "Mean"],
+        # value_vars=["Mean", "90th Percentile", "99th Percentile", "Max"],
         var_name="type",
         value_name="MB"
     )
@@ -110,6 +112,7 @@ def make_totals_plot(infile):
         color=alt.Color(
             "type",
             legend=None,
+            sort=None,
         ),
     )
 
@@ -124,10 +127,19 @@ def make_totals_plot(infile):
         ),
         color=alt.Color(
             "type",
+            legend=alt.Legend(
+                orient="top-left",
+                fillColor="white",
+                labelLimit=500,
+                padding=5,
+                strokeColor="black",
+            ),
+            sort=None,
         ),
         shape=alt.Shape(
             "type",
             title="",
+            sort=None,
         ),
     )
 
@@ -182,10 +194,11 @@ def make_category_plot(inpath):
         color=alt.Color(
             "category:N",
             scale=alt.Scale(scheme="tableau20"),
+            sort=['Video', 'Social Media', 'Messaging', 'Mixed CDN', 'Unknown (No DNS)', 'Software or Updates', 'API', 'Unknown (Not Mapped)', 'Adult Video', 'ICE (STUN/TURN)', 'Peer to Peer', 'Ad Network', 'Non-video Content', 'Compressed Web', 'Games', 'Local Services', 'Content Upload', 'IAAS', 'Files', 'Antivirus']
         ),
-        strokeDash=alt.StrokeDash(
-            "category:N",
-        ),
+        # strokeDash=alt.StrokeDash(
+        #     "category:N",
+        # ),
     ).save(
         "renders/bytes_per_time_of_day_category_lines.png",
         scale_factor=2,
@@ -246,7 +259,7 @@ if __name__ == "__main__":
     if platform.altair_support:
         print("Running vis tasks")
         make_change_vs_average_plot(inpath=graph_temporary_file)
-        # make_totals_plot(infile=graph_temporary_file)
-        # make_category_plot(inpath=graph_temporary_file)
+        make_totals_plot(infile=graph_temporary_file)
+        make_category_plot(inpath=graph_temporary_file)
 
     print("Done!")
