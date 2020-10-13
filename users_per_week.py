@@ -170,7 +170,7 @@ def make_plot(infile):
                 padding=10,
                 strokeColor="black",
             ),
-       ),
+        ),
         strokeDash=altair.StrokeDash(
             "user_type",
             sort=None,
