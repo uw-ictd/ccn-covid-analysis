@@ -108,6 +108,13 @@ def make_plot(infile):
         color=alt.Color(
             "type",
             sort=None,
+            legend=alt.Legend(
+                orient="top-left",
+                fillColor="white",
+                labelLimit=500,
+                padding=5,
+                strokeColor="black",
+            ),
         ),
         shape=alt.Shape(
             "type",
