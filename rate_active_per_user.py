@@ -40,6 +40,16 @@ def make_plot(inpath):
     flows = flows.reset_index()
 
     activity = bok.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")
+
+    # Drop users new to the network first active less than a week ago.
+    activity = activity.loc[
+        activity["days_since_first_active"] >= 7,
+    ]
+    # Drop users active for less than 1 day
+    activity = activity.loc[
+        activity["days_active"] >= 1.0,
+    ]
+
     # take the minimum of days online and days active, since active is
     # partial-day aware, but online rounds up to whole days. Can be up to 2-e
     # days off if the user joined late in the day and was last active early.
@@ -57,20 +67,19 @@ def make_plot(inpath):
 
     scatter = alt.Chart(df).mark_point().encode(
         x=alt.X(
+            "MB_per_online_day",
+            title="Mean MB per Day Online",
+        ),
+        y=alt.Y(
             "optimistic_online_ratio",
             title="Online Ratio",
             scale=alt.Scale(type="linear", domain=(0, 1.0)),
         ),
-        y=alt.Y(
-            "MB_per_online_day",
-            title="Mean MB per Day Online",
-        ),
-
     )
 
     regression = scatter.transform_regression(
-        "optimistic_online_ratio",
         "MB_per_online_day",
+        "optimistic_online_ratio",
         method="linear",
     ).mark_line(color="orange")
 
