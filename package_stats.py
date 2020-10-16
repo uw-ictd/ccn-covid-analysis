@@ -24,13 +24,14 @@ def make_plot(infile):
 
     print(purchases)
     bars = alt.Chart(purchases).mark_bar().encode(
-        x=alt.X('amount_MB',
-                type="ordinal",
-                title="Package Type (MB)",
-                ),
-        y=alt.Y(
+        x=alt.X(
             'count',
             title="Count",
+        ),
+        y=alt.Y(
+            'amount_MB',
+            type="ordinal",
+            title="Package Type (MB)",
         ),
         color=alt.Color(
             'amount_MB:N',
@@ -40,31 +41,40 @@ def make_plot(infile):
 
     text = bars.mark_text(
         align="left",
-        baseline="bottom",
+        baseline="middle",
+        xOffset=5,
     ).encode(
-        text="count:Q"
+        text="count:Q",
+        color=alt.value("black"),
     )
 
     bars = text + bars
 
-    bars.save(
+    bars.properties(
+        width=500,
+        height=75,
+    ).save(
         "renders/package_counts.png",
         scale_factor=2,
     )
 
     alt.Chart(purchases).mark_bar().encode(
-        x=alt.X('amount_MB',
-                type="ordinal",
-                title="Package Type (MB)",
-                ),
-        y=alt.Y(
+        x=alt.X(
             'total_GB',
             title="Total GB Purchased",
+        ),
+        y=alt.Y(
+            'amount_MB',
+            type="ordinal",
+            title="Package Type (MB)",
         ),
         color=alt.Color(
             'amount_MB:N',
             legend=None,
         )
+    ).properties(
+        width=500,
+        height=75,
     ).save(
         "renders/package_bytes.png",
         scale_factor=2,
