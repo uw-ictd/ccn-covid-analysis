@@ -1,6 +1,8 @@
 import altair as alt
 import numpy as np
 import pandas as pd
+from sklearn.linear_model import LinearRegression
+import statsmodels.api as sm
 
 import bok.dask_infra
 import bok.pd_infra
@@ -47,23 +49,75 @@ def make_plot(inpath):
     ]
     # Drop users active for less than 1 day
     activity = activity.loc[
-        activity["days_active"] >= 1.0,
+        activity["days_active"] >= 1,
     ]
 
     # take the minimum of days online and days active, since active is
     # partial-day aware, but online rounds up to whole days. Can be up to 2-e
     # days off if the user joined late in the day and was last active early.
-    activity["optimistic_online_ratio"] = np.minimum(
-        activity["optimistic_days_online"], activity["days_active"]) / activity["days_active"]
+    activity["online_ratio"] = np.minimum(
+        activity["days_online"],
+        (activity["days_active"] - activity["outage_impact_days"])
+    ) / (activity["days_active"] - activity["outage_impact_days"])
 
     flows["MB"] = flows["bytes_total"] / (1000**2)
     user_total = flows[["user", "MB"]]
     user_total = user_total.groupby(["user"]).sum().reset_index()
     df = user_total.merge(
-        activity[["user", "optimistic_online_ratio", "optimistic_days_online", "days_online"]],
+        activity[["user", "online_ratio", "days_online"]],
         on="user",
     )
     df["MB_per_online_day"] = df["MB"] / df["days_online"]
+
+    # Log transform for analysis
+    df["log_MB_per_online_day"] = df["MB_per_online_day"].map(np.log)
+    df["log_online_ratio"] = df["online_ratio"].map(np.log)
+
+    # Print log stats info
+    x_log = df["log_MB_per_online_day"]
+    y_log = df["log_online_ratio"]
+    x_log_with_const = sm.add_constant(x_log)
+    estimate = sm.OLS(y_log, x_log_with_const)
+    estimate_fit = estimate.fit()
+    print("Stats info for log-transformded OLS linear fit")
+    print("P value", estimate_fit.pvalues[1])
+    print("R squared", estimate_fit.rsquared)
+    print(estimate_fit.summary())
+
+    # Print direct linear regression stats info
+    x = df["MB_per_online_day"]
+    y = df["online_ratio"]
+    x_with_const = sm.add_constant(x)
+    estimate = sm.OLS(y, x_with_const)
+    estimate_fit = estimate.fit()
+    print("Stats info for direct OLS linear fit")
+    print("P value", estimate_fit.pvalues[1])
+    print("R squared", estimate_fit.rsquared)
+    print(estimate_fit.summary())
+
+    # Reshape to generate column matrixes expected by sklearn
+    mb_array = df["MB_per_online_day"].values.reshape((-1, 1))
+    online_ratio_array = df["online_ratio"].values.reshape((-1, 1))
+    log_mb_array = df["log_MB_per_online_day"].values.reshape((-1, 1))
+    log_online_array = df["log_online_ratio"].values.reshape((-1, 1))
+    lin_regressor = LinearRegression()
+    lin_regressor.fit(mb_array, online_ratio_array)
+    logt_regressor = LinearRegression()
+    logt_regressor.fit(log_mb_array, log_online_array)
+
+    # Generate a regression plot
+    uniform_x = np.linspace(start=mb_array.min(), stop=mb_array.max(), num=1000, endpoint=True).reshape((-1, 1))
+    predictions = lin_regressor.predict(uniform_x)
+    log_x = np.log(uniform_x)
+    logt_predictions = logt_regressor.predict(log_x)
+    logt_predictions = np.exp(logt_predictions)
+
+    regression_frame = pd.DataFrame({"regressionX": uniform_x.flatten(), "predictions": predictions.flatten()})
+    regression_frame = regression_frame.assign(type="Linear(P<0.01, R²=0.05)")
+
+    logt_frame = pd.DataFrame({"regressionX": uniform_x.flatten(), "predictions": logt_predictions.flatten()})
+    logt_frame = logt_frame.assign(type="Log Transformed Linear(P<0.005, R²=0.05)")
+    regression_frame = regression_frame.append(logt_frame)
 
     scatter = alt.Chart(df).mark_point().encode(
         x=alt.X(
@@ -71,17 +125,39 @@ def make_plot(inpath):
             title="Mean MB per Day Online",
         ),
         y=alt.Y(
-            "optimistic_online_ratio",
+            "online_ratio",
             title="Online Days / Active Days",
-            scale=alt.Scale(type="linear", domain=(0, 1.0)),
+            # scale=alt.Scale(type="linear", domain=(0, 1.0)),
         ),
     )
 
-    regression = scatter.transform_regression(
-        "MB_per_online_day",
-        "optimistic_online_ratio",
-        method="linear",
-    ).mark_line(color="orange")
+    regression = alt.Chart(regression_frame).mark_line(color="black", opacity=1).encode(
+        x=alt.X(
+            "regressionX",
+            # scale=alt.Scale(
+            #     type="log",
+            # ),
+        ),
+        y=alt.Y(
+            "predictions",
+            # scale=alt.Scale(
+            #     type="log",
+            # ),
+        ),
+        strokeDash=alt.StrokeDash(
+            "type",
+            title=None,
+            legend=alt.Legend(
+                orient='none',
+                fillColor="white",
+                labelLimit=500,
+                padding=5,
+                strokeColor="black",
+                legendX=300,
+                legendY=255,
+            )
+        ),
+    )
 
     (scatter + regression).properties(
         width=500,
