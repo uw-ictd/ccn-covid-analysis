@@ -119,7 +119,7 @@ def make_plot(inpath):
     logt_frame = logt_frame.assign(type="Log Transformed Linear(P<0.005, R²=0.05)")
     regression_frame = regression_frame.append(logt_frame)
 
-    scatter = alt.Chart(df).mark_point().encode(
+    scatter = alt.Chart(df).mark_point(opacity=0.9, strokeWidth=1.5).encode(
         x=alt.X(
             "MB_per_online_day",
             title="Mean MB per Day Online",
