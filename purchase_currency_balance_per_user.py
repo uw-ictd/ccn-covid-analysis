@@ -163,8 +163,7 @@ def make_time_at_zero_plots(user_balance_frame):
     # Simplify and trim data now for CDF plotting!
     df = user_timeshare.loc[:, ["user", "days_at_zero", "days_active", "corrected", "days_since_first_active"]]
     df["fraction_at_zero"] = df["days_at_zero"] / df["days_active"]
-
-    print(df.loc[df["fraction_at_zero"] > 1])
+    df["fraction_nonzero"] = 1.0 - df["fraction_at_zero"]
 
     alt.Chart(df).mark_point().encode(
         x=alt.X(
@@ -172,26 +171,31 @@ def make_time_at_zero_plots(user_balance_frame):
             title="Days Active",
         ),
         y=alt.Y(
-            "fraction_at_zero",
-            title="Fraction of Active Time with 0 Credit Balance",
+            "fraction_nonzero",
+            title="Fraction of Active Time with Positive Credit Balance",
         ),
         color=alt.Color(
             "corrected",
             title="Nonzero Start"
         ),
+    ).properties(
+        width=500,
     ).save("renders/purchase_currency_balance_per_user.png", scale_factor=2.0)
 
-    df = compute_cdf(df, "fraction_at_zero", "user")
+    df = compute_cdf(df, "fraction_nonzero", "user")
 
     alt.Chart(df).mark_line(interpolate='step-after', clip=True).encode(
-        x=alt.X('fraction_at_zero:Q',
+        x=alt.X('fraction_nonzero:Q',
                 scale=alt.Scale(type="linear", domain=(0, 1.0)),
-                title="Fraction of Time with 0 Credit Balance"
+                title="Fraction of Time with Positive Credit Balance"
                 ),
         y=alt.Y('cdf',
                 title="Fraction of Users (CDF)",
                 scale=alt.Scale(type="linear", domain=(0, 1.0)),
                 ),
+    ).properties(
+        width=500,
+        height=200,
     ).save("renders/purchase_currency_balance_per_user_cdf.png", scale_factor=2.0)
 
 
