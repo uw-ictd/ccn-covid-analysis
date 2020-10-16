@@ -3,8 +3,23 @@ import altair as alt
 
 import bok.constants
 import bok.dask_infra
+import bok.pd_infra
 
 transactions = bok.dask_infra.read_parquet("data/clean/transactions_TM").compute()
+
+# Find the first day the user was active. Define "active" as making first
+# purchase or first data in network.
+user_active_ranges = bok.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")[["user", "days_since_first_active", "days_active"]]
+
+# Drop users that have been active less than a week.
+users_to_analyze = user_active_ranges.loc[
+    user_active_ranges["days_since_first_active"] >= 7,
+]
+
+# Drop users active for less than one week
+users_to_analyze = users_to_analyze.loc[
+    users_to_analyze["days_active"] >=1,
+]
 
 
 # Each user's total amount of data purchased directly.
@@ -17,6 +32,9 @@ aggregate_frame = aggregate_frame.reset_index()
 
 aggregate_frame["amount_GB"] = aggregate_frame["amount_bytes"] * float(1) / (1000 ** 3)
 aggregate_frame["amount_USD"] = aggregate_frame["amount_idr"] * bok.constants.IDR_TO_USD
+
+# Merge in the active times
+aggregate_frame = aggregate_frame.merge(users_to_analyze, on="user", how="inner")
 
 alt.Chart(aggregate_frame).mark_bar().encode(
     x=alt.X('user',
@@ -39,22 +57,28 @@ stats_frame["cdf"] = stats_frame["pdf"].cumsum()
 print(stats_frame)
 
 stats_frame = stats_frame.reset_index()
-alt.Chart(stats_frame).mark_line().encode(
+alt.Chart(stats_frame).mark_line(interpolate="step-after", clip=True).encode(
     x=alt.X('amount_USD:Q',
             scale=alt.Scale(type="linear"),
             title="Total Amount Purchased (USD)"
             ),
     y=alt.Y('cdf',
-            title="CDF of Users"
+            title="CDF of Users N={}".format(len(aggregate_frame)),
             ),
+).properties(
+    width=500,
+    height=200,
 ).save("renders/purchase_total_per_user_cdf.png", scale_factor=2.0)
 
-alt.Chart(stats_frame).mark_line().encode(
+alt.Chart(stats_frame).mark_line(interpolate="step-after", clip=True).encode(
     x=alt.X('amount_USD:Q',
             scale=alt.Scale(type="log"),
             title="Total Amount Purchased (USD - Log Scale)"
             ),
     y=alt.Y('cdf',
-            title="CDF of Users"
+            title="CDF of Users N={}".format(len(aggregate_frame)),
             ),
+).properties(
+    width=500,
+    height=200,
 ).save("renders/purchase_total_per_user_cdf_log.png", scale_factor=2.0)

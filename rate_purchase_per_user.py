@@ -33,12 +33,13 @@ def make_rate_chart():
 
     # Drop users active for less than one week
     users_to_analyze = users_to_analyze.loc[
-        users_to_analyze["days_active"] >=7,
+        users_to_analyze["days_active"] >=1,
     ]
 
     aggregated_purchases = purchases.groupby(
         "user"
     )[["amount_idr", "amount_bytes"]].sum().reset_index()
+    print(len(aggregated_purchases))
 
     aggregated_purchases["amount_GB"] = aggregated_purchases["amount_bytes"] * float(1) / (1000 ** 3)
     aggregated_purchases["amount_USD"] = aggregated_purchases["amount_idr"] * bok.constants.IDR_TO_USD
@@ -92,26 +93,32 @@ def make_rate_chart():
     stats_frame["cdf"] = stats_frame["pdf"].cumsum()
 
     stats_frame = stats_frame.reset_index()
-    alt.Chart(stats_frame).mark_line().encode(
+    alt.Chart(stats_frame).mark_line(interpolate="step-after", clip=True).encode(
         x=alt.X('USD_per_day:Q',
                 scale=alt.Scale(type="linear"),
-                title="Amount Purchased/Days Since Joining (USD/Day)",
+                title="Amount Purchased/Days Active (USD/Day)",
                 ),
         y=alt.Y('cdf',
-                title="CDF of Users N={}".format(len(stats_frame)),
+                title="CDF of Users N={}".format(len(aggregated_purchases)),
                 scale=alt.Scale(domain=[0, 1]),
                 ),
+    ).properties(
+        width=500,
+        height=200,
     ).save("renders/rate_purchase_per_user_cdf.png", scale_factor=2.0)
 
-    alt.Chart(stats_frame).mark_line().encode(
+    alt.Chart(stats_frame).mark_line(interpolate="step-after", clip=True).encode(
         x=alt.X('USD_per_day:Q',
                 scale=alt.Scale(type="log"),
-                title="Amount Purchased/Days Since Joining (USD/Day - Log Scale)",
+                title="Amount Purchased/Days Active (USD/Day - Log Scale)",
                 ),
         y=alt.Y('cdf',
-                title="CDF of Users N={}".format(len(stats_frame)),
+                title="CDF of Users N={}".format(len(aggregated_purchases)),
                 scale=alt.Scale(domain=[0, 1]),
                 ),
+    ).properties(
+        width=500,
+        height=200,
     ).save("renders/rate_purchase_per_user_cdf_log.png", scale_factor=2.0)
 
 
