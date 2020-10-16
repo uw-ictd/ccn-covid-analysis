@@ -72,7 +72,7 @@ def make_plot(inpath):
         ),
         y=alt.Y(
             "optimistic_online_ratio",
-            title="Online Ratio",
+            title="Online Days / Active Days",
             scale=alt.Scale(type="linear", domain=(0, 1.0)),
         ),
     )
