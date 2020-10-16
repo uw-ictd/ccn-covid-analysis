@@ -19,6 +19,16 @@ def compute_cdf(frame, value_column, base_column):
 def make_plot(inpath):
     activity = bok.pd_infra.read_parquet(inpath)
 
+    # Drop users that have been active less than a week.
+    activity = activity.loc[
+        activity["days_since_first_active"] >= 7,
+    ]
+
+    # Drop users active for less than one week
+    activity = activity.loc[
+        activity["days_active"] >= 1,
+    ]
+
     # take the minimum of days online and days active, since active is
     # partial-day aware, but online rounds up to whole days. Can be up to 2-e
     # days off if the user joined late in the day and was last active early.
@@ -48,10 +58,10 @@ def make_plot(inpath):
     alt.Chart(df).mark_line(interpolate='step-after', clip=True).encode(
         x=alt.X('value:Q',
                 scale=alt.Scale(type="linear", domain=(0, 1.00)),
-                title="Online ratio"
+                title="Online Days / Active Days"
                 ),
         y=alt.Y('cdf',
-                title="Fraction of Users (CDF)",
+                title="CDF of Users N={}".format(len(activity)),
                 scale=alt.Scale(type="linear", domain=(0, 1.0)),
                 ),
         color=alt.Color(
@@ -60,7 +70,19 @@ def make_plot(inpath):
                 title=None
             ),
         ),
-        strokeDash="type",
+        strokeDash=alt.StrokeDash(
+            "type",
+            legend=alt.Legend(
+                orient="top-left",
+                fillColor="white",
+                labelLimit=500,
+                padding=5,
+                strokeColor="black",
+            ),
+        ),
+    ).properties(
+        width=500,
+        height=200,
     ).save("renders/rate_online_when_active_cdf.png", scale_factor=2.0)
 
 
