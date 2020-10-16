@@ -49,8 +49,11 @@ def make_plot(inpath):
     flows["MB"] = flows["bytes_total"] / (1000**2)
     user_total = flows[["user", "MB"]]
     user_total = user_total.groupby(["user"]).sum().reset_index()
-    df = user_total.merge(activity[["user", "optimistic_online_ratio", "optimistic_days_online"]], on="user")
-    df["MB_per_online_day"] = df["MB"] / df["optimistic_days_online"]
+    df = user_total.merge(
+        activity[["user", "optimistic_online_ratio", "optimistic_days_online", "days_online"]],
+        on="user",
+    )
+    df["MB_per_online_day"] = df["MB"] / df["days_online"]
 
     scatter = alt.Chart(df).mark_point().encode(
         x=alt.X(
