@@ -61,8 +61,11 @@ def make_plot(infile):
     purchases_no_top_10 = purchases.loc[purchases["rank"] > 10].copy()
     purchases_no_top_10["kind"] = "Revenue Sans Top 10"
 
-    purchases_no_top_25 = purchases.loc[purchases["rank"] > 25].copy()
-    purchases_no_top_25["kind"] = "Revenue Sans Top 25"
+    purchases_no_top_15 = purchases.loc[purchases["rank"] > 15].copy()
+    purchases_no_top_15["kind"] = "Revenue Sans Top 15"
+
+    purchases_no_top_20 = purchases.loc[purchases["rank"] > 20].copy()
+    purchases_no_top_20["kind"] = "Revenue Sans Top 20"
 
     finances = purchases.append(
         make_expenses()
@@ -71,7 +74,9 @@ def make_plot(infile):
     ).append(
         purchases_no_top_10
     ).append(
-        purchases_no_top_25
+        purchases_no_top_15
+    ).append(
+        purchases_no_top_20
     )
 
     label_order = {
@@ -79,7 +84,8 @@ def make_plot(infile):
         "Total Revenue": 2,
         "Revenue Sans Top 5": 3,
         "Revenue Sans Top 10": 4,
-        "Revenue Sans Top 25": 5,
+        "Revenue Sans Top 15": 5,
+        "Revenue Sans Top 20": 6,
     }
 
     finances = finances.sort_values(["timestamp", "kind"])
