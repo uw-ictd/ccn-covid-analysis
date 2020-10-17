@@ -35,7 +35,7 @@ def make_expenses():
 def reduce_to_pandas(outfile, dask_client):
     transactions = bok.dask_infra.read_parquet("data/clean/transactions_TM").compute()
     purchases = transactions.loc[(transactions["kind"] == "purchase") | (transactions["kind"] == "admin_topup")]
-    purchases = purchases[["timestamp", "amount_idr", "kind"]]
+    purchases = purchases[["timestamp", "amount_idr", "kind", "user"]]
     bok.pd_infra.clean_write_parquet(purchases, outfile)
 
 
