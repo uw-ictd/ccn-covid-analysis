@@ -108,6 +108,13 @@ def make_category_quantiles_plots(infile):
             "category:N",
             scale=alt.Scale(scheme="tableau20"),
             sort=cat_sort_list,
+            legend=alt.Legend(
+                orient="top-left",
+                fillColor="white",
+                labelLimit=500,
+                padding=5,
+                strokeColor="black",
+            ),
         ),
         order=alt.Order(
             "rank",
