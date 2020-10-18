@@ -54,8 +54,8 @@ def make_category_quantiles_plots(infile):
     user_totals["avg_daily_bytes"] = user_totals["bytes_total"] / user_totals["days_online"]
     user_totals["rank_total"] = user_totals["bytes_total"].rank(method="min", pct=True)
 
-    user_totals["rank_daily"] = user_totals["avg_daily_bytes"].rank(method="min", pct=True)
-    user_totals["quantile"] = pd.cut(user_totals["rank_daily"], 10)
+    user_totals["rank_daily"] = user_totals["avg_daily_bytes"].rank(method="min")
+    user_totals["quantile"] = pd.cut(user_totals["rank_daily"], 10, precision=0, right=False, include_lowest=True)
 
     # Merge the user quantile information back into the flows, and then group by category
     quantile_flows = user_category_total.merge(user_totals[["user", "quantile", "days_online"]], on="user", how="inner")
@@ -71,7 +71,7 @@ def make_category_quantiles_plots(infile):
     # want to merge on the fraction of traffic to each part from each user?
     # Are users counted equally or are bytes counted equally...
     alt.Chart(quantile_totals[["category", "quantile_str", "bytes_total", "rank", "normalized_bytes_total"]]).mark_bar().encode(
-        x="quantile_str:N",
+        x="quantile_str:O",
         y=alt.Y(
             "normalized_bytes_total",
             stack="normalize",
@@ -93,16 +93,23 @@ def make_category_quantiles_plots(infile):
         scale_factor=2,
     )
 
-    # This might not be showing exactly what I want to show, since in merging
-    # users some users that dominate video could be overrepresented. Maybe
-    # want to merge on the fraction of traffic to each part from each user?
-    # Are users counted equally or are bytes counted equally...
-    alt.Chart(quantile_totals[["category", "quantile_str", "bytes_total", "rank", "normalized_bytes_total"]]).mark_line().encode(
-        x="quantile_str:N",
+    quantile_totals["normalize_mb_total"] = quantile_totals["normalized_bytes_total"] / 1000.0**2
+
+    # Generate an order based on the intervals, not the strings, to correctly sort the axis.
+    quantiles = quantile_totals[["quantile", "quantile_str"]].groupby(["quantile"]).first()
+    quantiles = quantiles["quantile_str"].to_list()
+    alt.Chart(
+        quantile_totals[["category", "quantile_str", "bytes_total", "rank", "normalize_mb_total"]]
+    ).mark_line().encode(
+        x=alt.X(
+            "quantile_str:N",
+            title="User by Rank of Average Use Per Online Day (Grouped)",
+            sort=quantiles,
+        ),
         y=alt.Y(
-            "normalized_bytes_total",
+            "normalize_mb_total",
             sort=cat_sort_list,
-            title="average bytes per online day"
+            title="Average Traffic Per Online Day (MB)"
         ),
         color=alt.Color(
             "category:N",
@@ -114,12 +121,16 @@ def make_category_quantiles_plots(infile):
                 labelLimit=500,
                 padding=5,
                 strokeColor="black",
+                columns=2,
             ),
         ),
         order=alt.Order(
             "rank",
             sort="descending",
         ),
+    ).configure_axisX(
+        labelAngle=0,
+        labelFontSize=7,
     ).properties(
         width=500,
     ).save(
@@ -131,6 +142,11 @@ def make_category_quantiles_plots(infile):
 if __name__ == "__main__":
     platform = bok.platform.read_config()
     graph_temporary_file = "scratch/graphs/bytes_per_org_category_per_quantile"
+
+    # Module specific format options
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.width', None)
+    pd.set_option('display.max_rows', 40)
 
     if platform.large_compute_support:
         print("Running compute tasks")
