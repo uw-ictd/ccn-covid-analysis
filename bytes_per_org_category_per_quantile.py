@@ -57,9 +57,20 @@ def make_category_quantiles_plots(infile):
     user_totals["rank_daily"] = user_totals["avg_daily_bytes"].rank(method="min")
     user_totals["quantile"] = pd.cut(user_totals["rank_daily"], 10, precision=0, right=False, include_lowest=True)
 
+    # Compute the share of each user's traffic in each category
+    user_shares = user_totals.rename(columns={"bytes_total": "user_bytes_total"})
+    user_shares = user_category_total.merge(user_shares[["user", "user_bytes_total"]], on="user", how="inner")
+    user_shares["category_share"] = user_shares["bytes_total"] / user_shares["user_bytes_total"]
+    user_shares = user_shares[["user", "category",  "category_share"]]
+
     # Merge the user quantile information back into the flows, and then group by category
     quantile_flows = user_category_total.merge(user_totals[["user", "quantile", "days_online"]], on="user", how="inner")
     quantile_flows["normalized_bytes_total"] = quantile_flows["bytes_total"] / quantile_flows["days_online"]
+
+    # Merge category share information into the plot frame
+    quantile_flows = quantile_flows.merge(user_shares, on=["user", "category"], how="inner")
+
+    # Compute means for quantiles and quantile labels
     quantile_totals = quantile_flows.groupby(["quantile", "category"]).mean()
     quantile_totals = quantile_totals.reset_index()
     quantile_totals["quantile_str"] = quantile_totals["quantile"].apply(lambda x: str(x))
@@ -136,6 +147,49 @@ def make_category_quantiles_plots(infile):
         width=500,
     ).save(
         "renders/bytes_per_average_online_day_per_quantile_line.png",
+        scale_factor=2,
+    )
+
+    alt.Chart(
+        quantile_totals[["category", "quantile_str", "category_share", "rank"]]
+    ).mark_line().encode(
+        x=alt.X(
+            "quantile_str:N",
+            title="User by Rank of Average Use Per Online Day (Grouped)",
+            sort=quantiles,
+        ),
+        y=alt.Y(
+            "category_share",
+            sort=cat_sort_list,
+            title="Average Fraction of Traffic Per User"
+        ),
+        color=alt.Color(
+            "category:N",
+            scale=alt.Scale(scheme="tableau20"),
+            sort=cat_sort_list,
+            legend=alt.Legend(
+                orient="none",
+                fillColor="white",
+                labelLimit=500,
+                padding=5,
+                strokeColor="black",
+                columns=3,
+                labelFontSize=8,
+                legendX=15,
+                legendY=5,
+            ),
+        ),
+        order=alt.Order(
+            "rank",
+            sort="descending",
+        ),
+    ).configure_axisX(
+        labelAngle=0,
+        labelFontSize=7,
+    ).properties(
+        width=500,
+    ).save(
+        "renders/bytes_per_average_online_day_share_per_quantile_line.png",
         scale_factor=2,
     )
 
