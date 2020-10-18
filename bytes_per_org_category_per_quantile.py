@@ -59,11 +59,12 @@ def make_category_quantiles_plots(infile):
 
     # Merge the user quantile information back into the flows, and then group by category
     quantile_flows = user_category_total.merge(user_totals[["user", "quantile", "days_online"]], on="user", how="inner")
-    quantile_totals = quantile_flows.groupby(["quantile", "category"]).sum()
+    quantile_flows["normalized_bytes_total"] = quantile_flows["bytes_total"] / quantile_flows["days_online"]
+    quantile_totals = quantile_flows.groupby(["quantile", "category"]).mean()
     quantile_totals = quantile_totals.reset_index()
     quantile_totals["quantile_str"] = quantile_totals["quantile"].apply(lambda x: str(x))
-    # Weights users who were online a lot of days more heavily than directly averaging the totals
-    quantile_totals["normalized_bytes_total"] = quantile_totals["bytes_total"] / quantile_totals["days_online"]
+
+    # Add sort information back to rendered dataframe
     quantile_totals = quantile_totals.merge(cat_sort_order[["category", "rank"]], on="category", how="inner")
 
     # This might not be showing exactly what I want to show, since in merging
