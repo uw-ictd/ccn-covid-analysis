@@ -101,7 +101,7 @@ def make_category_quantiles_plots(infile):
     ).properties(
         width=500,
     ).save(
-        "renders/bytes_per_average_online_day_per_quantile_bar.png",
+        "renders/bytes_per_category_per_quantile_bar.png",
         scale_factor=2,
     )
 
@@ -146,7 +146,7 @@ def make_category_quantiles_plots(infile):
     ).properties(
         width=500,
     ).save(
-        "renders/bytes_per_average_online_day_per_quantile_line.png",
+        "renders/bytes_per_category_per_quantile_line.png",
         scale_factor=2,
     )
 
@@ -189,14 +189,14 @@ def make_category_quantiles_plots(infile):
     ).properties(
         width=500,
     ).save(
-        "renders/bytes_per_average_online_day_share_per_quantile_line.png",
+        "renders/bytes_per_category_share_per_quantile_line.png",
         scale_factor=2,
     )
 
 
 if __name__ == "__main__":
     platform = bok.platform.read_config()
-    graph_temporary_file = "scratch/graphs/bytes_per_org_category_per_quantile"
+    graph_temporary_file = "scratch/graphs/bytes_per_category_per_quantile"
 
     # Module specific format options
     pd.set_option('display.max_columns', None)
