@@ -5,7 +5,7 @@ import bok.constants
 import bok.dask_infra
 import bok.pd_infra
 
-transactions = bok.dask_infra.read_parquet("data/clean/transactions_TM").compute()
+transactions = bok.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
 
 # Find the first day the user was active. Define "active" as making first
 # purchase or first data in network.
