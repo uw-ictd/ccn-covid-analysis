@@ -10,14 +10,8 @@ import bok.dask_infra
 import bok.pd_infra
 
 
-# Module specific format options
-pd.set_option('display.max_columns', None)
-pd.set_option('display.width', None)
-pd.set_option('display.max_rows', None)
-
-
 def make_rate_chart():
-    transactions = bok.dask_infra.read_parquet("data/clean/transactions_TM").compute()
+    transactions = bok.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
 
     # Each user's total amount of data purchased directly.
     purchases = transactions.loc[transactions["kind"] == "purchase"]
@@ -123,4 +117,8 @@ def make_rate_chart():
 
 
 if __name__ == "__main__":
+    # Module specific format options
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.width', None)
+    pd.set_option('display.max_rows', None)
     make_rate_chart()
