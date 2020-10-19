@@ -7,9 +7,9 @@ import bok.dask_infra
 import bok.pd_infra
 
 
-def reduce_to_pandas(outfile, dask_client):
-    transactions = bok.dask_infra.read_parquet(
-        "data/clean/transactions_TM").compute()
+def generate_consolidated_purchases(outfile):
+    transactions = bok.pd_infra.read_parquet(
+        "data/clean/transactions_TM.parquet")
 
     # Consolidate together closely spaced small purchases by iterating
     # through each user's history.
@@ -128,9 +128,7 @@ def compute_cdf(frame, value_column, base_column):
 
 
 if __name__ == "__main__":
-    # client = bok.dask_infra.setup_dask_client()
     pd.set_option('display.max_columns', None)
-    client = None
     graph_temporary_file = "scratch/graphs/purchase_timing_per_user"
-    reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
-    chart = make_plot(graph_temporary_file)
+    generate_consolidated_purchases(outfile=graph_temporary_file)
+    make_plot(graph_temporary_file)
