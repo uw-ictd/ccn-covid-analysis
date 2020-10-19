@@ -131,7 +131,7 @@ def make_plot(inpath):
         ),
     )
 
-    regression = alt.Chart(regression_frame).mark_line(color="black", opacity=1).encode(
+    regression = alt.Chart(logt_frame).mark_line(color="black", opacity=1).encode(
         x=alt.X(
             "regressionX",
             # scale=alt.Scale(
