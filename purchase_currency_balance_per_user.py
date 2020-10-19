@@ -158,13 +158,22 @@ def make_time_at_zero_plots(user_balance_frame):
     user_corrected_status = user_balance_frame.loc[:, ["corrected", "user"]].drop_duplicates()
     user_timeshare = user_timeshare.merge(user_corrected_status, on="user", how="inner")
 
-
-    print(len(user_timeshare))
-
     # Simplify and trim data now for CDF plotting!
     df = user_timeshare.loc[:, ["user", "days_at_zero", "days_active", "corrected", "days_since_first_active"]]
     df["fraction_at_zero"] = df["days_at_zero"] / df["days_active"]
     df["fraction_nonzero"] = 1.0 - df["fraction_at_zero"]
+
+    user_count = len(user_timeshare)
+    nonzero_95_count = len(df[df["fraction_nonzero"] > 0.95])
+    active_longer_than_30_days_count = len(df[df["days_active"] > 30])
+    nonzero_95_and_active_longer_than_30_days_count = len(df[(df["fraction_nonzero"] > 0.95) & (df["days_active"] > 30)])
+    print("Nonzero balance 95% count", nonzero_95_count, "({})".format(nonzero_95_count/user_count))
+    print(
+        "Nonzero balance 95% count gt 1 mo",
+        nonzero_95_and_active_longer_than_30_days_count,
+        "({})".format(nonzero_95_and_active_longer_than_30_days_count/active_longer_than_30_days_count),
+        "({})".format(nonzero_95_and_active_longer_than_30_days_count/user_count),
+    )
 
     alt.Chart(df).mark_point().encode(
         x=alt.X(
