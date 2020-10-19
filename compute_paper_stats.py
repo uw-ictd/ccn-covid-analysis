@@ -280,6 +280,39 @@ def _inequality(client):
     print("max/median", users["spend_rate"].max()/users["spend_rate"].median())
 
 
+def _filter_stats(client):
+    print("---Filter Stats---")
+    activity = bok.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")
+    total = len(activity)
+    print("Original users:", total)
+
+    # Drop users that have been active less than a week.
+    activity = activity.loc[
+        activity["days_since_first_active"] >= 7,
+    ]
+
+    active_longer_than_week = len(activity)
+    print("Joined less than week:", total - active_longer_than_week)
+
+    # Drop users active for less than one week
+    activity = activity.loc[
+        activity["days_active"] >= 1,
+    ]
+
+    final_count = len(activity)
+    print("Total active less than one day", active_longer_than_week - final_count)
+
+    print("Final count", final_count, "/", total, "({})%".format(final_count/total))
+
+    typical = bok.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+    p2p = bok.dask_infra.read_parquet("data/clean/flows/p2p_TM_DIV_none_INDEX_start")
+
+    typical = typical.merge(activity, on=["user"], how="inner")
+    typical_flow_count = len(typical)
+    p2p_flow_count = len(p2p)
+    print("Typical", typical_flow_count, "p2p:", p2p_flow_count, "total_flow_count:", typical_flow_count+p2p_flow_count)
+
+
 if __name__ == "__main__":
     platform = bok.platform.read_config()
 
@@ -296,9 +329,10 @@ if __name__ == "__main__":
         # _compute_category_percentages(client)
         # _internet_uplink_downlink_ratio(client)
         # _total_bigco_traffic(client)
-        _median_offline(client)
+        # _median_offline(client)
         # _total_video_traffic(client)
-        _inequality(client)
+        # _inequality(client)
+        _filter_stats(client)
 
         client.close()
 
