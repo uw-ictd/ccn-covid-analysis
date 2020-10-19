@@ -147,14 +147,23 @@ def make_amount_plot(infile):
             title="Session Purchase Amount (MB) (Log Scale)",
             scale=alt.Scale(
                 type="log",
+                domain=(10, 2000)
             ),
         ),
         y=alt.Y(
             "count",
-            title="Occurrences (Count)",
+            title="Occurrences (Count) (Log Scale)",
             scale=alt.Scale(
-                type="linear",
+                type="log",
             ),
+        ),
+        color=alt.condition(
+            'datum.count>1000',
+            alt.ColorValue('red'), alt.ColorValue('steelblue'),
+        ),
+        shape=alt.condition(
+            'datum.count>1000',
+            alt.ShapeValue('diamond'), alt.ShapeValue('triangle'),
         ),
     ).properties(
         width=500,
