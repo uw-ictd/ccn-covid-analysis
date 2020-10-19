@@ -2,12 +2,9 @@
 """
 
 import altair
-import datetime
-import numpy as np
 import pandas as pd
 
 import bok.constants
-import bok.dask_infra
 import bok.platform
 import bok.pd_infra
 
@@ -32,15 +29,11 @@ def make_expenses():
     return expenses
 
 
-def reduce_to_pandas(outfile, dask_client):
-    transactions = bok.dask_infra.read_parquet("data/clean/transactions_TM").compute()
+def make_plot():
+    transactions = bok.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
     purchases = transactions.loc[(transactions["kind"] == "purchase") | (transactions["kind"] == "admin_topup")]
     purchases = purchases[["timestamp", "amount_idr", "kind", "user"]]
-    bok.pd_infra.clean_write_parquet(purchases, outfile)
 
-
-def make_plot(infile):
-    purchases = bok.pd_infra.read_parquet(infile)
     purchases["amount_usd"] = purchases["amount_idr"] * bok.constants.IDR_TO_USD
     purchases = purchases.loc[purchases["kind"] == "purchase"]
 
@@ -130,7 +123,6 @@ def make_plot(infile):
 
 if __name__ == "__main__":
     platform = bok.platform.read_config()
-    # pd.set_option('display.max_columns', None)
 
     # Module specific format options
     pd.set_option('display.max_columns', None)
@@ -138,16 +130,12 @@ if __name__ == "__main__":
     pd.set_option('display.width', None)
     pd.set_option('display.max_rows', 40)
 
-    graph_temporary_file = "scratch/graphs/revenue_vs_time"
     if platform.large_compute_support:
         print("Running compute tasks")
-        print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
-        client = bok.dask_infra.setup_platform_tuned_dask_client(8, platform)
-        reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
-        client.close()
+        pass
 
     if platform.altair_support:
         print("Running vis tasks")
-        make_plot(graph_temporary_file)
+        make_plot()
 
     print("Done!")
