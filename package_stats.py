@@ -8,13 +8,8 @@ import bok.pd_infra
 import bok.platform
 
 
-def reduce_to_pandas(outfile, dask_client):
-    transactions = bok.dask_infra.read_parquet("data/clean/transactions_TM").compute()
-    bok.pd_infra.clean_write_parquet(transactions, outfile)
-
-
-def make_plot(infile):
-    transactions = bok.pd_infra.read_parquet(infile)
+def make_plot():
+    transactions = bok.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
 
     purchases = transactions.loc[transactions["kind"] == "purchase"]
     purchases = purchases.groupby("amount_bytes")["timestamp"].count()
@@ -84,16 +79,8 @@ def make_plot(infile):
 if __name__ == "__main__":
     platform = bok.platform.read_config()
 
-    graph_temporary_file = "scratch/graphs/package_stats"
-    if platform.large_compute_support:
-        # Compute is small enough to not require a filter
-        print("Running compute tasks")
-        client = bok.dask_infra.setup_platform_tuned_dask_client(8, platform)
-        reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
-        client.close()
-
     if platform.altair_support:
         print("Running vis tasks")
-        make_plot(graph_temporary_file)
+        make_plot()
 
     print("Done!")
