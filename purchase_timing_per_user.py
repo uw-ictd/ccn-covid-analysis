@@ -115,7 +115,34 @@ def make_plot(infile):
                 ),
         color="type",
         strokeDash="type",
+    ).properties(
+        width=500,
     ).save("renders/purchase_timing_per_user_cdf.png", scale_factor=2.0)
+
+def make_amount_plot(infile):
+    purchases = bok.pd_infra.read_parquet(infile)
+    purchases = purchases.assign(count=1)
+    purchases = purchases[["amount_bytes", "count"]].groupby(["amount_bytes"]).sum().reset_index()
+
+    alt.Chart(purchases).mark_point().encode(
+        x=alt.X(
+            "amount_bytes",
+            scale=alt.Scale(
+                type="log",
+            ),
+        ),
+        y=alt.Y(
+            "count",
+            scale=alt.Scale(
+                type="linear",
+            ),
+        ),
+    ).properties(
+        width=500,
+    ).save("renders/purchase_timing_per_user_clumped_amounts.png", scale_factor=2.0)
+
+
+    print(purchases)
 
 
 def compute_cdf(frame, value_column, base_column):
@@ -132,3 +159,4 @@ if __name__ == "__main__":
     graph_temporary_file = "scratch/graphs/purchase_timing_per_user"
     generate_consolidated_purchases(outfile=graph_temporary_file)
     make_plot(graph_temporary_file)
+    make_amount_plot(graph_temporary_file)
