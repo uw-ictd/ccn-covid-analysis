@@ -49,7 +49,7 @@ def reduce_flows_to_pandas(in_path, out_path):
 def compute_purchase_range_frame():
     """Generates a frame with the range a user has made purchases in the net
     """
-    transactions = bok.dask_infra.read_parquet("data/clean/transactions_TM").compute()
+    transactions = bok.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
 
     # Each user's total amount of data purchased directly.
     purchases = transactions.loc[transactions["kind"] == "purchase"]
