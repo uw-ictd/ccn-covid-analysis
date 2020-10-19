@@ -113,7 +113,7 @@ def make_plot(infile):
 
     # Generate a dense dataframe with all days and directions
     date_range = pd.DataFrame({"day_bin": pd.date_range(bok.constants.MIN_DATE, bok.constants.MAX_DATE, freq="1D")})
-    category_range = pd.DataFrame({"throughput_type": ["Up", "Down", "Local"]}, dtype="category")
+    category_range = pd.DataFrame({"throughput_type": ["Up", "Down", "Local"]}, dtype=object)
     dense_index = bok.pd_infra.cartesian_product(date_range, category_range)
 
     throughput = dense_index.merge(
@@ -131,6 +131,24 @@ def make_plot(infile):
         window="7D",
     ).mean().reset_index()
 
+    # Work around vega-lite legend merging bug
+    label_order = {
+        "Down": 1,
+        "Up": 2,
+        "Local": 3,
+    }
+    # Mergesort is stablely implemented : )
+    throughput = throughput.sort_values(
+        ["throughput_type"],
+        key=lambda col: col.map(lambda x: label_order[x]),
+        kind="mergesort",
+    )
+    throughput_windowed = throughput_windowed.sort_values(
+        ["throughput_type"],
+        key=lambda col: col.map(lambda x: label_order[x]),
+        kind="mergesort",
+    )
+
     points = altair.Chart(throughput).mark_point(opacity=0.5).encode(
         x=altair.X("day_bin:T",
                    title="Time",
@@ -144,13 +162,19 @@ def make_plot(infile):
                    ),
         color=altair.Color(
             "throughput_type",
-            sort=["Down", "Up", "Local"],
+            sort=None,
         ),
         shape=altair.Shape(
             "throughput_type",
-            sort=["Down", "Up", "Local"],
+            sort=None,
             legend=altair.Legend(
-                title="Daily Total GB",
+                title="",
+                orient="top-left",
+                fillColor="white",
+                labelLimit=500,
+                padding=5,
+                strokeColor="black",
+                columns=3,
             ),
         )
     )
@@ -168,15 +192,15 @@ def make_plot(infile):
                    ),
         color=altair.Color(
             "throughput_type",
-            sort=["Down", "Up", "Local"],
-            legend=altair.Legend(
-                title="7-Day Moving Average",
-                symbolType="stroke",
-                ),
-            ),
+            sort=None,
+            legend=None,
+        ),
     )
 
-    (points + lines).properties(
+    (points + lines).resolve_scale(
+        color='independent',
+        shape='independent'
+    ).properties(
         width=500
     ).save(
         "renders/bytes_per_week.png", scale_factor=2
