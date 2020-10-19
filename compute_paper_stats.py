@@ -130,6 +130,14 @@ def _compute_dates():
     print("Length:", bok.constants.MAX_DATE - bok.constants.MIN_DATE)
 
 
+def _internet_uplink_downlink_ratio(client):
+    print("---DL UL ratio---")
+    typical = bok.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+    internet_flows = typical.loc[typical["local"] == False]
+    dl_ul_ratio = internet_flows["bytes_down"].sum() / internet_flows["bytes_up"].sum()
+    print("DL/UL ratio:", dl_ul_ratio.compute(), ":1")
+
+
 if __name__ == "__main__":
     platform = bok.platform.read_config()
 
@@ -143,7 +151,8 @@ if __name__ == "__main__":
         client = bok.dask_infra.setup_platform_tuned_dask_client(10, platform)
         # _compute_counts(client)
         # _compute_dns_percentages(client)
-        _compute_category_percentages(client)
+        # _compute_category_percentages(client)
+        _internet_uplink_downlink_ratio(client)
 
         client.close()
 
