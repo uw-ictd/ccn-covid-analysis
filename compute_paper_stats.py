@@ -19,30 +19,54 @@ def _explore_unknowns(in_path):
 
 
 def _compute_counts(dask_client):
-    typical = bok.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["bytes_up", "bytes_down"]]
+    typical = bok.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["bytes_up", "bytes_down", "local"]]
     p_to_p = bok.dask_infra.read_parquet("data/clean/flows/p2p_TM_DIV_none_INDEX_start")[["bytes_b_to_a", "bytes_a_to_b"]]
 
     typical_flow_count = typical.shape[0]
     p2p_flow_count = p_to_p.shape[0]
 
-    typical_downlink_bytes = typical["bytes_down"].sum()
-    typical_uplink_bytes = typical["bytes_up"].sum()
+    internet_flows = typical.loc[typical["local"] == False]
+
+    internet_flow_count = internet_flows.shape[0]
+    intranet_flow_count = typical_flow_count - internet_flow_count + p2p_flow_count
+
+    internet_downlink_bytes = internet_flows["bytes_down"].sum()
+    internet_uplink_bytes = internet_flows["bytes_up"].sum()
     p2p_bytes = (p_to_p["bytes_b_to_a"] + p_to_p["bytes_a_to_b"]).sum()
 
-    (typical_flow_count, p2p_flow_count, typical_downlink_bytes, typical_uplink_bytes, p2p_bytes) = client.compute(
-        [typical_flow_count, p2p_flow_count, typical_downlink_bytes, typical_uplink_bytes, p2p_bytes], sync=True)
+    local_bytes = (typical["bytes_down"] + typical["bytes_up"]).sum() - internet_downlink_bytes - internet_uplink_bytes
+    intranet_bytes = local_bytes + p2p_bytes
 
-    print("Typical Flow Count:", typical_flow_count)
-    print("P2P Flow Count:", p2p_flow_count)
-    print("Total Flow Count:", p2p_flow_count + typical_flow_count)
+    (internet_flow_count, intranet_flow_count, internet_downlink_bytes, internet_uplink_bytes, p2p_bytes, intranet_bytes) = dask_client.compute(
+        [internet_flow_count, intranet_flow_count, internet_downlink_bytes, internet_uplink_bytes, p2p_bytes, intranet_bytes],
+        sync=True)
 
-    print("Total typical DL Gbytes:", typical_downlink_bytes/1000**3)
-    print("Total typical UL Gbytes:", typical_uplink_bytes/1000**3)
-    print("Total p2p Gbytes:", p2p_bytes/1000**3)
-    print("Total GBytes:", (typical_downlink_bytes + typical_uplink_bytes + p2p_bytes)/1000**3)
+    print("Internet Flow Count:", internet_flow_count)
+    print("intranet Flow Count:", intranet_flow_count)
+    print("Total Flow Count:", internet_flow_count + intranet_flow_count)
+
+    print("Total internet DL Gbytes:", internet_downlink_bytes/1000**3)
+    print("Total internet UL Gbytes:", internet_uplink_bytes/1000**3)
+    print("Total internet Gbytes:", (internet_uplink_bytes + internet_downlink_bytes)/1000**3)
+    print("Total intranet Gbytes:", intranet_bytes/1000**3)
+    print("Total GBytes:", (internet_uplink_bytes + internet_downlink_bytes + intranet_bytes)/1000**3)
 
     transactions = bok.dask_infra.read_parquet("data/clean/transactions_TM")
+    print("Purchase transactions:", len(transactions.loc[transactions["kind"] == "purchase"]))
     print("Total transactions:", len(transactions))
+
+
+def _compute_dns_percentages(dask_client):
+    typical = bok.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+
+    print(typical)
+
+
+def _compute_dates():
+    print("Included Dates")
+    print("Start:", bok.constants.MIN_DATE)
+    print("End:", bok.constants.MAX_DATE)
+    print("Length:", bok.constants.MAX_DATE - bok.constants.MIN_DATE)
 
 
 if __name__ == "__main__":
@@ -57,7 +81,10 @@ if __name__ == "__main__":
         print("Running compute tasks")
         client = bok.dask_infra.setup_platform_tuned_dask_client(10, platform)
         _compute_counts(client)
+        _compute_dns_percentages(client)
 
         client.close()
+
+    _compute_dates()
 
     print("Done!")
