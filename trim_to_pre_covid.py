@@ -93,7 +93,7 @@ def trim_flows_flat_indexed(in_path, out_path):
 def trim_transactions_flat_noindex(in_path, out_path):
     df = bok.dask_infra.read_parquet(in_path)
     df = df.loc[(df["timestamp"] >= bok.constants.MIN_DATE) & (df["timestamp"] < bok.constants.MAX_DATE)]
-    bok.dask_infra.clean_write_parquet(df, out_path)
+    bok.pd_infra.clean_write_parquet(df.compute(), out_path)
 
 
 def trim_log_gaps_flat_noindex(in_path, out_path):
@@ -143,7 +143,7 @@ if __name__ == "__main__":
 
         trim_transactions_flat_noindex(
             "data/internal/transactions_TM",
-            "data/clean/transactions_TM",
+            "data/clean/transactions_TM.parquet",
         )
 
         trim_log_gaps_flat_noindex(
