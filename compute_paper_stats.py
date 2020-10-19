@@ -189,6 +189,26 @@ def _median_offline(dask_client):
     print("Fraction of users consistently on:", number_users_consistently_on / examined_users)
 
 
+def _total_video_traffic(dask_client):
+    print("---video total bytes ---")
+    typical = bok.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+    typical["bytes_total"] = typical["bytes_up"] + typical["bytes_down"]
+
+    adult_flows = typical.loc[(typical["category"] == "Adult Video")]
+    adult_gbytes = adult_flows["bytes_total"].sum() / 1000**3
+
+    video_flows = typical.loc[(typical["category"] == "Video")]
+    video_gbytes = video_flows["bytes_total"].sum() / 1000**3
+
+    (adult_gbytes, video_gbytes) = dask_client.compute(
+        [adult_gbytes, video_gbytes],
+        sync=True
+    )
+
+    print("Adult video gbytes", adult_gbytes, adult_gbytes/TOTAL_GBYTES, adult_gbytes/TOTAL_INTERNET_GBYTES)
+    print("General Video Gbytes", video_gbytes, video_gbytes/TOTAL_GBYTES, video_gbytes/TOTAL_INTERNET_GBYTES)
+    print("Video (all types) total", (video_gbytes + adult_gbytes)/TOTAL_GBYTES, (video_gbytes+  adult_gbytes)/TOTAL_INTERNET_GBYTES)
+
 if __name__ == "__main__":
     platform = bok.platform.read_config()
 
@@ -205,7 +225,8 @@ if __name__ == "__main__":
         # _compute_category_percentages(client)
         # _internet_uplink_downlink_ratio(client)
         # _total_bigco_traffic(client)
-        _median_offline(client)
+        # _median_offline(client)
+        _total_video_traffic(client)
 
         client.close()
 
