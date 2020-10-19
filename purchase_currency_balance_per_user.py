@@ -72,7 +72,6 @@ def compute_user_currency_histories():
     print("==================================================")
 
     early_registered_users = pd.DataFrame({"user": negative_balances["user"].unique()})
-    print(early_registered_users)
     bok.pd_infra.clean_write_parquet(early_registered_users, "data/clean/early_registered_users.parquet")
 
     negative_offsets = negative_balances.groupby("user").min().rename(columns={"balance": "offset"})
@@ -94,7 +93,6 @@ def compute_user_currency_histories():
     # looks like they were accidentally transferred money from the reseller
     # that was then pulled back with an admin transfer. This messes up their
     # active time calculation.
-    print(running_user_balance.head())
     running_user_balance = running_user_balance.loc[
         ~((running_user_balance["user"] == "5941e43f1e119acbd273d7dc6e82356e081920a10466afb6a56d8a0856457d5b") &
           (running_user_balance.index > "2020-04-24"))]
@@ -144,7 +142,6 @@ def make_time_at_zero_plots(user_balance_frame):
     user_time_nonzero = user_time_nonzero.loc[:, ["user", "duration_nonzero", "corrected"]]
     user_timeshare = user_time_nonzero.merge(user_time_at_zero, on="user", how="outer")
 
-    print(user_timeshare.head())
 
     # Some users never go to zero. Assign them 0 duration in the zero state.
     user_timeshare["duration_at_zero"] = user_timeshare["duration_at_zero"].fillna(pd.Timedelta(seconds=0))
@@ -156,11 +153,11 @@ def make_time_at_zero_plots(user_balance_frame):
     # Merge in active times
     user_timeshare = user_timeshare.merge(user_active_ranges, on="user", how="inner")
 
+    print("Nonzero balance count", len(user_timeshare[user_timeshare["duration_at_zero"] == pd.Timedelta(seconds=0)]))
     # Recover the corrected annotation
     user_corrected_status = user_balance_frame.loc[:, ["corrected", "user"]].drop_duplicates()
     user_timeshare = user_timeshare.merge(user_corrected_status, on="user", how="inner")
 
-    print(user_timeshare.head())
 
     print(len(user_timeshare))
 
