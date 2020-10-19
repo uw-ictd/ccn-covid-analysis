@@ -139,7 +139,7 @@ if __name__ == "__main__":
     graph_temporary_file = "scratch/graphs/users_per_time_of_day"
 
     if platform.large_compute_support:
-        client = bok.dask_infra.setup_dask_client()
+        client = bok.dask_infra.setup_platform_tuned_dask_client(10, platform)
         reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
         client.close()
 
