@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 
 import bok.constants
@@ -162,6 +163,32 @@ def _total_bigco_traffic(dask_client):
     print("Bigco total", (google_gbytes + facebook_gbytes)/TOTAL_GBYTES, (google_gbytes+  facebook_gbytes)/TOTAL_INTERNET_GBYTES)
 
 
+def _median_offline(dask_client):
+    print("---Online Ratio---")
+    activity = bok.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")
+
+    # Drop users that have been active less than a week.
+    activity = activity.loc[
+        activity["days_since_first_active"] >= 7,
+    ]
+
+    # Drop users active for less than one week
+    activity = activity.loc[
+        activity["days_active"] >= 1,
+    ]
+
+    activity["online_ratio"] = (
+        np.minimum(activity["days_online"], activity["days_active"]) /
+        (activity["days_active"] - activity["outage_impact_days"])
+    )
+
+    number_users_consistently_on = len(activity.loc[activity["online_ratio"] == 1.0])
+    examined_users = len(activity)
+    print("Median user online ratio:", activity["online_ratio"].median())
+    print("Number of users consistently on:", number_users_consistently_on)
+    print("Fraction of users consistently on:", number_users_consistently_on / examined_users)
+
+
 if __name__ == "__main__":
     platform = bok.platform.read_config()
 
@@ -170,14 +197,15 @@ if __name__ == "__main__":
     pd.set_option('display.width', None)
     pd.set_option('display.max_rows', None)
 
-    if platform.large_compute_support:
+    if platform.large_compute_support or True:
         print("Running compute tasks")
         client = bok.dask_infra.setup_platform_tuned_dask_client(10, platform)
         # _compute_counts(client)
         # _compute_dns_percentages(client)
         # _compute_category_percentages(client)
         # _internet_uplink_downlink_ratio(client)
-        _total_bigco_traffic(client)
+        # _total_bigco_traffic(client)
+        _median_offline(client)
 
         client.close()
 
