@@ -35,7 +35,7 @@ def generate_consolidated_purchases(outfile):
                 last_purchase_time = row.timestamp
                 continue
 
-            if (row.timestamp - last_purchase_time < datetime.timedelta(seconds=30)):
+            if (row.timestamp - last_purchase_time < datetime.timedelta(seconds=60)):
                 in_progress_purchase["amount_bytes"] += row.amount_bytes
                 in_progress_purchase["amount_idr"] += row.amount_idr
             else:
@@ -104,17 +104,32 @@ def make_plot(infile):
     stats_frame["value"] = stats_frame["value"] / 86400
     print(stats_frame)
 
-    alt.Chart(stats_frame).mark_line(interpolate='step-after', clip=True).encode(
+    alt.Chart(stats_frame).mark_line(clip=True).encode(
         x=alt.X('value:Q',
-                scale=alt.Scale(type="linear", domain=(0.01, 80)),
-                title="Time Between Purchases (Hours)"
+                scale=alt.Scale(type="log", domain=(0.1, 80)),
+                title="Time Between Purchases (Hours) (Log Scale)"
                 ),
         y=alt.Y('cdf',
                 title="Fraction of Users (CDF)",
                 scale=alt.Scale(type="linear", domain=(0, 1.0)),
                 ),
-        color="type",
-        strokeDash="type",
+        color=alt.Color(
+            "type",
+            sort=None,
+            legend=alt.Legend(
+                title="",
+                orient="bottom-right",
+                fillColor="white",
+                labelLimit=500,
+                padding=5,
+                strokeColor="black",
+                columns=1,
+            ),
+        ),
+        strokeDash=alt.StrokeDash(
+            "type",
+            sort=None,
+        )
     ).properties(
         width=500,
     ).save("renders/purchase_timing_per_user_cdf.png", scale_factor=2.0)
@@ -123,16 +138,19 @@ def make_amount_plot(infile):
     purchases = bok.pd_infra.read_parquet(infile)
     purchases = purchases.assign(count=1)
     purchases = purchases[["amount_bytes", "count"]].groupby(["amount_bytes"]).sum().reset_index()
+    purchases["amount_mb"] = purchases["amount_bytes"] / 1000**2
 
     alt.Chart(purchases).mark_point().encode(
         x=alt.X(
-            "amount_bytes",
+            "amount_mb",
+            title="Session Purchase Amount (MB) (Log Scale)",
             scale=alt.Scale(
                 type="log",
             ),
         ),
         y=alt.Y(
             "count",
+            title="Occurrences (Count)",
             scale=alt.Scale(
                 type="linear",
             ),
