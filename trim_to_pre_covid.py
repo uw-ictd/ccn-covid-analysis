@@ -96,6 +96,12 @@ def trim_transactions_flat_noindex(in_path, out_path):
     bok.dask_infra.clean_write_parquet(df, out_path)
 
 
+def trim_log_gaps_flat_noindex(in_path, out_path):
+    df = bok.pd_infra.read_parquet(in_path)
+    df = df.loc[(df["start"] >= bok.constants.MIN_DATE) & (df["start"] < bok.constants.MAX_DATE)]
+    bok.pd_infra.clean_write_parquet(df, out_path)
+
+
 if __name__ == "__main__":
     platform = bok.platform.read_config()
 
@@ -111,7 +117,7 @@ if __name__ == "__main__":
         print("Running compute tasks")
         client = bok.dask_infra.setup_platform_tuned_dask_client(5, platform)
 
-        # _explore_unknowns("data/internal/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+        _explore_unknowns("data/internal/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
         annotate_category_org_from_ip(
             "data/internal/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start",
             "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start",
@@ -138,6 +144,11 @@ if __name__ == "__main__":
         trim_transactions_flat_noindex(
             "data/internal/transactions_TM",
             "data/clean/transactions_TM",
+        )
+
+        trim_log_gaps_flat_noindex(
+            "data/internal/log_gaps_TM.parquet",
+            "data/clean/log_gaps_TM.parquet",
         )
 
         client.close()
