@@ -80,8 +80,20 @@ def reduce_to_pandas(outfile, dask_client):
 
 
 def make_plot(infile):
+    registered_users = bok.pd_infra.read_parquet("data/clean/early_registered_users.parquet")
+    registered_users = registered_users.assign(start=bok.constants.MIN_DATE)
+
     transactions = pd.read_csv("data/clean/first_time_user_transactions.csv")[["start", "user"]]
-    registered_users = get_registered_users_query(transactions)
+    transactions = transactions.astype({
+        'start': 'datetime64[ns]',
+        "user": "object",
+    })[["start", "user"]].copy()
+    registered_users = registered_users.append(transactions).sort_values("start").groupby("user").first()
+    registered_users = registered_users.reset_index().sort_values("start").reset_index()
+    registered_users = registered_users.assign(temp=1)
+    registered_users["count"] = registered_users["temp"].cumsum()
+    registered_users = registered_users.drop(["temp", "user"], axis="columns").rename(columns={"count": "user"})
+    registered_users["day"] = registered_users["start"].dt.floor("d")
 
     # Generate a dense dataframe with all days
     date_range = pd.DataFrame({"day": pd.date_range(bok.constants.MIN_DATE, bok.constants.MAX_DATE, freq="1D")})
@@ -103,7 +115,12 @@ def make_plot(infile):
     week_range = pd.DataFrame({"day": pd.date_range(bok.constants.MIN_DATE, bok.constants.MAX_DATE, freq="W-MON")})
     weekly_users = weekly_users.merge(week_range, on="day", how="outer")
     weekly_users.fillna(0)
-    print(weekly_users)
+
+    monthly_users = user_days.groupby(pd.Grouper(key="day", freq="M"))["user"].nunique()
+    monthly_users = monthly_users.to_frame().reset_index().rename(columns={"user": "month_unique_users"})
+    month_range = pd.DataFrame({"day": pd.date_range(bok.constants.MIN_DATE, bok.constants.MAX_DATE, freq="M")})
+    monthly_users = monthly_users.merge(month_range, on="day", how="outer")
+    monthly_users = monthly_users.fillna(0)
 
     # Join the active and registered users together
     users = active_users.merge(registered_users,
@@ -112,16 +129,17 @@ def make_plot(infile):
                                right_on="day",
                                suffixes=('_active', '_registered'))
     users = users.merge(weekly_users, how="outer", on="day")
+    users = users.merge(monthly_users, how="outer", on="day")
 
     # For cohorts with no active users, fill zero.
     users["user_active"] = users["user_active"].fillna(value=0)
 
-    users = users.rename(columns={"day": "date", "user_active": "Unique Daily Online", "user_registered": "Registered", "week_unique_users": "Unique Weekly Online"})
+    users = users.rename(columns={"day": "date", "user_active": "Unique Daily Online", "user_registered": "Registered", "week_unique_users": "Unique Weekly Online", "month_unique_users": "Unique Monthly Online"})
     users = users.set_index("date").sort_index()
     users["Registered"] = users["Registered"].fillna(method="ffill")
     users["Unique Weekly Online"] = users["Unique Weekly Online"].fillna(method="bfill")
+    users["Unique Monthly Online"] = users["Unique Monthly Online"].fillna(method="bfill")
     users = users.reset_index()
-    print(users)
 
     # Limit graphs to the study period
     users = users.loc[users["date"] < bok.constants.MAX_DATE]
@@ -132,20 +150,31 @@ def make_plot(infile):
     ).mean()
 
     # Get the data in a form that is easily plottable
-    users = users.melt(id_vars=["date"], value_vars=["Unique Daily Online", "Registered", "Unique Weekly Online"], var_name="user_type", value_name="num_users")
+    users = users.melt(id_vars=["date"], value_vars=["Registered", "Unique Monthly Online", "Unique Weekly Online", "Unique Daily Online"], var_name="user_type", value_name="num_users")
     # Drop the rolling average... it wasn't useful
     # users = users.melt(id_vars=["date"], value_vars=["Active", "Registered", "Active 7-Day Average", "Unique Weekly Active"], var_name="user_type", value_name="num_users")
     # Reset the types of the dataframe
     types = {
         "date": "datetime64",
-        "user_type": "category",
         "num_users": "int64"
     }
     # Required since some rolling average entries are NaN before the average window is filled.
     users = users.dropna()
     users = users.astype(types)
 
-    users = users.set_index("date").sort_values(["date", "num_users"])
+    users = users.sort_values(["date", "num_users"])
+    label_order = {
+        "Registered": 1,
+        "Unique Monthly Online": 2,
+        "Unique Weekly Online": 3,
+        "Unique Daily Online": 4,
+    }
+    # Mergesort is stablely implemented : )
+    users = users.sort_values(
+        ["user_type"],
+        key=lambda col: col.map(lambda x: label_order[x]),
+        kind="mergesort",
+    )
     users = users.reset_index()
 
     altair.Chart(users).mark_line(interpolate='step-after').encode(
@@ -185,7 +214,7 @@ if __name__ == "__main__":
     pd.set_option('display.max_columns', None)
     pd.set_option('display.max_colwidth', None)
     pd.set_option('display.width', None)
-    pd.set_option('display.max_rows', None)
+    pd.set_option('display.max_rows', 40)
 
     graph_temporary_file = "scratch/graphs/users_per_week"
     if platform.large_compute_support:

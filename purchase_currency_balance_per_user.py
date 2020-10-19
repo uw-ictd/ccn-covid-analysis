@@ -71,6 +71,10 @@ def compute_user_currency_histories():
     ))
     print("==================================================")
 
+    early_registered_users = pd.DataFrame({"user": negative_balances["user"].unique()})
+    print(early_registered_users)
+    bok.pd_infra.clean_write_parquet(early_registered_users, "data/clean/early_registered_users.parquet")
+
     negative_offsets = negative_balances.groupby("user").min().rename(columns={"balance": "offset"})
     negative_offsets["offset"] = -negative_offsets["offset"]
     negative_offsets["corrected"] = True
