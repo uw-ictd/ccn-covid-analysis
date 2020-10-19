@@ -21,7 +21,7 @@ def compute_user_currency_histories():
     # Importantly, use the timezone adjusted log but NOT the trimmed log to
     # avoid clipping state from early users.
     transactions = bok.dask_infra.read_parquet(
-        "data/clean/transactions_TZ"
+        "data/internal/transactions_TZ"
     ).compute()
 
     # Split transfers into positive components for the dest and negative for
