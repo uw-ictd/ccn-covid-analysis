@@ -212,8 +212,12 @@ def _total_video_traffic(dask_client):
     adult_gbytes_only_top_20 = adult_flows["bytes_total"].sum() / 1000**3
     video_gbytes_only_top_20 = video_flows["bytes_total"].sum() / 1000**3
 
-    (adult_gbytes, video_gbytes, adult_gbytes_only_top_20, video_gbytes_only_top_20) = dask_client.compute(
-        [adult_gbytes, video_gbytes, adult_gbytes_only_top_20, video_gbytes_only_top_20],
+    top_20_all_flows = typical.merge(users_only_top_20[["user", "rank"]], on="user", how="inner")
+    top_20_all_gbytes = top_20_all_flows["bytes_total"].sum() / 1000**3
+    top_20_internet_gbytes = top_20_all_flows.loc[top_20_all_flows["local"] == False]["bytes_total"].sum() / 1000 **3
+
+    (adult_gbytes, video_gbytes, adult_gbytes_only_top_20, video_gbytes_only_top_20, top_20_all_gbytes, top_20_internet_gbytes) = dask_client.compute(
+        [adult_gbytes, video_gbytes, adult_gbytes_only_top_20, video_gbytes_only_top_20, top_20_all_gbytes, top_20_internet_gbytes],
         sync=True
     )
 
@@ -222,9 +226,23 @@ def _total_video_traffic(dask_client):
     print("General Video Gbytes", video_gbytes, video_gbytes/TOTAL_GBYTES, video_gbytes/TOTAL_INTERNET_GBYTES)
     print("Video (all types) total", (video_gbytes + adult_gbytes)/TOTAL_GBYTES, (video_gbytes+  adult_gbytes)/TOTAL_INTERNET_GBYTES)
 
-    print("Adult video gbytes no top 20", adult_gbytes_only_top_20, adult_gbytes_only_top_20/TOTAL_GBYTES, adult_gbytes_only_top_20/TOTAL_INTERNET_GBYTES)
-    print("General Video Gbytes no top 20", video_gbytes_only_top_20, video_gbytes_only_top_20/TOTAL_GBYTES, video_gbytes_only_top_20/TOTAL_INTERNET_GBYTES)
-    print("Video (all types) total no top 20", (video_gbytes_only_top_20 + adult_gbytes_only_top_20)/TOTAL_GBYTES, (video_gbytes_only_top_20 + adult_gbytes_only_top_20)/TOTAL_INTERNET_GBYTES)
+    print(
+        "Adult video gbytes top 20",
+        adult_gbytes_only_top_20,
+        adult_gbytes_only_top_20/top_20_all_gbytes,
+        adult_gbytes_only_top_20/top_20_internet_gbytes,
+    )
+    print(
+        "General Video Gbytes top 20",
+        video_gbytes_only_top_20,
+        video_gbytes_only_top_20/top_20_all_gbytes,
+        video_gbytes_only_top_20/top_20_internet_gbytes,
+    )
+    print(
+        "Video (all types) total top 20",
+        (video_gbytes_only_top_20 + adult_gbytes_only_top_20)/top_20_all_gbytes,
+        (video_gbytes_only_top_20 + adult_gbytes_only_top_20)/top_20_internet_gbytes,
+    )
 
 
 if __name__ == "__main__":
