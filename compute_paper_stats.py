@@ -5,6 +5,9 @@ import bok.dask_infra
 import bok.pd_infra
 import bok.platform
 
+TOTAL_GBYTES = 1339.916865913
+TOTAL_INTERNET_GBYTES = 1324.865370317
+
 
 def _explore_unknowns(in_path):
     flows = bok.dask_infra.read_parquet(in_path)
@@ -130,12 +133,33 @@ def _compute_dates():
     print("Length:", bok.constants.MAX_DATE - bok.constants.MIN_DATE)
 
 
-def _internet_uplink_downlink_ratio(client):
+def _internet_uplink_downlink_ratio(dask_client):
     print("---DL UL ratio---")
     typical = bok.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
     internet_flows = typical.loc[typical["local"] == False]
     dl_ul_ratio = internet_flows["bytes_down"].sum() / internet_flows["bytes_up"].sum()
     print("DL/UL ratio:", dl_ul_ratio.compute(), ":1")
+
+
+def _total_bigco_traffic(dask_client):
+    print("---BigCo total bytes ---")
+    typical = bok.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+    typical["bytes_total"] = typical["bytes_up"] + typical["bytes_down"]
+
+    facebook_flows = typical.loc[(typical["org"] == "Facebook") | (typical["org"] == "Instagram") | (typical["org"] == "WhatsApp")]
+    facebook_gbytes = facebook_flows["bytes_total"].sum() / 1000**3
+
+    google_flows = typical.loc[(typical["org"] == "Google")]
+    google_gbytes = google_flows["bytes_total"].sum() / 1000**3
+
+    (facebook_gbytes, google_gbytes) = dask_client.compute(
+        [facebook_gbytes, google_gbytes],
+        sync=True
+    )
+
+    print("Facebook++ gbytes", facebook_gbytes, facebook_gbytes/TOTAL_GBYTES, facebook_gbytes/TOTAL_INTERNET_GBYTES)
+    print("Google Gbytes", google_gbytes, google_gbytes/TOTAL_GBYTES, google_gbytes/TOTAL_INTERNET_GBYTES)
+    print("Bigco total", (google_gbytes + facebook_gbytes)/TOTAL_GBYTES, (google_gbytes+  facebook_gbytes)/TOTAL_INTERNET_GBYTES)
 
 
 if __name__ == "__main__":
@@ -152,7 +176,8 @@ if __name__ == "__main__":
         # _compute_counts(client)
         # _compute_dns_percentages(client)
         # _compute_category_percentages(client)
-        _internet_uplink_downlink_ratio(client)
+        # _internet_uplink_downlink_ratio(client)
+        _total_bigco_traffic(client)
 
         client.close()
 
