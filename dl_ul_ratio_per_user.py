@@ -141,7 +141,6 @@ def make_ul_dl_scatter_plot(infile):
 
     logt_frame = pd.DataFrame({"regressionX": uniform_x.flatten(), "predictions": logt_predictions.flatten()})
     logt_frame = logt_frame.assign(type="Log Transformed Linear(P<0.0001, R²=0.19)")
-    regression_frame = regression_frame.append(logt_frame)
 
     user_totals = user_totals.groupby(["user"]).first()
 
@@ -171,7 +170,7 @@ def make_ul_dl_scatter_plot(infile):
         # )
     )
 
-    regression = alt.Chart(regression_frame).mark_line(color="black", opacity=1).encode(
+    regression = alt.Chart(logt_frame).mark_line(color="black", opacity=1).encode(
         x=alt.X(
             "regressionX",
             # scale=alt.Scale(
