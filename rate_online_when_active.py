@@ -32,8 +32,10 @@ def make_plot(inpath):
     # take the minimum of days online and days active, since active is
     # partial-day aware, but online rounds up to whole days. Can be up to 2-e
     # days off if the user joined late in the day and was last active early.
-    activity["optimistic_online_ratio"] = np.minimum(
-        activity["optimistic_days_online"], activity["days_active"]) / activity["days_active"]
+    activity["optimistic_online_ratio"] = (
+        np.minimum(activity["days_online"], activity["days_active"]) /
+        (activity["days_active"] - activity["outage_impact_days"])
+    )
     print(activity)
 
     # Compute a CDF since the specific user does not matter
