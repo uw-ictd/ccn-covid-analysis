@@ -19,6 +19,7 @@ def _explore_unknowns(in_path):
 
 
 def _compute_counts(dask_client):
+    print("---Raw Counts---")
     typical = bok.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["bytes_up", "bytes_down", "local"]]
     p_to_p = bok.dask_infra.read_parquet("data/clean/flows/p2p_TM_DIV_none_INDEX_start")[["bytes_b_to_a", "bytes_a_to_b"]]
 
@@ -59,6 +60,7 @@ def _compute_counts(dask_client):
 
 
 def _compute_dns_percentages(dask_client):
+    print("---DNS---")
     typical = bok.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
     typical["bytes_total"] = typical["bytes_up"] + typical["bytes_down"]
 
@@ -89,8 +91,40 @@ def _compute_dns_percentages(dask_client):
     print("user_derived", user_derived_count, "&", user_derived_count * 100/total_count, "&", user_derived_gb, "&", user_derived_gb*100/total_gb)
 
 
+def _compute_category_percentages(dask_client):
+    print("---Category/Org---")
+    typical = bok.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+    typical["bytes_total"] = typical["bytes_up"] + typical["bytes_down"]
+
+    internet_flows = typical.loc[typical["local"] == False]
+    total_count = internet_flows.shape[0]
+    total_gb = internet_flows["bytes_total"].sum() / 1000**3
+
+    mapped = internet_flows.loc[(internet_flows["category"] != "Unknown (No DNS)") & (internet_flows["category"] != "Unknown (Not Mapped)") & (internet_flows["category"] != "Google (No DNS)")]
+    mapped_count = mapped.shape[0]
+    mapped_gb = mapped["bytes_total"].sum() / 1000**3
+
+    org_mapped = internet_flows.loc[(internet_flows["org"] != "Unknown (No DNS)") & (internet_flows["org"] != "Unknown (Not Mapped)")]
+    org_mapped_count = org_mapped.shape[0]
+    org_mapped_gb = org_mapped["bytes_total"].sum() / 1000**3
+
+    unique_orgs = internet_flows["org"].unique()
+    unique_cats = internet_flows["category"].unique()
+
+    (total_count, total_gb, mapped_count, mapped_gb, org_mapped_count, org_mapped_gb, unique_cats, unique_orgs) = dask_client.compute(
+        [total_count, total_gb, mapped_count, mapped_gb, org_mapped_count, org_mapped_gb, unique_cats, unique_orgs],
+        sync=True,
+    )
+
+    print("Name", "count:", "  countpct:", "  GB:", "  GBpct:")
+    print("category mapped", mapped_count, "&", mapped_count * 100/total_count, "&", mapped_gb, "&", mapped_gb*100/total_gb)
+    print("org mapped", org_mapped_count, "&", org_mapped_count * 100/total_count, "&", org_mapped_gb, "&", org_mapped_gb*100/total_gb)
+    print("Unique cats", len(unique_cats))
+    print("Unique orgs", len(unique_orgs))
+
+
 def _compute_dates():
-    print("Included Dates")
+    print("---Included Dates---")
     print("Start:", bok.constants.MIN_DATE)
     print("End:", bok.constants.MAX_DATE)
     print("Length:", bok.constants.MAX_DATE - bok.constants.MIN_DATE)
@@ -107,8 +141,9 @@ if __name__ == "__main__":
     if platform.large_compute_support:
         print("Running compute tasks")
         client = bok.dask_infra.setup_platform_tuned_dask_client(10, platform)
-        _compute_counts(client)
-        _compute_dns_percentages(client)
+        # _compute_counts(client)
+        # _compute_dns_percentages(client)
+        _compute_category_percentages(client)
 
         client.close()
 
