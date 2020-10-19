@@ -41,14 +41,16 @@ def _compute_counts(dask_client):
         [internet_flow_count, intranet_flow_count, internet_downlink_bytes, internet_uplink_bytes, p2p_bytes, intranet_bytes],
         sync=True)
 
-    print("Internet Flow Count:", internet_flow_count)
-    print("intranet Flow Count:", intranet_flow_count)
+    print("Internet Flow Count:", internet_flow_count, internet_flow_count/(internet_flow_count + intranet_flow_count))
+    print("intranet Flow Count:", intranet_flow_count, intranet_flow_count/(internet_flow_count + intranet_flow_count))
     print("Total Flow Count:", internet_flow_count + intranet_flow_count)
 
+    total_internet_gbytes = (internet_uplink_bytes + internet_downlink_bytes)/1000**3
+    total_gbytes = total_internet_gbytes + (intranet_bytes/1000**3)
     print("Total internet DL Gbytes:", internet_downlink_bytes/1000**3)
     print("Total internet UL Gbytes:", internet_uplink_bytes/1000**3)
-    print("Total internet Gbytes:", (internet_uplink_bytes + internet_downlink_bytes)/1000**3)
-    print("Total intranet Gbytes:", intranet_bytes/1000**3)
+    print("Total internet Gbytes:", total_internet_gbytes, total_internet_gbytes/total_gbytes)
+    print("Total intranet Gbytes:", intranet_bytes/1000**3, intranet_bytes/1000**3/total_gbytes)
     print("Total GBytes:", (internet_uplink_bytes + internet_downlink_bytes + intranet_bytes)/1000**3)
 
     transactions = bok.dask_infra.read_parquet("data/clean/transactions_TM")
@@ -58,8 +60,33 @@ def _compute_counts(dask_client):
 
 def _compute_dns_percentages(dask_client):
     typical = bok.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+    typical["bytes_total"] = typical["bytes_up"] + typical["bytes_down"]
 
-    print(typical)
+    internet_flows = typical.loc[typical["local"] == False]
+    total_count = internet_flows.shape[0]
+    total_gb = internet_flows["bytes_total"].sum() / 1000**3
+
+    mapped = internet_flows.loc[internet_flows["fqdn"] != ""]
+    mapped_count = mapped.shape[0]
+    mapped_gb = mapped["bytes_total"].sum() / 1000**3
+
+    unambiguous = internet_flows.loc[(internet_flows["fqdn"] != "") & (internet_flows["ambiguous_fqdn_count"] == 1)]
+    unambiguous_count = unambiguous.shape[0]
+    unambiguous_gb = unambiguous["bytes_total"].sum() / 1000**3
+
+    user_derived = internet_flows.loc[(internet_flows["fqdn_source"] == "user_dns_log")]
+    user_derived_count = user_derived.shape[0]
+    user_derived_gb = user_derived["bytes_total"].sum() / 1000**3
+
+    (total_count, total_gb, mapped_count, mapped_gb, unambiguous_count, unambiguous_gb, user_derived_count, user_derived_gb) = dask_client.compute(
+        [total_count, total_gb, mapped_count, mapped_gb, unambiguous_count, unambiguous_gb, user_derived_count, user_derived_gb],
+        sync=True,
+    )
+
+    print("Name", "count:", "  countpct:", "  GB:", "  GBpct:")
+    print("mapped", mapped_count, "&", mapped_count * 100/total_count, "&", mapped_gb, "&", mapped_gb*100/total_gb)
+    print("unambiguous", unambiguous_count, "&", unambiguous_count * 100/total_count, "&", unambiguous_gb, "&", unambiguous_gb*100/total_gb)
+    print("user_derived", user_derived_count, "&", user_derived_count * 100/total_count, "&", user_derived_gb, "&", user_derived_gb*100/total_gb)
 
 
 def _compute_dates():
