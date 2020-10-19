@@ -180,8 +180,10 @@ def make_time_at_zero_plots(user_balance_frame):
         ),
         color=alt.Color(
             "corrected",
-            title="Nonzero Start"
+            title="Nonzero Start",
+            legend=None,
         ),
+        shape="corrected",
     ).properties(
         width=500,
     ).save("renders/purchase_currency_balance_per_user.png", scale_factor=2.0)

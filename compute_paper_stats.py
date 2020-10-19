@@ -182,7 +182,7 @@ def _median_offline(dask_client):
         (activity["days_active"] - activity["outage_impact_days"])
     )
 
-    number_users_consistently_on = len(activity.loc[activity["online_ratio"] == 1.0])
+    number_users_consistently_on = len(activity.loc[activity["online_ratio"] >= 0.95])
     examined_users = len(activity)
     print("Median user online ratio:", activity["online_ratio"].median())
     print("Number of users consistently on:", number_users_consistently_on)
@@ -245,6 +245,41 @@ def _total_video_traffic(dask_client):
     )
 
 
+def _inequality(client):
+    transactions = bok.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
+    purchases = transactions.loc[transactions["kind"] == "purchase"]
+    purchases["amount_usd"] = purchases["amount_idr"] * bok.constants.IDR_TO_USD
+
+    user_ranks = purchases.groupby("user").sum().reset_index()
+    user_ranks["rank"] = user_ranks["amount_idr"].rank(method="min", ascending=False)
+
+    # Find the first day the user was active. Define "active" as making first
+    # purchase or first data in network.
+    user_active_ranges = bok.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")[["user", "days_since_first_active", "days_active"]]
+
+    # Drop users that have been active less than a week.
+    users_to_analyze = user_active_ranges.loc[
+        user_active_ranges["days_since_first_active"] >= 7,
+    ]
+
+    # Drop users active for less than one week
+    users_to_analyze = users_to_analyze.loc[
+        users_to_analyze["days_active"] >=1,
+    ]
+
+    users = user_ranks.merge(users_to_analyze, on="user", how="inner")
+    users["spend_rate"] = users["amount_usd"] / users["days_active"]
+    print(users.head(40))
+
+    print("Minimum Spend Rate", users["spend_rate"].min())
+    print("Max Spend Rate", users["spend_rate"].max())
+    print("Mean Spend Rate", users["spend_rate"].mean())
+    print("Median Spend Rate", users["spend_rate"].median())
+
+    print("max/mean", users["spend_rate"].max()/users["spend_rate"].mean())
+    print("max/median", users["spend_rate"].max()/users["spend_rate"].median())
+
+
 if __name__ == "__main__":
     platform = bok.platform.read_config()
 
@@ -261,8 +296,9 @@ if __name__ == "__main__":
         # _compute_category_percentages(client)
         # _internet_uplink_downlink_ratio(client)
         # _total_bigco_traffic(client)
-        # _median_offline(client)
-        _total_video_traffic(client)
+        _median_offline(client)
+        # _total_video_traffic(client)
+        _inequality(client)
 
         client.close()
 

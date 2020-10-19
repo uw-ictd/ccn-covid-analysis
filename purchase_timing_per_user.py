@@ -132,6 +132,7 @@ def make_plot(infile):
         )
     ).properties(
         width=500,
+        height=200,
     ).save("renders/purchase_timing_per_user_cdf.png", scale_factor=2.0)
 
 def make_amount_plot(infile):
@@ -157,6 +158,7 @@ def make_amount_plot(infile):
         ),
     ).properties(
         width=500,
+        height=300,
     ).save("renders/purchase_timing_per_user_clumped_amounts.png", scale_factor=2.0)
 
 
