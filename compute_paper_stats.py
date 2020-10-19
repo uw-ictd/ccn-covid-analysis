@@ -200,14 +200,32 @@ def _total_video_traffic(dask_client):
     video_flows = typical.loc[(typical["category"] == "Video")]
     video_gbytes = video_flows["bytes_total"].sum() / 1000**3
 
-    (adult_gbytes, video_gbytes) = dask_client.compute(
-        [adult_gbytes, video_gbytes],
+    transactions = bok.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
+    purchases = transactions.loc[transactions["kind"] == "purchase"]
+
+    user_ranks = purchases.groupby("user").sum().reset_index()
+    user_ranks["rank"] = user_ranks["amount_idr"].rank(method="min", ascending=False)
+
+    users_only_top_20 = user_ranks.loc[user_ranks["rank"] <= 20].copy()
+    adult_flows = adult_flows.merge(users_only_top_20[["user", "rank"]], on="user", how="inner")
+    video_flows = video_flows.merge(users_only_top_20[["user", "rank"]], on="user", how="inner")
+    adult_gbytes_only_top_20 = adult_flows["bytes_total"].sum() / 1000**3
+    video_gbytes_only_top_20 = video_flows["bytes_total"].sum() / 1000**3
+
+    (adult_gbytes, video_gbytes, adult_gbytes_only_top_20, video_gbytes_only_top_20) = dask_client.compute(
+        [adult_gbytes, video_gbytes, adult_gbytes_only_top_20, video_gbytes_only_top_20],
         sync=True
     )
+
 
     print("Adult video gbytes", adult_gbytes, adult_gbytes/TOTAL_GBYTES, adult_gbytes/TOTAL_INTERNET_GBYTES)
     print("General Video Gbytes", video_gbytes, video_gbytes/TOTAL_GBYTES, video_gbytes/TOTAL_INTERNET_GBYTES)
     print("Video (all types) total", (video_gbytes + adult_gbytes)/TOTAL_GBYTES, (video_gbytes+  adult_gbytes)/TOTAL_INTERNET_GBYTES)
+
+    print("Adult video gbytes no top 20", adult_gbytes_only_top_20, adult_gbytes_only_top_20/TOTAL_GBYTES, adult_gbytes_only_top_20/TOTAL_INTERNET_GBYTES)
+    print("General Video Gbytes no top 20", video_gbytes_only_top_20, video_gbytes_only_top_20/TOTAL_GBYTES, video_gbytes_only_top_20/TOTAL_INTERNET_GBYTES)
+    print("Video (all types) total no top 20", (video_gbytes_only_top_20 + adult_gbytes_only_top_20)/TOTAL_GBYTES, (video_gbytes_only_top_20 + adult_gbytes_only_top_20)/TOTAL_INTERNET_GBYTES)
+
 
 if __name__ == "__main__":
     platform = bok.platform.read_config()
