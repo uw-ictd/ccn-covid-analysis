@@ -206,18 +206,18 @@ def _total_video_traffic(dask_client):
     user_ranks = purchases.groupby("user").sum().reset_index()
     user_ranks["rank"] = user_ranks["amount_idr"].rank(method="min", ascending=False)
 
-    users_only_top_20 = user_ranks.loc[user_ranks["rank"] <= 20].copy()
-    adult_flows = adult_flows.merge(users_only_top_20[["user", "rank"]], on="user", how="inner")
-    video_flows = video_flows.merge(users_only_top_20[["user", "rank"]], on="user", how="inner")
-    adult_gbytes_only_top_20 = adult_flows["bytes_total"].sum() / 1000**3
-    video_gbytes_only_top_20 = video_flows["bytes_total"].sum() / 1000**3
+    users_only_top_10 = user_ranks.loc[user_ranks["rank"] <= 10].copy()
+    adult_flows = adult_flows.merge(users_only_top_10[["user", "rank"]], on="user", how="inner")
+    video_flows = video_flows.merge(users_only_top_10[["user", "rank"]], on="user", how="inner")
+    adult_gbytes_only_top_10 = adult_flows["bytes_total"].sum() / 1000**3
+    video_gbytes_only_top_10 = video_flows["bytes_total"].sum() / 1000**3
 
-    top_20_all_flows = typical.merge(users_only_top_20[["user", "rank"]], on="user", how="inner")
-    top_20_all_gbytes = top_20_all_flows["bytes_total"].sum() / 1000**3
-    top_20_internet_gbytes = top_20_all_flows.loc[top_20_all_flows["local"] == False]["bytes_total"].sum() / 1000 **3
+    top_10_all_flows = typical.merge(users_only_top_10[["user", "rank"]], on="user", how="inner")
+    top_10_all_gbytes = top_10_all_flows["bytes_total"].sum() / 1000**3
+    top_10_internet_gbytes = top_10_all_flows.loc[top_10_all_flows["local"] == False]["bytes_total"].sum() / 1000 **3
 
-    (adult_gbytes, video_gbytes, adult_gbytes_only_top_20, video_gbytes_only_top_20, top_20_all_gbytes, top_20_internet_gbytes) = dask_client.compute(
-        [adult_gbytes, video_gbytes, adult_gbytes_only_top_20, video_gbytes_only_top_20, top_20_all_gbytes, top_20_internet_gbytes],
+    (adult_gbytes, video_gbytes, adult_gbytes_only_top_10, video_gbytes_only_top_10, top_10_all_gbytes, top_10_internet_gbytes) = dask_client.compute(
+        [adult_gbytes, video_gbytes, adult_gbytes_only_top_10, video_gbytes_only_top_10, top_10_all_gbytes, top_10_internet_gbytes],
         sync=True
     )
 
@@ -227,21 +227,21 @@ def _total_video_traffic(dask_client):
     print("Video (all types) total", (video_gbytes + adult_gbytes)/TOTAL_GBYTES, (video_gbytes+  adult_gbytes)/TOTAL_INTERNET_GBYTES)
 
     print(
-        "Adult video gbytes top 20",
-        adult_gbytes_only_top_20,
-        adult_gbytes_only_top_20/top_20_all_gbytes,
-        adult_gbytes_only_top_20/top_20_internet_gbytes,
+        "Adult video gbytes top 10",
+        adult_gbytes_only_top_10,
+        adult_gbytes_only_top_10/top_10_all_gbytes,
+        adult_gbytes_only_top_10/top_10_internet_gbytes,
     )
     print(
-        "General Video Gbytes top 20",
-        video_gbytes_only_top_20,
-        video_gbytes_only_top_20/top_20_all_gbytes,
-        video_gbytes_only_top_20/top_20_internet_gbytes,
+        "General Video Gbytes top 10",
+        video_gbytes_only_top_10,
+        video_gbytes_only_top_10/top_10_all_gbytes,
+        video_gbytes_only_top_10/top_10_internet_gbytes,
     )
     print(
-        "Video (all types) total top 20",
-        (video_gbytes_only_top_20 + adult_gbytes_only_top_20)/top_20_all_gbytes,
-        (video_gbytes_only_top_20 + adult_gbytes_only_top_20)/top_20_internet_gbytes,
+        "Video (all types) total top 10",
+        (video_gbytes_only_top_10 + adult_gbytes_only_top_10)/top_10_all_gbytes,
+        (video_gbytes_only_top_10 + adult_gbytes_only_top_10)/top_10_internet_gbytes,
     )
 
 
@@ -330,9 +330,9 @@ if __name__ == "__main__":
         # _internet_uplink_downlink_ratio(client)
         # _total_bigco_traffic(client)
         # _median_offline(client)
-        # _total_video_traffic(client)
+        _total_video_traffic(client)
         # _inequality(client)
-        _filter_stats(client)
+        # _filter_stats(client)
 
         client.close()
 
