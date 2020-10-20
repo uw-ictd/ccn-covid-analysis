@@ -161,6 +161,7 @@ def make_plot(inpath):
 
     (scatter + regression).properties(
         width=500,
+        height=250,
     ).save(
         "renders/rate_active_per_user.png", scale_factor=2.0
     )

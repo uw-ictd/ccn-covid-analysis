@@ -148,6 +148,9 @@ def make_totals_plot(infile):
     ).resolve_scale(
         color='independent',
         shape='independent'
+    ).properties(
+        width=500,
+        height=250,
     ).save(
         "renders/bytes_per_time_of_day_lines.png",
         scale_factor=2,
