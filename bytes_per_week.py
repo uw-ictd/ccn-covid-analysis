@@ -111,6 +111,11 @@ def make_plot(infile):
     # Fix plotting scale
     throughput["GB"] = throughput["bytes"] / (1000**3)
 
+    temp = throughput.copy()
+    temp = temp.groupby("day_bin").sum()
+    print("Std dev", temp["GB"].std())
+    print("Mean", temp["GB"].mean())
+
     # Generate a dense dataframe with all days and directions
     date_range = pd.DataFrame({"day_bin": pd.date_range(bok.constants.MIN_DATE, bok.constants.MAX_DATE, freq="1D")})
     category_range = pd.DataFrame({"throughput_type": ["Up", "Down", "Local"]}, dtype=object)
