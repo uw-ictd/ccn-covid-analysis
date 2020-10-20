@@ -192,7 +192,7 @@ def _median_offline(dask_client):
 def _total_video_traffic(dask_client):
     print("---video total bytes ---")
     typical = bok.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
-    typical["bytes_total"] = typical["bytes_up"] + typical["bytes_down"]
+    typical["bytes_total"] = typical["bytes_down"]
 
     adult_flows = typical.loc[(typical["category"] == "Adult Video")]
     adult_gbytes = adult_flows["bytes_total"].sum() / 1000**3
