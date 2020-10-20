@@ -344,6 +344,26 @@ def _total_ice_traffic(dask_client):
     print("Unique users", unique_users)
 
 
+def _compute_arpu():
+    print("---ARPU ---")
+    transactions = bok.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
+    purchases = transactions.loc[transactions["kind"] == "purchase"]
+    purchases["amount_usd"] = purchases["amount_idr"] * bok.constants.IDR_TO_USD
+
+    users = purchases["user"].nunique()
+    revenue = purchases["amount_idr"].sum()
+
+    aarpu = revenue / users
+
+    marpu = aarpu / 12
+
+    darpu = aarpu / ((bok.constants.MAX_DATE - bok.constants.MIN_DATE).total_seconds() / 86400)
+
+    print("aARPU", aarpu)
+    print("mARPU", marpu)
+    print("dARPU", darpu)
+
+
 
 
 if __name__ == "__main__":
@@ -366,10 +386,11 @@ if __name__ == "__main__":
         # _total_video_traffic(client)
         # _inequality(client)
         # _filter_stats(client)
-        _total_ice_traffic(client)
+        # _total_ice_traffic(client)
 
         client.close()
 
+    _compute_arpu()
     _compute_dates()
 
     print("Done!")
