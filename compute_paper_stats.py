@@ -193,7 +193,7 @@ def _median_offline(dask_client):
 def _total_video_traffic(dask_client):
     print("---video total bytes ---")
     typical = bok.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
-    typical["bytes_total"] = typical["bytes_down"]
+    typical["bytes_total"] = typical["bytes_down"] + typical["bytes_up"]
 
     adult_flows = typical.loc[(typical["category"] == "Adult Video")]
     adult_gbytes = adult_flows["bytes_total"].sum() / 1000**3
@@ -314,6 +314,38 @@ def _filter_stats(client):
     print("Typical", typical_flow_count, "p2p:", p2p_flow_count, "total_flow_count:", typical_flow_count+p2p_flow_count)
 
 
+def _total_ice_traffic(dask_client):
+    print("---ICE total bytes ---")
+    typical = bok.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+    typical["bytes_total"] = typical["bytes_up"] + typical["bytes_down"]
+
+    all_gbytes = typical[typical["local"] == False]["bytes_total"].sum() / 1000**3
+
+    p2pflows = typical.loc[(typical["category"] == "Peer to Peer")]
+    p2pgbytes = p2pflows["bytes_total"].sum() / 1000**3
+
+    ice_flows = typical.loc[(typical["category"] == "ICE (STUN/TURN)")]
+    ice_gbytes = ice_flows["bytes_total"].sum() / 1000**3
+
+    all_ice_flows = p2pflows.append(ice_flows)
+    all_ice_flows = all_ice_flows.groupby(["user"]).count()
+    unique_users = all_ice_flows.shape[0]
+
+    (p2pgbytes, ice_gbytes,  all_gbytes, unique_users) = dask_client.compute(
+        [p2pgbytes, ice_gbytes,  all_gbytes, unique_users],
+        sync=True
+    )
+
+
+    print("p2p gbytes", p2pgbytes, p2pgbytes/TOTAL_GBYTES, p2pgbytes/all_gbytes)
+    print("ice Gbytes", ice_gbytes, ice_gbytes/TOTAL_GBYTES, ice_gbytes/all_gbytes)
+    print("(all types) total", (ice_gbytes + p2pgbytes)/TOTAL_GBYTES, (ice_gbytes+  p2pgbytes)/all_gbytes)
+
+    print("Unique users", unique_users)
+
+
+
+
 if __name__ == "__main__":
     platform = bok.platform.read_config()
 
@@ -334,6 +366,7 @@ if __name__ == "__main__":
         # _total_video_traffic(client)
         # _inequality(client)
         # _filter_stats(client)
+        _total_ice_traffic(client)
 
         client.close()
 
