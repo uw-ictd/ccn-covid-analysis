@@ -314,19 +314,6 @@ def _filter_stats(client):
     print("Typical", typical_flow_count, "p2p:", p2p_flow_count, "total_flow_count:", typical_flow_count+p2p_flow_count)
 
 
-def _export_hdf5(client):
-    transactions = bok.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
-    typical = bok.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
-    p2p = bok.dask_infra.read_parquet("data/clean/flows/p2p_TM_DIV_none_INDEX_start")
-    transactions = dask.dataframe.from_pandas(transactions, npartitions=1)
-
-    outfile = "data/ccn_flows_transactions.h5"
-
-    transactions.to_hdf(outfile, "/transactions")
-    typical.to_hdf(outfile, "/typical_flows")
-    p2p.to_hdf(outfile, "/p2p_flows")
-
-
 if __name__ == "__main__":
     platform = bok.platform.read_config()
 
@@ -347,7 +334,6 @@ if __name__ == "__main__":
         # _total_video_traffic(client)
         # _inequality(client)
         # _filter_stats(client)
-        _export_hdf5(client)
 
         client.close()
 
