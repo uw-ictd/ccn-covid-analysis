@@ -73,6 +73,7 @@ def make_rate_chart():
             "amount_USD:Q",
             title="Total (USD)",
             scale=alt.Scale(domain=[0, 2000], range=[30, 1000]),
+            legend=None,
         ),
     ).properties(
         width=600,
