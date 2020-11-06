@@ -6,10 +6,8 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 import statsmodels.api as sm
-from sklearn.metrics import r2_score
 
 import infra.dask_infra
-import infra.domains
 import infra.pd_infra
 import infra.platform
 

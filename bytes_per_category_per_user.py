@@ -2,11 +2,9 @@
 """
 
 import altair as alt
-import numpy as np
 import pandas as pd
 
 import infra.dask_infra
-import infra.domains
 import infra.pd_infra
 import infra.platform
 

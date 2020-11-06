@@ -5,7 +5,7 @@ import infra.dask_infra
 import infra.pd_infra
 import infra.platform
 
-from infra.mapped_ips import IpProcessor
+from mappers.mapped_ips import IpProcessor
 
 
 def _explore_unknowns(in_path):
