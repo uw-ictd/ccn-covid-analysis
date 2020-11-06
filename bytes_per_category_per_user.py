@@ -4,24 +4,24 @@
 import altair as alt
 import pandas as pd
 
-import infra.dask_infra
-import infra.pd_infra
+import infra.dask
+import infra.pd
 import infra.platform
 
 
 def reduce_to_pandas(outfile, dask_client):
-    flows = infra.dask_infra.read_parquet(
+    flows = infra.dask.read_parquet(
         "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["user", "category", "org", "bytes_up", "bytes_down"]]
 
     # Do the grouping
     flows = flows.groupby(["user", "category", "org"]).sum()
     flows = flows.compute()
 
-    infra.pd_infra.clean_write_parquet(flows, outfile)
+    infra.pd.clean_write_parquet(flows, outfile)
 
 
 def make_category_per_user_plots(infile):
-    grouped_flows = infra.pd_infra.read_parquet(infile)
+    grouped_flows = infra.pd.read_parquet(infile)
     grouped_flows = grouped_flows.reset_index()
     grouped_flows["bytes_total"] = grouped_flows["bytes_up"] + grouped_flows["bytes_down"]
     user_category_total = grouped_flows[["user", "category", "bytes_total"]].groupby(
@@ -29,7 +29,7 @@ def make_category_per_user_plots(infile):
     ).sum().reset_index()
 
     # Filter users by time in network to eliminate early incomplete samples
-    user_active_ranges = infra.pd_infra.read_parquet(
+    user_active_ranges = infra.pd.read_parquet(
         "data/clean/user_active_deltas.parquet")[["user", "days_since_first_active", "days_active", "days_online"]]
     # Drop users that joined less than a week ago.
     users_to_analyze = user_active_ranges.loc[
@@ -151,7 +151,7 @@ if __name__ == "__main__":
 
     if platform.large_compute_support:
         print("Running compute tasks")
-        client = infra.dask_infra.setup_platform_tuned_dask_client(10, platform)
+        client = infra.dask.setup_platform_tuned_dask_client(10, platform)
         reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
         client.close()
 

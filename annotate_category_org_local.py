@@ -6,7 +6,7 @@ import dask.delayed
 import ipaddress
 import os
 
-import infra.dask_infra
+import infra.dask
 import mappers.domains
 import infra.platform
 
@@ -19,7 +19,7 @@ def _categorize_user(in_path, out_path):
 
     Requires the input parquet file specify an `fqdn` column, protocol, and ports
     """
-    frame = infra.dask_infra.read_parquet(in_path)
+    frame = infra.dask.read_parquet(in_path)
 
     # First pass assign by FQDN
     processor = mappers.domains.FqdnProcessor()
@@ -65,7 +65,7 @@ def _categorize_user(in_path, out_path):
         axis="columns",
         meta=("local", bool))
 
-    return infra.dask_infra.clean_write_parquet(frame, out_path, compute=False)
+    return infra.dask.clean_write_parquet(frame, out_path, compute=False)
 
 
 def _assign_org_from_ip(ip, current):
@@ -144,7 +144,7 @@ def _augment_user_flows_with_stun_state(in_path, out_path):
 
     Will not be correct unless the flow is indexed by time
     """
-    flow_frame = infra.dask_infra.read_parquet(in_path)
+    flow_frame = infra.dask.read_parquet(in_path)
     # Bookeeping for building a new frame
     max_rows_per_division = 100000
     out_chunk = list()
@@ -231,7 +231,7 @@ def _augment_user_flows_with_stun_state(in_path, out_path):
                                                          force=True)
     out_frame = out_frame.categorize(columns=["fqdn_source", "org", "category"])
 
-    infra.dask_infra.clean_write_parquet(out_frame, out_path)
+    infra.dask.clean_write_parquet(out_frame, out_path)
     print("Finished writing user", in_path)
 
 
@@ -285,7 +285,7 @@ def merge_parquet_frames(in_parent_directory, out_frame_path):
     div_on_disk = sorted(os.listdir(in_parent_directory))
     for div in div_on_disk:
         div_path = os.path.join(in_parent_directory, div)
-        frame = infra.dask_infra.read_parquet(div_path)
+        frame = infra.dask.read_parquet(div_path)
 
         if merged_frame is None:
             merged_frame = frame
@@ -299,11 +299,11 @@ def merge_parquet_frames(in_parent_directory, out_frame_path):
         force=True
     )
 
-    infra.dask_infra.clean_write_parquet(merged_frame, out_frame_path)
+    infra.dask.clean_write_parquet(merged_frame, out_frame_path)
 
 
 def _print_heavy_hitter_unmapped_domains(infile):
-    df = infra.dask_infra.read_parquet(infile)
+    df = infra.dask.read_parquet(infile)
 
     unmapped = df.loc[((df["org"] == "Unknown (Not Mapped)") | (df["category"] == "Unknown (Not Mapped)"))]
     df = unmapped.groupby("fqdn").sum()
@@ -328,7 +328,7 @@ if __name__ == "__main__":
 
     if platform.large_compute_support:
         print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
-        client = infra.dask_infra.setup_platform_tuned_dask_client(20, platform)
+        client = infra.dask.setup_platform_tuned_dask_client(20, platform)
 
         #augment_all_user_flows(in_parent_directory, annotated_parent_directory, client)
         stun_augment_all_user_flows(annotated_parent_directory, stun_annotated_parent_directory, client)

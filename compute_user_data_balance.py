@@ -6,8 +6,8 @@ import pandas as pd
 import os
 
 import infra.parsers
-import infra.dask_infra
-import infra.pd_infra
+import infra.dask
+import infra.pd
 import infra.platform
 
 
@@ -15,7 +15,7 @@ def compute_user_data_purchase_histories():
     """Compute the running ledger of total data purchased by each user
     """
     # Extract data from the transactions file into a resolved pandas frame
-    transactions = infra.dask_infra.read_parquet("data/clean/transactions_TM").compute()
+    transactions = infra.dask.read_parquet("data/clean/transactions_TM").compute()
 
     # Track purchases as positive balance
     purchases = transactions.loc[
@@ -37,12 +37,12 @@ def compute_filtered_purchase_and_use_intermediate(outfile, client):
     user purchases
     """
 
-    all_flows = infra.dask_infra.read_parquet(
+    all_flows = infra.dask.read_parquet(
         "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
     ).loc[:, ["user", "bytes_up", "bytes_down", "local", "end"]]
 
     # Filter the balances included to users who have been minimally active
-    user_active_ranges = infra.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")
+    user_active_ranges = infra.pd.read_parquet("data/clean/user_active_deltas.parquet")
     # Drop users new to the network first active less than a week ago.
     users_to_analyze = user_active_ranges.loc[
         user_active_ranges["days_since_first_active"] >= 7,
@@ -66,7 +66,7 @@ def compute_filtered_purchase_and_use_intermediate(outfile, client):
     flows = nonlocal_user_filtered_flows
 
     # Read in the purchases data
-    purchases = infra.pd_infra.read_parquet("data/clean/transactions_consolidated_TM.parquet")
+    purchases = infra.pd.read_parquet("data/clean/transactions_consolidated_TM.parquet")
     purchases = purchases.loc[
         purchases["kind"] == "purchase",
         ["timestamp", "user", "amount_bytes", "time_since_last_purchase"]
@@ -105,7 +105,7 @@ def compute_filtered_purchase_and_use_intermediate(outfile, client):
     aggregate = aggregate.set_index("timestamp").repartition(partition_size="64M",
                                                              force=True)
 
-    write_delayed = infra.dask_infra.clean_write_parquet(aggregate, outfile, compute=False)
+    write_delayed = infra.dask.clean_write_parquet(aggregate, outfile, compute=False)
 
     results = client.compute(
         [all_flows_length, user_filtered_flows_length, nonlocal_user_filtered_flows_length, write_delayed],
@@ -266,7 +266,7 @@ def _process_and_split_single_user(infile, outfile, user):
      Takes as input an overall dataframe file and outputs a user-specific
      dataframe file.
     """
-    df = infra.dask_infra.read_parquet(infile)
+    df = infra.dask.read_parquet(infile)
 
     df = df.loc[
         df["user"] == user
@@ -284,12 +284,12 @@ def _process_and_split_single_user(infile, outfile, user):
     dask_df = dask_df.repartition(partition_size="64M",
                                   force=True)
 
-    infra.dask_infra.clean_write_parquet(dask_df, outfile)
+    infra.dask.clean_write_parquet(dask_df, outfile)
     print("completed tare for user:", user)
 
 
 def tare_all_users(infile, out_parent_directory, client):
-    users = infra.dask_infra.read_parquet(infile)["user"].unique().compute()
+    users = infra.dask.read_parquet(infile)["user"].unique().compute()
     tokens = []
 
     batch_size = 1
@@ -312,7 +312,7 @@ def tare_all_users(infile, out_parent_directory, client):
 
 def reduce_to_pandas(infile, outfile, client):
     print("Beginning pandas reduction")
-    aggregated_balances = infra.dask_infra.read_parquet(infile)
+    aggregated_balances = infra.dask.read_parquet(infile)
 
     # TODO For now just select a single user to debug.
     df = aggregated_balances.loc[
@@ -323,7 +323,7 @@ def reduce_to_pandas(infile, outfile, client):
 
     df = df.compute()
 
-    infra.pd_infra.clean_write_parquet(df, outfile)
+    infra.pd.clean_write_parquet(df, outfile)
 
 
 def reduce_to_user_pd_frame(user, outpath):
@@ -365,12 +365,12 @@ def reduce_to_user_pd_frame(user, outpath):
     running_user_balance = user_ledger
     running_user_balance["balance"] = user_ledger["bytes"].transform(pd.Series.cumsum)
 
-    infra.pd_infra.clean_write_parquet(running_user_balance, outpath)
+    infra.pd.clean_write_parquet(running_user_balance, outpath)
 
 
 def make_plot(inpath):
-    gap_df = infra.pd_infra.read_parquet("data/clean/log_gaps_TM.parquet")
-    running_user_balance = infra.pd_infra.read_parquet(inpath)
+    gap_df = infra.pd.read_parquet("data/clean/log_gaps_TM.parquet")
+    running_user_balance = infra.pd.read_parquet(inpath)
     print(running_user_balance)
     # Limit the domain instead of the time resolution
     running_user_balance = running_user_balance.loc[(running_user_balance["timestamp"] > "2019-05-21 18:25") &
@@ -445,10 +445,10 @@ if __name__ == "__main__":
 
     if platform.large_compute_support:
         print("Running compute subcommands")
-        client = infra.dask_infra.setup_platform_tuned_dask_client(per_worker_memory_GB=10, platform=platform)
+        client = infra.dask.setup_platform_tuned_dask_client(per_worker_memory_GB=10, platform=platform)
         # compute_filtered_purchase_and_use_intermediate(grouped_flows_and_purchases_file, client)
         tare_all_users(grouped_flows_and_purchases_file, split_tared_balance_file, client)
-        infra.dask_infra.merge_parquet_frames(split_tared_balance_file, merged_balance_file, index_column="timestamp")
+        infra.dask.merge_parquet_frames(split_tared_balance_file, merged_balance_file, index_column="timestamp")
         reduce_to_pandas(merged_balance_file, graph_temporary_file, client)
         client.close()
     else:

@@ -6,7 +6,7 @@ import pandas as pd
 
 import infra.constants
 import infra.platform
-import infra.pd_infra
+import infra.pd
 
 
 def make_expenses():
@@ -30,7 +30,7 @@ def make_expenses():
 
 
 def make_plot():
-    transactions = infra.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
+    transactions = infra.pd.read_parquet("data/clean/transactions_TM.parquet")
     purchases = transactions.loc[(transactions["kind"] == "purchase") | (transactions["kind"] == "admin_topup")]
     purchases = purchases[["timestamp", "amount_idr", "kind", "user"]]
 

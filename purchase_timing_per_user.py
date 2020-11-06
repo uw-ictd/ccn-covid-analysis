@@ -3,12 +3,12 @@ import pandas as pd
 import altair as alt
 
 import infra.constants
-import infra.dask_infra
-import infra.pd_infra
+import infra.dask
+import infra.pd
 
 
 def generate_consolidated_purchases(outfile):
-    transactions = infra.pd_infra.read_parquet(
+    transactions = infra.pd.read_parquet(
         "data/clean/transactions_TM.parquet")
 
     # Consolidate together closely spaced small purchases by iterating
@@ -54,7 +54,7 @@ def generate_consolidated_purchases(outfile):
         consolidated_purchases += consolidated_user_purchases
 
     consolidated_purchases_frame = pd.DataFrame(consolidated_purchases)
-    infra.pd_infra.clean_write_parquet(consolidated_purchases_frame, outfile)
+    infra.pd.clean_write_parquet(consolidated_purchases_frame, outfile)
 
 
 def _purchase_tuple_to_dict(tuple):
@@ -67,7 +67,7 @@ def _purchase_tuple_to_dict(tuple):
 
 
 def make_plot(infile):
-    purchases = infra.pd_infra.read_parquet(infile)
+    purchases = infra.pd.read_parquet(infile)
 
     # Drop nulls from the first purchase
     clean_purchases = purchases.dropna()
@@ -136,7 +136,7 @@ def make_plot(infile):
     ).save("renders/purchase_timing_per_user_cdf.png", scale_factor=2.0)
 
 def make_amount_plot(infile):
-    purchases = infra.pd_infra.read_parquet(infile)
+    purchases = infra.pd.read_parquet(infile)
     purchases = purchases.assign(count=1)
     purchases = purchases[["amount_bytes", "count"]].groupby(["amount_bytes"]).sum().reset_index()
     purchases["amount_mb"] = purchases["amount_bytes"] / 1000**2

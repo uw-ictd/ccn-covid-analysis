@@ -2,7 +2,7 @@ import pandas as pd
 import dask.dataframe
 import os
 
-import infra.dask_infra
+import infra.dask
 
 def trim_flows_recursive(in_path, out_path, client):
     subfiles = sorted(os.listdir(in_path))
@@ -23,7 +23,7 @@ def trim_flows_recursive(in_path, out_path, client):
                         "ambiguous_fqdn_count": int
                         })
 
-        handle = infra.dask_infra.clean_write_parquet(df, df_out_path, compute=False)
+        handle = infra.dask.clean_write_parquet(df, df_out_path, compute=False)
         future_handles.append(handle)
 
     print("Recursive flow trim now")
@@ -41,7 +41,7 @@ def trim_dns_recursive(in_path, out_path, client):
         df = dask.dataframe.read_parquet(df_path, engine="fastparquet")
         df = df.loc[(df.index >= '2019-03-10 00:00') & (df.index < '2020-05-03 00:00')]
 
-        handle = infra.dask_infra.clean_write_parquet(df, df_out_path, compute=False)
+        handle = infra.dask.clean_write_parquet(df, df_out_path, compute=False)
         future_handles.append(handle)
 
     print("Recursive dns trim now")
@@ -59,7 +59,7 @@ def trim_flows_flat_noindex(in_path, out_path):
                     })
 
     print("Single layer flow trim now")
-    infra.dask_infra.clean_write_parquet(df, out_path)
+    infra.dask.clean_write_parquet(df, out_path)
 
 
 def trim_atypical_flows_flat_noindex(in_path, out_path):
@@ -73,7 +73,7 @@ def trim_atypical_flows_flat_noindex(in_path, out_path):
                     })
 
     print("Single layer flow trim now")
-    infra.dask_infra.clean_write_parquet(df, out_path)
+    infra.dask.clean_write_parquet(df, out_path)
 
 
 def trim_dns_flat(in_path, out_path):
@@ -81,7 +81,7 @@ def trim_dns_flat(in_path, out_path):
     df = df.loc[(df.index >= '2019-03-10 00:00') & (df.index < '2020-05-03 00:00')]
 
     print("Single layer dns trim now")
-    infra.dask_infra.clean_write_parquet(df, out_path)
+    infra.dask.clean_write_parquet(df, out_path)
 
 
 def trim_transactions_flat_noindex(in_path, out_path):
@@ -90,11 +90,11 @@ def trim_transactions_flat_noindex(in_path, out_path):
     print("Single layer transaction trim  now")
     df["amount_bytes"] = df["amount_bytes"].fillna(value=0)
     df = df.astype({"amount_bytes": int, "amount_idr": int})
-    infra.dask_infra.clean_write_parquet(df, out_path)
+    infra.dask.clean_write_parquet(df, out_path)
 
 
 if __name__ == "__main__":
-    client = infra.dask_infra.setup_dask_client()
+    client = infra.dask.setup_dask_client()
     trim_flows_recursive("data/clean/flows/typical_fqdn_TZ_DIV_user_INDEX_start",
                          "data/clean/flows/typical_fqdn_TM_DIV_user_INDEX_start",
                          client)

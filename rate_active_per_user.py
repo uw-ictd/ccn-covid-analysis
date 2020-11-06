@@ -4,12 +4,12 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression
 import statsmodels.api as sm
 
-import infra.dask_infra
-import infra.pd_infra
+import infra.dask
+import infra.pd
 import infra.platform
 
 def reduce_to_pandas(outpath, dask_client):
-    flows = infra.dask_infra.read_parquet(
+    flows = infra.dask.read_parquet(
         "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["user", "bytes_up", "bytes_down"]]
 
     flows["bytes_total"] = flows["bytes_up"] + flows["bytes_down"]
@@ -25,7 +25,7 @@ def reduce_to_pandas(outpath, dask_client):
     flows = flows.reset_index()[["start_bin", "user", "bytes_total"]]
     flows = flows.compute()
 
-    infra.pd_infra.clean_write_parquet(flows, outpath)
+    infra.pd.clean_write_parquet(flows, outpath)
 
 
 def compute_cdf(frame, value_column, base_column):
@@ -38,10 +38,10 @@ def compute_cdf(frame, value_column, base_column):
 
 
 def make_plot(inpath):
-    flows = infra.pd_infra.read_parquet(inpath)
+    flows = infra.pd.read_parquet(inpath)
     flows = flows.reset_index()
 
-    activity = infra.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")
+    activity = infra.pd.read_parquet("data/clean/user_active_deltas.parquet")
 
     # Drop users new to the network first active less than a week ago.
     activity = activity.loc[
@@ -180,7 +180,7 @@ if __name__ == "__main__":
 
     if platform.large_compute_support:
         print("Running compute subcommands")
-        client = infra.dask_infra.setup_platform_tuned_dask_client(per_worker_memory_GB=10, platform=platform)
+        client = infra.dask.setup_platform_tuned_dask_client(per_worker_memory_GB=10, platform=platform)
         reduce_to_pandas(outpath=graph_temporary_file, dask_client=client)
         client.close()
 

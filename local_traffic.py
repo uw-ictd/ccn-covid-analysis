@@ -6,17 +6,17 @@ import numpy as np
 import pandas as pd
 
 import infra.constants
-import infra.dask_infra
-import infra.pd_infra
+import infra.dask
+import infra.pd
 import infra.platform
 
 
 def reduce_to_pandas(outfile, dask_client):
-    flows = infra.dask_infra.read_parquet(
+    flows = infra.dask.read_parquet(
         "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
     )[["bytes_up", "bytes_down", "local"]]
 
-    peer_flows = infra.dask_infra.read_parquet(
+    peer_flows = infra.dask.read_parquet(
         "data/clean/flows/p2p_TM_DIV_none_INDEX_start"
     )[["bytes_a_to_b", "bytes_b_to_a"]]
 
@@ -45,11 +45,11 @@ def reduce_to_pandas(outfile, dask_client):
     flows_realized = flows.compute()
 
     # Store the reduced pandas dataframe for graphing to disk
-    infra.pd_infra.clean_write_parquet(flows_realized, outfile)
+    infra.pd.clean_write_parquet(flows_realized, outfile)
 
 
 def make_plot(infile):
-    flows = infra.pd_infra.read_parquet(infile)
+    flows = infra.pd.read_parquet(infile)
 
     # Record 0 for gaps
     flows = flows.fillna(value=0)
@@ -98,12 +98,12 @@ def make_plot(infile):
 
 
 def anomaly_flows_reduce_to_pandas(outpath, dask_client):
-    anomaly_flows = infra.dask_infra.read_parquet("data/clean/flows/nouser_TM_DIV_none_INDEX_start")
-    infra.pd_infra.clean_write_parquet(anomaly_flows.compute(), outpath)
+    anomaly_flows = infra.dask.read_parquet("data/clean/flows/nouser_TM_DIV_none_INDEX_start")
+    infra.pd.clean_write_parquet(anomaly_flows.compute(), outpath)
 
 
 def anomaly_flows_make_plot(inpath):
-    anomaly_flows = infra.pd_infra.read_parquet(inpath).reset_index()
+    anomaly_flows = infra.pd.read_parquet(inpath).reset_index()
 
     # Classify the anomalies
     anomaly_flows = anomaly_flows.assign(kind="Unknown")
@@ -123,7 +123,7 @@ def anomaly_flows_make_plot(inpath):
     anomaly_flows = anomaly_flows.reset_index()
 
     # Densify the samples with zeros for days with no observed flows
-    dense_index = infra.pd_infra.cartesian_product(
+    dense_index = infra.pd.cartesian_product(
         pd.DataFrame({"day_bin": pd.date_range(infra.constants.MIN_DATE, infra.constants.MAX_DATE)}),
         pd.DataFrame({"kind": anomaly_flows["kind"].unique()})
     )
@@ -147,8 +147,8 @@ def anomaly_flows_make_plot(inpath):
 
 
 def p2p_flows_reduce_to_pandas(outpath, dask_client):
-    p2p_flows = infra.dask_infra.read_parquet("data/clean/flows/p2p_TM_DIV_none_INDEX_start")
-    infra.pd_infra.clean_write_parquet(p2p_flows.compute(), outpath)
+    p2p_flows = infra.dask.read_parquet("data/clean/flows/p2p_TM_DIV_none_INDEX_start")
+    infra.pd.clean_write_parquet(p2p_flows.compute(), outpath)
 
 
 def _canonical_order(a, b):
@@ -160,7 +160,7 @@ def _canonical_order(a, b):
 
 
 def p2p_flows_make_plot(inpath):
-    p2p_flows = infra.pd_infra.read_parquet(inpath).reset_index()
+    p2p_flows = infra.pd.read_parquet(inpath).reset_index()
 
     # Classify the flows
     p2p_flows = p2p_flows.assign(kind="Two-Way")
@@ -183,7 +183,7 @@ def p2p_flows_make_plot(inpath):
     p2p_flows = p2p_flows.reset_index()
 
     # Densify the samples with zeros for days with no observed flows
-    dense_index = infra.pd_infra.cartesian_product(
+    dense_index = infra.pd.cartesian_product(
         pd.DataFrame({"day_bin": pd.date_range(infra.constants.MIN_DATE, infra.constants.MAX_DATE)}),
         pd.DataFrame({"kind": p2p_flows["kind"].unique()})
     )
@@ -267,7 +267,7 @@ if __name__ == "__main__":
 
     if platform.large_compute_support:
         print("Running compute subcommands")
-        client = infra.dask_infra.setup_platform_tuned_dask_client(per_worker_memory_GB=10, platform=platform)
+        client = infra.dask.setup_platform_tuned_dask_client(per_worker_memory_GB=10, platform=platform)
         reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
         anomaly_flows_reduce_to_pandas(outpath=anomaly_temporary_file, dask_client=client)
         p2p_flows_reduce_to_pandas(outpath=p2p_temporary_file, dask_client=client)

@@ -3,8 +3,8 @@ import pandas as pd
 
 from infra.constants import MAX_DATE, MIN_DATE
 import infra.parsers
-import infra.dask_infra
-import infra.pd_infra
+import infra.dask
+import infra.pd
 
 
 # Module specific format options
@@ -20,7 +20,7 @@ def compute_user_currency_histories():
     # Extract data from the transactions file into a resolved pandas frame
     # Importantly, use the timezone adjusted log but NOT the trimmed log to
     # avoid clipping state from early users.
-    transactions = infra.dask_infra.read_parquet(
+    transactions = infra.dask.read_parquet(
         "data/internal/transactions_TZ"
     ).compute()
 
@@ -72,7 +72,7 @@ def compute_user_currency_histories():
     print("==================================================")
 
     early_registered_users = pd.DataFrame({"user": negative_balances["user"].unique()})
-    infra.pd_infra.clean_write_parquet(early_registered_users, "data/clean/early_registered_users.parquet")
+    infra.pd.clean_write_parquet(early_registered_users, "data/clean/early_registered_users.parquet")
 
     negative_offsets = negative_balances.groupby("user").min().rename(columns={"balance": "offset"})
     negative_offsets["offset"] = -negative_offsets["offset"]
@@ -107,7 +107,7 @@ def make_time_at_zero_plots(user_balance_frame):
     user_balance_frame["duration_at_state"] = user_balance_frame["next_event_time"] - user_balance_frame["timestamp"]
 
     # Filter the balances included to users who have been minimally active
-    user_active_ranges = infra.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")
+    user_active_ranges = infra.pd.read_parquet("data/clean/user_active_deltas.parquet")
     # Drop users new to the network first active less than a week ago.
     users_to_analyze = user_active_ranges.loc[
         user_active_ranges["days_since_first_active"] >= 7,

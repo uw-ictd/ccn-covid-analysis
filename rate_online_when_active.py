@@ -2,8 +2,8 @@ import altair as alt
 import numpy as np
 import pandas as pd
 
-import infra.dask_infra
-import infra.pd_infra
+import infra.dask
+import infra.pd
 import infra.platform
 
 
@@ -17,7 +17,7 @@ def compute_cdf(frame, value_column, base_column):
 
 
 def make_plot(inpath):
-    activity = infra.pd_infra.read_parquet(inpath)
+    activity = infra.pd.read_parquet(inpath)
 
     # Drop users that have been active less than a week.
     activity = activity.loc[

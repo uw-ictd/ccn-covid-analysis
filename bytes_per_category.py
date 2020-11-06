@@ -5,8 +5,8 @@ import altair as alt
 import pandas as pd
 
 import infra.constants
-import infra.dask_infra
-import infra.pd_infra
+import infra.dask
+import infra.pd
 import infra.platform
 
 
@@ -18,7 +18,7 @@ pd.set_option('display.max_rows', 40)
 
 
 def reduce_to_pandas(outfile, dask_client):
-    flows = infra.dask_infra.read_parquet(
+    flows = infra.dask.read_parquet(
         "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["category", "org", "bytes_up", "bytes_down", "protocol", "dest_port"]]
 
     # Compress to days
@@ -30,11 +30,11 @@ def reduce_to_pandas(outfile, dask_client):
     flows = flows.groupby(["start_bin", "category", "org"]).sum()
     flows = flows.compute()
 
-    infra.pd_infra.clean_write_parquet(flows, outfile)
+    infra.pd.clean_write_parquet(flows, outfile)
 
 
 def make_category_plot(infile):
-    grouped_flows = infra.pd_infra.read_parquet(infile)
+    grouped_flows = infra.pd.read_parquet(infile)
     grouped_flows = grouped_flows.reset_index()
     grouped_flows["bytes_total"] = grouped_flows["bytes_up"] + grouped_flows["bytes_down"]
 
@@ -121,7 +121,7 @@ def make_category_plot(infile):
 
 
 def make_category_aggregate_bar_chart(infile):
-    grouped_flows = infra.pd_infra.read_parquet(infile).reset_index()
+    grouped_flows = infra.pd.read_parquet(infile).reset_index()
 
     # Consolidate by week instead of by day
     grouped_flows = grouped_flows[
@@ -167,7 +167,7 @@ def make_category_aggregate_bar_chart(infile):
 
 
 def compute_stats(infile, dimension):
-    grouped_flows = infra.pd_infra.read_parquet(infile)
+    grouped_flows = infra.pd.read_parquet(infile)
     grouped_flows = grouped_flows.reset_index()
     grouped_flows["bytes_total"] = grouped_flows["bytes_up"] + grouped_flows["bytes_down"]
 
@@ -193,7 +193,7 @@ def compute_stats(infile, dimension):
 def make_org_plot(infile):
     """ Generate plots to explore the traffic distribution across organizations
     """
-    grouped_flows = infra.pd_infra.read_parquet(infile)
+    grouped_flows = infra.pd.read_parquet(infile)
     grouped_flows = grouped_flows.reset_index()
     grouped_flows["bytes_total"] = grouped_flows["bytes_up"] + grouped_flows["bytes_down"]
 
@@ -345,7 +345,7 @@ if __name__ == "__main__":
 
     graph_temporary_file = "scratch/graphs/bytes_per_category"
     if platform.large_compute_support:
-        client = infra.dask_infra.setup_platform_tuned_dask_client(10, platform)
+        client = infra.dask.setup_platform_tuned_dask_client(10, platform)
         reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
         client.close()
 

@@ -3,8 +3,8 @@
 
 import altair
 import infra.constants
-import infra.dask_infra
-import infra.pd_infra
+import infra.dask
+import infra.pd
 import infra.platform
 import dask.config
 import dask.dataframe
@@ -67,7 +67,7 @@ def reduce_to_pandas(outfile, dask_client):
     #
     # Importantly, dask is lazy and doesn't actually import the whole thing,
     # but just keeps track of where the file shards live on disk.
-    df = infra.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+    df = infra.dask.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
 
     df = df.reset_index()
     df["day"] = df["start"].dt.floor("d")
@@ -76,11 +76,11 @@ def reduce_to_pandas(outfile, dask_client):
     df = df.groupby(["day", "user"]).sum().reset_index()
     df = df[["day", "user"]]
 
-    infra.pd_infra.clean_write_parquet(df.compute(), outfile)
+    infra.pd.clean_write_parquet(df.compute(), outfile)
 
 
 def make_plot(infile):
-    registered_users = infra.pd_infra.read_parquet("data/clean/early_registered_users.parquet")
+    registered_users = infra.pd.read_parquet("data/clean/early_registered_users.parquet")
     registered_users = registered_users.assign(start=infra.constants.MIN_DATE)
 
     transactions = pd.read_csv("data/clean/first_time_user_transactions.csv")[["start", "user"]]
@@ -104,7 +104,7 @@ def make_plot(infile):
         right_on="day",
     ).fillna(method="ffill").dropna()
 
-    user_days = infra.pd_infra.read_parquet(infile)
+    user_days = infra.pd.read_parquet(infile)
 
     active_users = user_days.groupby("day")["user"].nunique()
     active_users = active_users.to_frame().reset_index()
@@ -220,7 +220,7 @@ if __name__ == "__main__":
     if platform.large_compute_support:
         print("Running compute tasks")
         print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
-        client = infra.dask_infra.setup_platform_tuned_dask_client(10, platform)
+        client = infra.dask.setup_platform_tuned_dask_client(10, platform)
         reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
         client.close()
 

@@ -3,13 +3,13 @@
 
 import altair as alt
 
-import infra.dask_infra
-import infra.pd_infra
+import infra.dask
+import infra.pd
 import infra.platform
 
 
 def make_plot():
-    transactions = infra.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
+    transactions = infra.pd.read_parquet("data/clean/transactions_TM.parquet")
 
     purchases = transactions.loc[transactions["kind"] == "purchase"]
     purchases = purchases.groupby("amount_bytes")["timestamp"].count()

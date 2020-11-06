@@ -3,8 +3,8 @@ import numpy as np
 import pandas as pd
 
 import infra.constants
-import infra.dask_infra
-import infra.pd_infra
+import infra.dask
+import infra.pd
 import infra.platform
 
 TOTAL_GBYTES = 1339.916865913
@@ -12,21 +12,21 @@ TOTAL_INTERNET_GBYTES = 1324.865370317
 
 
 def _explore_unknowns(in_path):
-    flows = infra.dask_infra.read_parquet(in_path)
+    flows = infra.dask.read_parquet(in_path)
     unknown_flows = flows.loc[(flows["category"] == "Unknown (No DNS)") | (flows["org"] == "Unknown (No DNS)")]
     unknown_flows["mbytes_total"] = (unknown_flows["bytes_up"] + unknown_flows["bytes_down"]) / 1000**2
     unknown_flows = unknown_flows.groupby(["dest_ip"]).sum()
     unknown_flows = unknown_flows.compute()
-    infra.pd_infra.clean_write_parquet(unknown_flows, "scratch/flows/temp-unkown-fqdns")
-    unknown_flows = infra.pd_infra.read_parquet("scratch/flows/temp-unkown-fqdns")
+    infra.pd.clean_write_parquet(unknown_flows, "scratch/flows/temp-unkown-fqdns")
+    unknown_flows = infra.pd.read_parquet("scratch/flows/temp-unkown-fqdns")
     unknown_flows = unknown_flows.sort_values(["mbytes_total"])
     print(unknown_flows.tail(40))
 
 
 def _compute_counts(dask_client):
     print("---Raw Counts---")
-    typical = infra.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["bytes_up", "bytes_down", "local"]]
-    p_to_p = infra.dask_infra.read_parquet("data/clean/flows/p2p_TM_DIV_none_INDEX_start")[["bytes_b_to_a", "bytes_a_to_b"]]
+    typical = infra.dask.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["bytes_up", "bytes_down", "local"]]
+    p_to_p = infra.dask.read_parquet("data/clean/flows/p2p_TM_DIV_none_INDEX_start")[["bytes_b_to_a", "bytes_a_to_b"]]
 
     typical_flow_count = typical.shape[0]
     p2p_flow_count = p_to_p.shape[0]
@@ -59,14 +59,14 @@ def _compute_counts(dask_client):
     print("Total intranet Gbytes:", intranet_bytes/1000**3, intranet_bytes/1000**3/total_gbytes)
     print("Total GBytes:", (internet_uplink_bytes + internet_downlink_bytes + intranet_bytes)/1000**3)
 
-    transactions = infra.dask_infra.read_parquet("data/clean/transactions_TM")
+    transactions = infra.dask.read_parquet("data/clean/transactions_TM")
     print("Purchase transactions:", len(transactions.loc[transactions["kind"] == "purchase"]))
     print("Total transactions:", len(transactions))
 
 
 def _compute_dns_percentages(dask_client):
     print("---DNS---")
-    typical = infra.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+    typical = infra.dask.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
     typical["bytes_total"] = typical["bytes_up"] + typical["bytes_down"]
 
     internet_flows = typical.loc[typical["local"] == False]
@@ -98,7 +98,7 @@ def _compute_dns_percentages(dask_client):
 
 def _compute_category_percentages(dask_client):
     print("---Category/Org---")
-    typical = infra.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+    typical = infra.dask.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
     typical["bytes_total"] = typical["bytes_up"] + typical["bytes_down"]
 
     internet_flows = typical.loc[typical["local"] == False]
@@ -137,7 +137,7 @@ def _compute_dates():
 
 def _internet_uplink_downlink_ratio(dask_client):
     print("---DL UL ratio---")
-    typical = infra.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+    typical = infra.dask.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
     internet_flows = typical.loc[typical["local"] == False]
     dl_ul_ratio = internet_flows["bytes_down"].sum() / internet_flows["bytes_up"].sum()
     print("DL/UL ratio:", dl_ul_ratio.compute(), ":1")
@@ -145,7 +145,7 @@ def _internet_uplink_downlink_ratio(dask_client):
 
 def _total_bigco_traffic(dask_client):
     print("---BigCo total bytes ---")
-    typical = infra.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+    typical = infra.dask.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
     typical["bytes_total"] = typical["bytes_up"] + typical["bytes_down"]
 
     facebook_flows = typical.loc[(typical["org"] == "Facebook") | (typical["org"] == "Instagram") | (typical["org"] == "WhatsApp")]
@@ -166,7 +166,7 @@ def _total_bigco_traffic(dask_client):
 
 def _median_offline(dask_client):
     print("---Online Ratio---")
-    activity = infra.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")
+    activity = infra.pd.read_parquet("data/clean/user_active_deltas.parquet")
 
     # Drop users that have been active less than a week.
     activity = activity.loc[
@@ -192,7 +192,7 @@ def _median_offline(dask_client):
 
 def _total_video_traffic(dask_client):
     print("---video total bytes ---")
-    typical = infra.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+    typical = infra.dask.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
     typical["bytes_total"] = typical["bytes_down"] + typical["bytes_up"]
 
     adult_flows = typical.loc[(typical["category"] == "Adult Video")]
@@ -201,7 +201,7 @@ def _total_video_traffic(dask_client):
     video_flows = typical.loc[(typical["category"] == "Video")]
     video_gbytes = video_flows["bytes_total"].sum() / 1000**3
 
-    transactions = infra.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
+    transactions = infra.pd.read_parquet("data/clean/transactions_TM.parquet")
     purchases = transactions.loc[transactions["kind"] == "purchase"]
 
     user_ranks = purchases.groupby("user").sum().reset_index()
@@ -247,7 +247,7 @@ def _total_video_traffic(dask_client):
 
 
 def _inequality(client):
-    transactions = infra.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
+    transactions = infra.pd.read_parquet("data/clean/transactions_TM.parquet")
     purchases = transactions.loc[transactions["kind"] == "purchase"]
     purchases["amount_usd"] = purchases["amount_idr"] * infra.constants.IDR_TO_USD
 
@@ -256,7 +256,7 @@ def _inequality(client):
 
     # Find the first day the user was active. Define "active" as making first
     # purchase or first data in network.
-    user_active_ranges = infra.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")[["user", "days_since_first_active", "days_active"]]
+    user_active_ranges = infra.pd.read_parquet("data/clean/user_active_deltas.parquet")[["user", "days_since_first_active", "days_active"]]
 
     # Drop users that have been active less than a week.
     users_to_analyze = user_active_ranges.loc[
@@ -283,7 +283,7 @@ def _inequality(client):
 
 def _filter_stats(client):
     print("---Filter Stats---")
-    activity = infra.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")
+    activity = infra.pd.read_parquet("data/clean/user_active_deltas.parquet")
     total = len(activity)
     print("Original users:", total)
 
@@ -305,8 +305,8 @@ def _filter_stats(client):
 
     print("Final count", final_count, "/", total, "({})%".format(final_count/total))
 
-    typical = infra.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
-    p2p = infra.dask_infra.read_parquet("data/clean/flows/p2p_TM_DIV_none_INDEX_start")
+    typical = infra.dask.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+    p2p = infra.dask.read_parquet("data/clean/flows/p2p_TM_DIV_none_INDEX_start")
 
     typical = typical.merge(activity, on=["user"], how="inner")
     typical_flow_count = len(typical)
@@ -316,7 +316,7 @@ def _filter_stats(client):
 
 def _total_ice_traffic(dask_client):
     print("---ICE total bytes ---")
-    typical = infra.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+    typical = infra.dask.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
     typical["bytes_total"] = typical["bytes_up"] + typical["bytes_down"]
 
     all_gbytes = typical[typical["local"] == False]["bytes_total"].sum() / 1000**3
@@ -346,7 +346,7 @@ def _total_ice_traffic(dask_client):
 
 def _compute_arpu():
     print("---ARPU ---")
-    transactions = infra.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
+    transactions = infra.pd.read_parquet("data/clean/transactions_TM.parquet")
     purchases = transactions.loc[transactions["kind"] == "purchase"]
     purchases["amount_usd"] = purchases["amount_idr"] * infra.constants.IDR_TO_USD
 
@@ -376,7 +376,7 @@ if __name__ == "__main__":
 
     if platform.large_compute_support:
         print("Running compute tasks")
-        client = infra.dask_infra.setup_platform_tuned_dask_client(10, platform)
+        client = infra.dask.setup_platform_tuned_dask_client(10, platform)
         # _compute_counts(client)
         # _compute_dns_percentages(client)
         # _compute_category_percentages(client)

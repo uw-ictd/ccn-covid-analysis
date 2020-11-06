@@ -10,20 +10,20 @@ import numpy as np
 import pandas as pd
 
 import infra.constants
-import infra.dask_infra
-import infra.pd_infra
+import infra.dask
+import infra.pd
 
 
 def reduce_flow_gaps_to_pandas(outfile, dask_client):
-    typical_flows = infra.dask_infra.read_parquet(
+    typical_flows = infra.dask.read_parquet(
         "data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start"
     )[["bytes_up", "bytes_down", "end"]]
 
-    peer_flows = infra.dask_infra.read_parquet(
+    peer_flows = infra.dask.read_parquet(
         "data/clean/flows/p2p_TM_DIV_none_INDEX_start"
     )[["bytes_a_to_b", "bytes_b_to_a", "end"]]
 
-    nouser_flows = infra.dask_infra.read_parquet(
+    nouser_flows = infra.dask.read_parquet(
         "data/clean/flows/nouser_TM_DIV_none_INDEX_start"
     )[["bytes_a_to_b", "bytes_b_to_a", "end"]]
 
@@ -75,11 +75,11 @@ def reduce_flow_gaps_to_pandas(outfile, dask_client):
     gaps_frame = pd.DataFrame(gaps, columns=["start", "end"])
     print(gaps_frame.head())
 
-    infra.pd_infra.clean_write_parquet(gaps_frame, outfile)
+    infra.pd.clean_write_parquet(gaps_frame, outfile)
 
 
 def make_timeline_plot(infile):
-    gaps = infra.pd_infra.read_parquet(infile)
+    gaps = infra.pd.read_parquet(infile)
     print(gaps.head())
     alt.Chart(gaps).mark_rect().encode(
         x=alt.X("start:T"),
@@ -93,7 +93,7 @@ def make_timeline_plot(infile):
 
 
 def compute_uptime_stats(infile):
-    gaps = infra.pd_infra.read_parquet(infile)
+    gaps = infra.pd.read_parquet(infile)
 
     gaps["duration"] = gaps["end"] - gaps["start"]
     downtime = gaps["duration"].sum()
@@ -105,7 +105,7 @@ def compute_uptime_stats(infile):
 
 
 def make_outage_duration_cdf_plot(infile):
-    gaps = infra.pd_infra.read_parquet(infile)
+    gaps = infra.pd.read_parquet(infile)
 
     gaps["duration"] = gaps["end"] - gaps["start"]
 
@@ -144,7 +144,7 @@ def compute_cdf(frame, value_column, base_column):
 
 
 if __name__ == "__main__":
-    client = infra.dask_infra.setup_dask_client()
+    client = infra.dask.setup_dask_client()
     graph_temporary_file = "scratch/graphs/flow_gaps"
     # reduce_flow_gaps_to_pandas(outfile=graph_temporary_file, dask_client=client)
     make_timeline_plot(graph_temporary_file)

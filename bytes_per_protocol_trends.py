@@ -1,13 +1,13 @@
 import altair as alt
 import infra.constants
-import infra.dask_infra
-import infra.pd_infra
+import infra.dask
+import infra.pd
 import infra.platform
 import pandas as pd
 
 
 def reduce_to_pandas(outfile, dask_client):
-    flows = infra.dask_infra.read_parquet(
+    flows = infra.dask.read_parquet(
         "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
     )[["protocol", "dest_port", "bytes_up", "bytes_down"]]
 
@@ -21,11 +21,11 @@ def reduce_to_pandas(outfile, dask_client):
 
     flows = flows.compute()
 
-    infra.pd_infra.clean_write_parquet(flows, outfile)
+    infra.pd.clean_write_parquet(flows, outfile)
 
 
 def make_plot(infile):
-    grouped_flows = infra.pd_infra.read_parquet(infile)
+    grouped_flows = infra.pd.read_parquet(infile)
     grouped_flows = grouped_flows.reset_index()
     grouped_flows["bytes_total"] = grouped_flows["bytes_up"] + grouped_flows["bytes_down"]
 
@@ -191,7 +191,7 @@ if __name__ == "__main__":
 
     if platform.large_compute_support:
         print("Running compute")
-        client = infra.dask_infra.setup_platform_tuned_dask_client(10, platform)
+        client = infra.dask.setup_platform_tuned_dask_client(10, platform)
         reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
         client.close()
         print("Done with compute")

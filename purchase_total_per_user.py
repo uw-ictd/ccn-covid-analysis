@@ -2,14 +2,14 @@ import pandas as pd
 import altair as alt
 
 import infra.constants
-import infra.dask_infra
-import infra.pd_infra
+import infra.dask
+import infra.pd
 
-transactions = infra.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
+transactions = infra.pd.read_parquet("data/clean/transactions_TM.parquet")
 
 # Find the first day the user was active. Define "active" as making first
 # purchase or first data in network.
-user_active_ranges = infra.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")[["user", "days_since_first_active", "days_active"]]
+user_active_ranges = infra.pd.read_parquet("data/clean/user_active_deltas.parquet")[["user", "days_since_first_active", "days_active"]]
 
 # Drop users that have been active less than a week.
 users_to_analyze = user_active_ranges.loc[

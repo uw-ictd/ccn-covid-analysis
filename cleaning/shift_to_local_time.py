@@ -2,7 +2,7 @@ import pandas as pd
 import dask.dataframe
 import os
 
-import infra.dask_infra
+import infra.dask
 
 def shift_flows_recursive(in_path, out_path, client):
     subfiles = sorted(os.listdir(in_path))
@@ -20,7 +20,7 @@ def shift_flows_recursive(in_path, out_path, client):
         df["end"] = df["end"] + pd.tseries.offsets.DateOffset(hours=9)
         df = df.set_index("start")
 
-        handle = infra.dask_infra.clean_write_parquet(df, df_out_path, compute=False)
+        handle = infra.dask.clean_write_parquet(df, df_out_path, compute=False)
         future_handles.append(handle)
 
     print("Recursive flow shift now")
@@ -41,7 +41,7 @@ def shift_dns_recursive(in_path, out_path, client):
         df["timestamp"] = df["timestamp"] + pd.tseries.offsets.DateOffset(hours=9)
         df = df.set_index("timestamp")
 
-        handle = infra.dask_infra.clean_write_parquet(df, df_out_path, compute=False)
+        handle = infra.dask.clean_write_parquet(df, df_out_path, compute=False)
         future_handles.append(handle)
 
     print("Recursive dns shift now")
@@ -53,7 +53,7 @@ def shift_flows_flat_noindex(in_path, out_path):
     df["start"] = df["start"] + pd.tseries.offsets.DateOffset(hours=9)
     df["end"] = df["end"] + pd.tseries.offsets.DateOffset(hours=9)
     print("Single layer flow shift now")
-    infra.dask_infra.clean_write_parquet(df, out_path)
+    infra.dask.clean_write_parquet(df, out_path)
 
 
 def shift_dns_flat(in_path, out_path):
@@ -62,18 +62,18 @@ def shift_dns_flat(in_path, out_path):
     df["timestamp"] = df["timestamp"] + pd.tseries.offsets.DateOffset(hours=9)
     print("Single layer dns shift now")
     df = df.set_index("timestamp")
-    infra.dask_infra.clean_write_parquet(df, out_path)
+    infra.dask.clean_write_parquet(df, out_path)
 
 
 def shift_transactions_flat_noindex(in_path, out_path):
     df = dask.dataframe.read_parquet(in_path, engine="fastparquet")
     df["timestamp"] = df["timestamp"] + pd.tseries.offsets.DateOffset(hours=9)
     print("Single layer timestamp shift now")
-    infra.dask_infra.clean_write_parquet(df, out_path)
+    infra.dask.clean_write_parquet(df, out_path)
 
 
 if __name__ == "__main__":
-    client = infra.dask_infra.setup_dask_client()
+    client = infra.dask.setup_dask_client()
     shift_flows_recursive("data/clean/flows/typical_fqdn_DIV_user_INDEX_start",
                           "data/clean/flows/typical_fqdn_TZ_DIV_user_INDEX_start",
                           client)

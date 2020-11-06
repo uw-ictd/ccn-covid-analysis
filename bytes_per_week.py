@@ -11,8 +11,8 @@ import math
 import numpy as np
 import pandas as pd
 
-import infra.dask_infra
-import infra.pd_infra
+import infra.dask
+import infra.pd
 import infra.platform
 
 # Configs
@@ -56,8 +56,8 @@ def get_throughput_data(flows):
 
 
 def reduce_to_pandas(outfile, dask_client):
-    typical = infra.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["bytes_up", "bytes_down"]]
-    p_to_p = infra.dask_infra.read_parquet("data/clean/flows/p2p_TM_DIV_none_INDEX_start")[["bytes_b_to_a", "bytes_a_to_b"]]
+    typical = infra.dask.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["bytes_up", "bytes_down"]]
+    p_to_p = infra.dask.read_parquet("data/clean/flows/p2p_TM_DIV_none_INDEX_start")[["bytes_b_to_a", "bytes_a_to_b"]]
     p_to_p["bytes_local"] = p_to_p["bytes_a_to_b"] + p_to_p["bytes_b_to_a"]
     print(p_to_p)
 
@@ -102,11 +102,11 @@ def reduce_to_pandas(outfile, dask_client):
 
     print("computed", combined)
 
-    infra.pd_infra.clean_write_parquet(combined, outfile)
+    infra.pd.clean_write_parquet(combined, outfile)
 
 
 def make_plot(infile):
-    throughput = infra.pd_infra.read_parquet(infile)
+    throughput = infra.pd.read_parquet(infile)
 
     # Fix plotting scale
     throughput["GB"] = throughput["bytes"] / (1000**3)
@@ -119,7 +119,7 @@ def make_plot(infile):
     # Generate a dense dataframe with all days and directions
     date_range = pd.DataFrame({"day_bin": pd.date_range(infra.constants.MIN_DATE, infra.constants.MAX_DATE, freq="1D")})
     category_range = pd.DataFrame({"throughput_type": ["Up", "Down", "Local"]}, dtype=object)
-    dense_index = infra.pd_infra.cartesian_product(date_range, category_range)
+    dense_index = infra.pd.cartesian_product(date_range, category_range)
 
     throughput = dense_index.merge(
         throughput,
@@ -218,7 +218,7 @@ if __name__ == "__main__":
     graph_temporary_file = "scratch/graphs/bytes_per_week"
     if platform.large_compute_support:
         print("Running compute tasks")
-        client = infra.dask_infra.setup_platform_tuned_dask_client(10, platform)
+        client = infra.dask.setup_platform_tuned_dask_client(10, platform)
         reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
         client.close()
 

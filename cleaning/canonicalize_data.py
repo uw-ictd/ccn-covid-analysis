@@ -2,7 +2,7 @@
 """
 
 import mappers.domains
-import infra.dask_infra
+import infra.dask
 import infra.parsers
 import csv
 import dask.config
@@ -456,7 +456,7 @@ def consolidate_datasets(input_directory,
 
 
 def _clean_write_parquet(dataframe, path, engine="fastparquet", compute=True):
-    return infra.dask_infra.clean_write_parquet(dataframe, path, engine, compute)
+    return infra.dask.clean_write_parquet(dataframe, path, engine, compute)
 
 
 def split_by_user(flowlog_path, dns_path, client):
@@ -702,7 +702,7 @@ def categorize_fqdn_from_parquet(in_path, out_path, compute=True):
 
 
 if __name__ == "__main__":
-    client = infra.dask_infra.setup_dask_client()
+    client = infra.dask.setup_dask_client()
 
     CLEAN_TRANSACTIONS = False
 
@@ -729,7 +729,7 @@ if __name__ == "__main__":
             "../data/transactions.log")
         transactions = dask.dataframe.from_pandas(transactions, chunksize=100000)
 
-        infra.dask_infra.clean_write_parquet(transactions,
+        infra.dask.clean_write_parquet(transactions,
                                            "../data/clean/transactions")
 
     if SPLIT_FLOWLOGS:

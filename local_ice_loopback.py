@@ -2,8 +2,8 @@ import altair as alt
 import numpy as np
 import pandas as pd
 
-import infra.dask_infra
-import infra.pd_infra
+import infra.dask
+import infra.pd
 import infra.platform
 
 
@@ -17,7 +17,7 @@ def compute_cdf(frame, value_column, base_column):
 
 
 def reduce_to_pandas(outpath, client):
-    flows = infra.dask_infra.read_parquet(
+    flows = infra.dask.read_parquet(
         "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["user", "category", "fqdn", "bytes_up", "bytes_down", "dest_ip"]]
 
     flows = flows.loc[(flows["category"] == "Peer to Peer") | (flows["category"] == "ICE (STUN/TURN)")]
@@ -37,11 +37,11 @@ def reduce_to_pandas(outpath, client):
 
     flows = flows.rename(columns={"user": "user_count"})
 
-    infra.pd_infra.clean_write_parquet(flows.compute(), outpath)
+    infra.pd.clean_write_parquet(flows.compute(), outpath)
 
 
 def make_plot(inpath):
-    flows = infra.pd_infra.read_parquet(inpath)
+    flows = infra.pd.read_parquet(inpath)
 
     flows = flows.reset_index()
     flows = flows.sort_values("total_bytes")
@@ -88,7 +88,7 @@ if __name__ == "__main__":
 
     if platform.large_compute_support:
         print("Running compute subcommands")
-        client = infra.dask_infra.setup_platform_tuned_dask_client(per_worker_memory_GB=10, platform=platform)
+        client = infra.dask.setup_platform_tuned_dask_client(per_worker_memory_GB=10, platform=platform)
         reduce_to_pandas(graph_temp_file, client)
         client.close()
 
