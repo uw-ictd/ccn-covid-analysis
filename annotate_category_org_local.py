@@ -7,7 +7,7 @@ import ipaddress
 import os
 
 import infra.dask_infra
-import infra.domains
+import mappers.domains
 import infra.platform
 
 from collections import namedtuple
@@ -22,7 +22,7 @@ def _categorize_user(in_path, out_path):
     frame = infra.dask_infra.read_parquet(in_path)
 
     # First pass assign by FQDN
-    processor = infra.domains.FqdnProcessor()
+    processor = mappers.domains.FqdnProcessor()
     frame["org_category"] = frame.apply(
         lambda row: processor.process_fqdn(row["fqdn"]),
         axis="columns",

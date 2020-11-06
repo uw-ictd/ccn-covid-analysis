@@ -1,7 +1,7 @@
 """ Loads data from raw data files and stores in an analysis friendly manner
 """
 
-import infra.domains
+import mappers.domains
 import infra.dask_infra
 import infra.parsers
 import csv
@@ -691,7 +691,7 @@ def categorize_fqdn_from_parquet(in_path, out_path, compute=True):
         engine="fastparquet")
 
     frame["category"] = frame.apply(
-        lambda row: infra.domains.assign_category(row["fqdn"]),
+        lambda row: mappers.domains.assign_category(row["fqdn"]),
         axis="columns",
         meta=("category", object))
 
