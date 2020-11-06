@@ -9,21 +9,21 @@ import altair as alt
 import numpy as np
 import pandas as pd
 
-import bok.constants
-import bok.dask_infra
-import bok.pd_infra
+import infra.constants
+import infra.dask_infra
+import infra.pd_infra
 
 
 def reduce_flow_gaps_to_pandas(outfile, dask_client):
-    typical_flows = bok.dask_infra.read_parquet(
+    typical_flows = infra.dask_infra.read_parquet(
         "data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start"
     )[["bytes_up", "bytes_down", "end"]]
 
-    peer_flows = bok.dask_infra.read_parquet(
+    peer_flows = infra.dask_infra.read_parquet(
         "data/clean/flows/p2p_TM_DIV_none_INDEX_start"
     )[["bytes_a_to_b", "bytes_b_to_a", "end"]]
 
-    nouser_flows = bok.dask_infra.read_parquet(
+    nouser_flows = infra.dask_infra.read_parquet(
         "data/clean/flows/nouser_TM_DIV_none_INDEX_start"
     )[["bytes_a_to_b", "bytes_b_to_a", "end"]]
 
@@ -75,11 +75,11 @@ def reduce_flow_gaps_to_pandas(outfile, dask_client):
     gaps_frame = pd.DataFrame(gaps, columns=["start", "end"])
     print(gaps_frame.head())
 
-    bok.pd_infra.clean_write_parquet(gaps_frame, outfile)
+    infra.pd_infra.clean_write_parquet(gaps_frame, outfile)
 
 
 def make_timeline_plot(infile):
-    gaps = bok.pd_infra.read_parquet(infile)
+    gaps = infra.pd_infra.read_parquet(infile)
     print(gaps.head())
     alt.Chart(gaps).mark_rect().encode(
         x=alt.X("start:T"),
@@ -93,11 +93,11 @@ def make_timeline_plot(infile):
 
 
 def compute_uptime_stats(infile):
-    gaps = bok.pd_infra.read_parquet(infile)
+    gaps = infra.pd_infra.read_parquet(infile)
 
     gaps["duration"] = gaps["end"] - gaps["start"]
     downtime = gaps["duration"].sum()
-    total_time = bok.constants.MAX_DATE - bok.constants.MIN_DATE
+    total_time = infra.constants.MAX_DATE - infra.constants.MIN_DATE
 
     print("Downtime", downtime)
     print("Total time", total_time)
@@ -105,7 +105,7 @@ def compute_uptime_stats(infile):
 
 
 def make_outage_duration_cdf_plot(infile):
-    gaps = bok.pd_infra.read_parquet(infile)
+    gaps = infra.pd_infra.read_parquet(infile)
 
     gaps["duration"] = gaps["end"] - gaps["start"]
 
@@ -144,7 +144,7 @@ def compute_cdf(frame, value_column, base_column):
 
 
 if __name__ == "__main__":
-    client = bok.dask_infra.setup_dask_client()
+    client = infra.dask_infra.setup_dask_client()
     graph_temporary_file = "scratch/graphs/flow_gaps"
     # reduce_flow_gaps_to_pandas(outfile=graph_temporary_file, dask_client=client)
     make_timeline_plot(graph_temporary_file)

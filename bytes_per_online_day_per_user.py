@@ -5,13 +5,13 @@ import altair as alt
 import numpy as np
 import pandas as pd
 
-import bok.dask_infra
-import bok.pd_infra
-import bok.platform
+import infra.dask_infra
+import infra.pd_infra
+import infra.platform
 
 
 def reduce_to_pandas(outpath, dask_client):
-    flows = bok.dask_infra.read_parquet(
+    flows = infra.dask_infra.read_parquet(
         "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["user", "bytes_up", "bytes_down"]]
 
     flows["bytes_total"] = flows["bytes_up"] + flows["bytes_down"]
@@ -27,7 +27,7 @@ def reduce_to_pandas(outpath, dask_client):
     flows = flows.reset_index()[["start_bin", "user", "bytes_total"]]
     flows = flows.compute()
 
-    bok.pd_infra.clean_write_parquet(flows, outpath)
+    infra.pd_infra.clean_write_parquet(flows, outpath)
 
 
 def compute_cdf(frame, value_column, base_column):
@@ -40,13 +40,13 @@ def compute_cdf(frame, value_column, base_column):
 
 
 def make_plot(inpath):
-    flows = bok.pd_infra.read_parquet(inpath)
+    flows = infra.pd_infra.read_parquet(inpath)
     flows = flows.reset_index()
     flows["MB"] = flows["bytes_total"] / (1000**2)
     user_total = flows[["user", "MB"]]
     user_total = user_total.groupby(["user"]).sum().reset_index()
 
-    activity = bok.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")
+    activity = infra.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")
 
     df = user_total.merge(activity[["user", "days_online", "optimistic_days_online", "days_active"]], on="user")
     df["MB_per_online_day"] = df["MB"] / df["days_online"]
@@ -92,7 +92,7 @@ def make_plot(inpath):
 
 
 if __name__ == "__main__":
-    platform = bok.platform.read_config()
+    platform = infra.platform.read_config()
 
     # Module specific format options
     pd.set_option('display.max_columns', None)
@@ -104,7 +104,7 @@ if __name__ == "__main__":
 
     if platform.large_compute_support:
         print("Running compute subcommands")
-        client = bok.dask_infra.setup_platform_tuned_dask_client(per_worker_memory_GB=10, platform=platform)
+        client = infra.dask_infra.setup_platform_tuned_dask_client(per_worker_memory_GB=10, platform=platform)
         reduce_to_pandas(outpath=graph_temporary_file, dask_client=client)
         client.close()
 

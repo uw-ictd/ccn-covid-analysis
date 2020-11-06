@@ -1,9 +1,9 @@
 """ Loads data from raw data files and stores in an analysis friendly manner
 """
 
-import bok.domains
-import bok.dask_infra
-import bok.parsers
+import infra.domains
+import infra.dask_infra
+import infra.parsers
 import csv
 import dask.config
 import dask.dataframe
@@ -18,10 +18,10 @@ import socket
 
 from collections import (Counter, defaultdict)
 
-from bok.datatypes import (TypicalFlow,
-                           AnomalyPeerToPeerFlow,
-                           AnomalyNoUserFlow,
-                           DnsResponse)
+from infra.datatypes import (TypicalFlow,
+                             AnomalyPeerToPeerFlow,
+                             AnomalyNoUserFlow,
+                             DnsResponse)
 
 
 def remove_nuls_from_file(source_path, dest_path):
@@ -456,7 +456,7 @@ def consolidate_datasets(input_directory,
 
 
 def _clean_write_parquet(dataframe, path, engine="fastparquet", compute=True):
-    return bok.dask_infra.clean_write_parquet(dataframe, path, engine, compute)
+    return infra.dask_infra.clean_write_parquet(dataframe, path, engine, compute)
 
 
 def split_by_user(flowlog_path, dns_path, client):
@@ -691,7 +691,7 @@ def categorize_fqdn_from_parquet(in_path, out_path, compute=True):
         engine="fastparquet")
 
     frame["category"] = frame.apply(
-        lambda row: bok.domains.assign_category(row["fqdn"]),
+        lambda row: infra.domains.assign_category(row["fqdn"]),
         axis="columns",
         meta=("category", object))
 
@@ -702,7 +702,7 @@ def categorize_fqdn_from_parquet(in_path, out_path, compute=True):
 
 
 if __name__ == "__main__":
-    client = bok.dask_infra.setup_dask_client()
+    client = infra.dask_infra.setup_dask_client()
 
     CLEAN_TRANSACTIONS = False
 
@@ -725,11 +725,11 @@ if __name__ == "__main__":
             "../data/original-raw-archives/transactions-encoded-2020-05-04.log",
             "data/transactions.log")
 
-        transactions = bok.parsers.parse_transactions_log(
+        transactions = infra.parsers.parse_transactions_log(
             "../data/transactions.log")
         transactions = dask.dataframe.from_pandas(transactions, chunksize=100000)
 
-        bok.dask_infra.clean_write_parquet(transactions,
+        infra.dask_infra.clean_write_parquet(transactions,
                                            "../data/clean/transactions")
 
     if SPLIT_FLOWLOGS:

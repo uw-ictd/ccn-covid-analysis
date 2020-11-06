@@ -2,7 +2,7 @@
 """
 
 import altair
-import bok.constants
+import infra.constants
 import dask.config
 import dask.dataframe
 import dask.distributed
@@ -11,14 +11,14 @@ import math
 import numpy as np
 import pandas as pd
 
-import bok.dask_infra
-import bok.pd_infra
-import bok.platform
+import infra.dask_infra
+import infra.pd_infra
+import infra.platform
 
 # Configs
 day_intervals = 7
 # IMPORTANT: Run get_date_range() to update these values when loading in a new dataset!
-max_date = bok.constants.MAX_DATE
+max_date = infra.constants.MAX_DATE
 
 def cohort_as_date_interval(x):
     cohort_start = max_date - datetime.timedelta(day_intervals * x + day_intervals - 1)
@@ -56,8 +56,8 @@ def get_throughput_data(flows):
 
 
 def reduce_to_pandas(outfile, dask_client):
-    typical = bok.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["bytes_up", "bytes_down"]]
-    p_to_p = bok.dask_infra.read_parquet("data/clean/flows/p2p_TM_DIV_none_INDEX_start")[["bytes_b_to_a", "bytes_a_to_b"]]
+    typical = infra.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["bytes_up", "bytes_down"]]
+    p_to_p = infra.dask_infra.read_parquet("data/clean/flows/p2p_TM_DIV_none_INDEX_start")[["bytes_b_to_a", "bytes_a_to_b"]]
     p_to_p["bytes_local"] = p_to_p["bytes_a_to_b"] + p_to_p["bytes_b_to_a"]
     print(p_to_p)
 
@@ -102,11 +102,11 @@ def reduce_to_pandas(outfile, dask_client):
 
     print("computed", combined)
 
-    bok.pd_infra.clean_write_parquet(combined, outfile)
+    infra.pd_infra.clean_write_parquet(combined, outfile)
 
 
 def make_plot(infile):
-    throughput = bok.pd_infra.read_parquet(infile)
+    throughput = infra.pd_infra.read_parquet(infile)
 
     # Fix plotting scale
     throughput["GB"] = throughput["bytes"] / (1000**3)
@@ -117,9 +117,9 @@ def make_plot(infile):
     print("Mean", temp["GB"].mean())
 
     # Generate a dense dataframe with all days and directions
-    date_range = pd.DataFrame({"day_bin": pd.date_range(bok.constants.MIN_DATE, bok.constants.MAX_DATE, freq="1D")})
+    date_range = pd.DataFrame({"day_bin": pd.date_range(infra.constants.MIN_DATE, infra.constants.MAX_DATE, freq="1D")})
     category_range = pd.DataFrame({"throughput_type": ["Up", "Down", "Local"]}, dtype=object)
-    dense_index = bok.pd_infra.cartesian_product(date_range, category_range)
+    dense_index = infra.pd_infra.cartesian_product(date_range, category_range)
 
     throughput = dense_index.merge(
         throughput,
@@ -213,12 +213,12 @@ def make_plot(infile):
 
 
 if __name__ == "__main__":
-    platform = bok.platform.read_config()
+    platform = infra.platform.read_config()
 
     graph_temporary_file = "scratch/graphs/bytes_per_week"
     if platform.large_compute_support:
         print("Running compute tasks")
-        client = bok.dask_infra.setup_platform_tuned_dask_client(10, platform)
+        client = infra.dask_infra.setup_platform_tuned_dask_client(10, platform)
         reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
         client.close()
 

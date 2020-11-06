@@ -2,18 +2,18 @@ import altair as alt
 import numpy as np
 import pandas as pd
 
-import bok.dask_infra
-import bok.pd_infra
-import bok.platform
+import infra.dask_infra
+import infra.pd_infra
+import infra.platform
 
 
 def create_all_flows(dask_client):
-    typical_flows = bok.dask_infra.read_parquet(
+    typical_flows = infra.dask_infra.read_parquet(
         "data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start")[["end", "protocol", "bytes_up", "bytes_down"]]
 
-    p2p_flows = bok.dask_infra.read_parquet("data/clean/flows/p2p_TM_DIV_none_INDEX_start")[["end", "protocol", "bytes_a_to_b", "bytes_b_to_a"]]
+    p2p_flows = infra.dask_infra.read_parquet("data/clean/flows/p2p_TM_DIV_none_INDEX_start")[["end", "protocol", "bytes_a_to_b", "bytes_b_to_a"]]
 
-    nouser_flows = bok.dask_infra.read_parquet("data/clean/flows/nouser_TM_DIV_none_INDEX_start")[["end", "protocol", "bytes_a_to_b", "bytes_b_to_a"]]
+    nouser_flows = infra.dask_infra.read_parquet("data/clean/flows/nouser_TM_DIV_none_INDEX_start")[["end", "protocol", "bytes_a_to_b", "bytes_b_to_a"]]
 
     typical_flows["bytes_total"] = typical_flows["bytes_up"] + typical_flows["bytes_down"]
     p2p_flows["bytes_total"] = p2p_flows["bytes_a_to_b"] + p2p_flows["bytes_b_to_a"]
@@ -25,11 +25,11 @@ def create_all_flows(dask_client):
 
     all_flows = typical_flows.append(p2p_flows).append(nouser_flows)
     all_flows = all_flows.set_index("start").repartition(partition_size="128M", force=True)
-    bok.dask_infra.clean_write_parquet(all_flows, "data/clean/flows/all_TM_DIV_none_INDEX_start")
+    infra.dask_infra.clean_write_parquet(all_flows, "data/clean/flows/all_TM_DIV_none_INDEX_start")
 
 
 def reduce_to_pandas(outfile, dask_client):
-    flows = bok.dask_infra.read_parquet(
+    flows = infra.dask_infra.read_parquet(
         "data/clean/flows/all_TM_DIV_none_INDEX_start")[["bytes_total"]]
 
     # Compress to days
@@ -43,11 +43,11 @@ def reduce_to_pandas(outfile, dask_client):
 
     flows = flows.compute()
 
-    bok.pd_infra.clean_write_parquet(flows, outfile)
+    infra.pd_infra.clean_write_parquet(flows, outfile)
 
 
 def make_plot(infile):
-    grouped_flows = bok.pd_infra.read_parquet(infile)
+    grouped_flows = infra.pd_infra.read_parquet(infile)
     grouped_flows = grouped_flows.reset_index()
 
     days = ['Monday', 'Tuesday', 'Wednesday',
@@ -146,12 +146,12 @@ def make_plot(infile):
 
 
 if __name__ == "__main__":
-    platform = bok.platform.read_config()
+    platform = infra.platform.read_config()
     graph_temporary_file = "scratch/graphs/bytes_per_day_of_week"
 
     if platform.large_compute_support:
         print("Performing compute operations")
-        client = bok.dask_infra.setup_dask_client()
+        client = infra.dask_infra.setup_dask_client()
         # create_all_flows(client)
         reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
         client.close()

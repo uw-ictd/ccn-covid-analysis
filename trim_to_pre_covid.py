@@ -1,27 +1,27 @@
 import pandas as pd
 
-import bok.constants
-import bok.dask_infra
-import bok.pd_infra
-import bok.platform
+import infra.constants
+import infra.dask_infra
+import infra.pd_infra
+import infra.platform
 
-from bok.mapped_ips import IpProcessor
+from infra.mapped_ips import IpProcessor
 
 
 def _explore_unknowns(in_path):
-    flows = bok.dask_infra.read_parquet(in_path)
+    flows = infra.dask_infra.read_parquet(in_path)
     unknown_flows = flows.loc[(flows["category"] == "Unknown (No DNS)") | (flows["org"] == "Unknown (No DNS)")]
     unknown_flows["mbytes_total"] = (unknown_flows["bytes_up"] + unknown_flows["bytes_down"]) / 1000**2
     unknown_flows = unknown_flows.groupby(["dest_ip"]).sum()
     unknown_flows = unknown_flows.compute()
-    bok.pd_infra.clean_write_parquet(unknown_flows, "scratch/flows/temp-unkown-fqdns")
-    unknown_flows = bok.pd_infra.read_parquet("scratch/flows/temp-unkown-fqdns")
+    infra.pd_infra.clean_write_parquet(unknown_flows, "scratch/flows/temp-unkown-fqdns")
+    unknown_flows = infra.pd_infra.read_parquet("scratch/flows/temp-unkown-fqdns")
     unknown_flows = unknown_flows.sort_values(["mbytes_total"])
     print(unknown_flows.tail(40))
 
 
 def annotate_category_org_from_ip(in_path, out_path):
-    flows = bok.dask_infra.read_parquet(in_path)
+    flows = infra.dask_infra.read_parquet(in_path)
     flows = flows.reset_index()
     flows = flows.astype({
         "org": object,
@@ -56,11 +56,11 @@ def annotate_category_org_from_ip(in_path, out_path):
 
     flows = flows.drop(["ipcategory", "iporg"], axis=1)
     # flows = flows.categorize(columns=["fqdn_source", "org", "category"])
-    bok.dask_infra.clean_write_parquet(flows, out_path)
+    infra.dask_infra.clean_write_parquet(flows, out_path)
 
 
 def anonymize_flows(in_path, out_path):
-    flows = bok.dask_infra.read_parquet(in_path)
+    flows = infra.dask_infra.read_parquet(in_path)
     user_counts_per_org = flows[["user", "org", "bytes_up"]].groupby(["user", "org"]).first().dropna().reset_index()
     user_counts_per_org = user_counts_per_org.assign(user_count=1).groupby(["org"]).sum()
     user_counts_per_org = user_counts_per_org.drop("bytes_up", axis=1)
@@ -69,44 +69,44 @@ def anonymize_flows(in_path, out_path):
         "org": object,
     })
     flows_with_counts["org"] = flows_with_counts["org"].mask(
-        flows_with_counts["user_count"] < bok.constants.MIN_K_ANON,
+        flows_with_counts["user_count"] < infra.constants.MIN_K_ANON,
         other="Other [Anonymized U<5]",
     )
     flows_with_counts = flows_with_counts.categorize(columns=["fqdn_source", "org", "category"])
     flows = flows_with_counts.drop("user_count", axis=1)
-    bok.dask_infra.clean_write_parquet(flows, out_path)
+    infra.dask_infra.clean_write_parquet(flows, out_path)
 
 
 def trim_flows_flat_noindex(in_path, out_path):
-    df = bok.dask_infra.read_parquet(in_path)
-    df = df.loc[(df["start"] >= bok.constants.MIN_DATE) & (df["start"] < bok.constants.MAX_DATE)]
+    df = infra.dask_infra.read_parquet(in_path)
+    df = df.loc[(df["start"] >= infra.constants.MIN_DATE) & (df["start"] < infra.constants.MAX_DATE)]
     df = df.set_index("start").repartition(partition_size="128M")
-    bok.dask_infra.clean_write_parquet(df, out_path)
+    infra.dask_infra.clean_write_parquet(df, out_path)
 
 
 def trim_flows_flat_indexed(in_path, out_path):
-    df = bok.dask_infra.read_parquet(in_path)
-    df = df.loc[(df.index >= bok.constants.MIN_DATE) & (df.index < bok.constants.MAX_DATE)]
-    bok.dask_infra.clean_write_parquet(df, out_path)
+    df = infra.dask_infra.read_parquet(in_path)
+    df = df.loc[(df.index >= infra.constants.MIN_DATE) & (df.index < infra.constants.MAX_DATE)]
+    infra.dask_infra.clean_write_parquet(df, out_path)
 
 
 def trim_transactions_flat_noindex(in_path, out_path):
-    df = bok.dask_infra.read_parquet(in_path)
-    df = df.loc[(df["timestamp"] >= bok.constants.MIN_DATE) & (df["timestamp"] < bok.constants.MAX_DATE)]
-    bok.pd_infra.clean_write_parquet(df.compute(), out_path)
+    df = infra.dask_infra.read_parquet(in_path)
+    df = df.loc[(df["timestamp"] >= infra.constants.MIN_DATE) & (df["timestamp"] < infra.constants.MAX_DATE)]
+    infra.pd_infra.clean_write_parquet(df.compute(), out_path)
 
 
 def trim_log_gaps_flat_noindex(in_path, out_path):
-    df = bok.pd_infra.read_parquet(in_path)
-    df = df.loc[(df["start"] >= bok.constants.MIN_DATE) & (df["start"] < bok.constants.MAX_DATE)]
-    bok.pd_infra.clean_write_parquet(df, out_path)
+    df = infra.pd_infra.read_parquet(in_path)
+    df = df.loc[(df["start"] >= infra.constants.MIN_DATE) & (df["start"] < infra.constants.MAX_DATE)]
+    infra.pd_infra.clean_write_parquet(df, out_path)
 
 
 if __name__ == "__main__":
-    platform = bok.platform.read_config()
+    platform = infra.platform.read_config()
 
-    print("Min:", bok.constants.MIN_DATE)
-    print("Max:", bok.constants.MAX_DATE)
+    print("Min:", infra.constants.MIN_DATE)
+    print("Max:", infra.constants.MAX_DATE)
 
     # Module specific format options
     pd.set_option('display.max_columns', None)
@@ -115,7 +115,7 @@ if __name__ == "__main__":
 
     if platform.large_compute_support:
         print("Running compute tasks")
-        client = bok.dask_infra.setup_platform_tuned_dask_client(5, platform)
+        client = infra.dask_infra.setup_platform_tuned_dask_client(5, platform)
 
         _explore_unknowns("data/internal/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
         annotate_category_org_from_ip(

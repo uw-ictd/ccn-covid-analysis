@@ -3,13 +3,13 @@
 
 import altair as alt
 
-import bok.dask_infra
-import bok.pd_infra
-import bok.platform
+import infra.dask_infra
+import infra.pd_infra
+import infra.platform
 
 
 def make_plot():
-    transactions = bok.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
+    transactions = infra.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
 
     purchases = transactions.loc[transactions["kind"] == "purchase"]
     purchases = purchases.groupby("amount_bytes")["timestamp"].count()
@@ -77,7 +77,7 @@ def make_plot():
 
 
 if __name__ == "__main__":
-    platform = bok.platform.read_config()
+    platform = infra.platform.read_config()
 
     if platform.altair_support:
         print("Running vis tasks")

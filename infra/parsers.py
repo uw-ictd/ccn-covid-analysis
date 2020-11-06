@@ -2,7 +2,7 @@ import csv
 import dateutil
 import pandas as pd
 
-from bok.datatypes import Transaction
+from infra.datatypes import Transaction
 
 
 # Read to a structured dataframe

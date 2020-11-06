@@ -2,14 +2,14 @@
 """
 
 import altair
-import bok.dask_infra
+import infra.dask_infra
 import dask.dataframe
 import dask.distributed
 import numpy as np
 import pandas as pd
 
 if __name__ == "__main__":
-    client = bok.dask_infra.setup_dask_client()
+    client = infra.dask_infra.setup_dask_client()
 
     # Import the flows dataset
     #

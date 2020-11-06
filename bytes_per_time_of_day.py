@@ -1,18 +1,18 @@
 import altair as alt
-import bok.dask_infra
-import bok.pd_infra
-import bok.platform
+import infra.dask_infra
+import infra.pd_infra
+import infra.platform
 
 
 def reduce_to_pandas(outfile, dask_client):
-    typical = bok.dask_infra.read_parquet(
+    typical = infra.dask_infra.read_parquet(
         "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
     )[["bytes_up", "bytes_down", "category"]]
     typical["bytes_total"] = typical["bytes_up"] + typical["bytes_down"]
     typical = typical.reset_index()
     typical = typical[["start", "category", "bytes_total"]]
 
-    p2p = bok.dask_infra.read_parquet(
+    p2p = infra.dask_infra.read_parquet(
         "data/clean/flows/p2p_TM_DIV_none_INDEX_start"
     )[["bytes_a_to_b", "bytes_b_to_a"]]
     p2p["bytes_total"] = p2p["bytes_a_to_b"] + p2p["bytes_b_to_a"]
@@ -33,11 +33,11 @@ def reduce_to_pandas(outfile, dask_client):
 
     flows = flows.compute()
 
-    bok.pd_infra.clean_write_parquet(flows, outfile)
+    infra.pd_infra.clean_write_parquet(flows, outfile)
 
 
 def make_totals_plot(infile):
-    grouped_flows = bok.pd_infra.read_parquet(infile)
+    grouped_flows = infra.pd_infra.read_parquet(infile)
     grouped_flows = grouped_flows.reset_index()
 
     grouped_flows["MB"] = grouped_flows["bytes_total"] / (1000**2)
@@ -158,7 +158,7 @@ def make_totals_plot(infile):
 
 
 def make_category_plot(inpath):
-    grouped_flows = bok.pd_infra.read_parquet(inpath)
+    grouped_flows = infra.pd_infra.read_parquet(inpath)
     grouped_flows = grouped_flows.reset_index()
 
     grouped_flows["MB"] = grouped_flows["bytes_total"] / (1000**2)
@@ -209,7 +209,7 @@ def make_category_plot(inpath):
 
 
 def make_change_vs_average_plot(inpath):
-    grouped_flows = bok.pd_infra.read_parquet(inpath)
+    grouped_flows = infra.pd_infra.read_parquet(inpath)
     grouped_flows = grouped_flows.reset_index()
 
     grouped_flows["MB"] = grouped_flows["bytes_total"] / (1000**2)
@@ -250,12 +250,12 @@ def make_change_vs_average_plot(inpath):
 
 
 if __name__ == "__main__":
-    platform = bok.platform.read_config()
+    platform = infra.platform.read_config()
     graph_temporary_file = "scratch/graphs/bytes_per_time_of_day"
 
     if platform.large_compute_support:
         print("Running compute tasks")
-        client = bok.dask_infra.setup_platform_tuned_dask_client(10, platform)
+        client = infra.dask_infra.setup_platform_tuned_dask_client(10, platform)
         reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
         client.close()
 

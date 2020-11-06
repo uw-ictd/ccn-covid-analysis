@@ -5,20 +5,20 @@ import altair as alt
 import datetime
 import pandas as pd
 
-import bok.constants
-import bok.dask_infra
-import bok.pd_infra
+import infra.constants
+import infra.dask_infra
+import infra.pd_infra
 
 
 def make_rate_chart():
-    transactions = bok.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
+    transactions = infra.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
 
     # Each user's total amount of data purchased directly.
     purchases = transactions.loc[transactions["kind"] == "purchase"]
 
     # Find the first day the user was active. Define "active" as making first
     # purchase or first data in network.
-    user_active_ranges = bok.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")[["user", "days_since_first_active", "days_active"]]
+    user_active_ranges = infra.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")[["user", "days_since_first_active", "days_active"]]
 
     # Drop users that have been active less than a week.
     users_to_analyze = user_active_ranges.loc[
@@ -36,7 +36,7 @@ def make_rate_chart():
     print(len(aggregated_purchases))
 
     aggregated_purchases["amount_GB"] = aggregated_purchases["amount_bytes"] * float(1) / (1000 ** 3)
-    aggregated_purchases["amount_USD"] = aggregated_purchases["amount_idr"] * bok.constants.IDR_TO_USD
+    aggregated_purchases["amount_USD"] = aggregated_purchases["amount_idr"] * infra.constants.IDR_TO_USD
 
     # Merge in the active times
     aggregated_purchases = aggregated_purchases.merge(users_to_analyze,

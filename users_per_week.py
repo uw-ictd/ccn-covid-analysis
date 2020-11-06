@@ -2,10 +2,10 @@
 """
 
 import altair
-import bok.constants
-import bok.dask_infra
-import bok.pd_infra
-import bok.platform
+import infra.constants
+import infra.dask_infra
+import infra.pd_infra
+import infra.platform
 import dask.config
 import dask.dataframe
 import dask.distributed
@@ -17,7 +17,7 @@ import pandas as pd
 # Configs
 day_intervals = 7
 # IMPORTANT: Run get_data_range() to update these values when loading in a new dataset!
-max_date = bok.constants.MAX_DATE
+max_date = infra.constants.MAX_DATE
 
 def cohort_as_date_interval(x):
     cohort_start = max_date - datetime.timedelta(day_intervals * x + day_intervals - 1)
@@ -67,7 +67,7 @@ def reduce_to_pandas(outfile, dask_client):
     #
     # Importantly, dask is lazy and doesn't actually import the whole thing,
     # but just keeps track of where the file shards live on disk.
-    df = bok.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+    df = infra.dask_infra.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
 
     df = df.reset_index()
     df["day"] = df["start"].dt.floor("d")
@@ -76,12 +76,12 @@ def reduce_to_pandas(outfile, dask_client):
     df = df.groupby(["day", "user"]).sum().reset_index()
     df = df[["day", "user"]]
 
-    bok.pd_infra.clean_write_parquet(df.compute(), outfile)
+    infra.pd_infra.clean_write_parquet(df.compute(), outfile)
 
 
 def make_plot(infile):
-    registered_users = bok.pd_infra.read_parquet("data/clean/early_registered_users.parquet")
-    registered_users = registered_users.assign(start=bok.constants.MIN_DATE)
+    registered_users = infra.pd_infra.read_parquet("data/clean/early_registered_users.parquet")
+    registered_users = registered_users.assign(start=infra.constants.MIN_DATE)
 
     transactions = pd.read_csv("data/clean/first_time_user_transactions.csv")[["start", "user"]]
     transactions = transactions.astype({
@@ -96,7 +96,7 @@ def make_plot(infile):
     registered_users["day"] = registered_users["start"].dt.floor("d")
 
     # Generate a dense dataframe with all days
-    date_range = pd.DataFrame({"day": pd.date_range(bok.constants.MIN_DATE, bok.constants.MAX_DATE, freq="1D")})
+    date_range = pd.DataFrame({"day": pd.date_range(infra.constants.MIN_DATE, infra.constants.MAX_DATE, freq="1D")})
     registered_users = date_range.merge(
         registered_users,
         how="left",
@@ -104,7 +104,7 @@ def make_plot(infile):
         right_on="day",
     ).fillna(method="ffill").dropna()
 
-    user_days = bok.pd_infra.read_parquet(infile)
+    user_days = infra.pd_infra.read_parquet(infile)
 
     active_users = user_days.groupby("day")["user"].nunique()
     active_users = active_users.to_frame().reset_index()
@@ -112,13 +112,13 @@ def make_plot(infile):
     # Group weekly to capture the total number of unique users across the entire week and account for intermittent use.
     weekly_users = user_days.groupby(pd.Grouper(key="day", freq="W-MON"))["user"].nunique()
     weekly_users = weekly_users.to_frame().reset_index().rename(columns={"user": "week_unique_users"})
-    week_range = pd.DataFrame({"day": pd.date_range(bok.constants.MIN_DATE, bok.constants.MAX_DATE, freq="W-MON")})
+    week_range = pd.DataFrame({"day": pd.date_range(infra.constants.MIN_DATE, infra.constants.MAX_DATE, freq="W-MON")})
     weekly_users = weekly_users.merge(week_range, on="day", how="outer")
     weekly_users.fillna(0)
 
     monthly_users = user_days.groupby(pd.Grouper(key="day", freq="M"))["user"].nunique()
     monthly_users = monthly_users.to_frame().reset_index().rename(columns={"user": "month_unique_users"})
-    month_range = pd.DataFrame({"day": pd.date_range(bok.constants.MIN_DATE, bok.constants.MAX_DATE, freq="M")})
+    month_range = pd.DataFrame({"day": pd.date_range(infra.constants.MIN_DATE, infra.constants.MAX_DATE, freq="M")})
     monthly_users = monthly_users.merge(month_range, on="day", how="outer")
     monthly_users = monthly_users.fillna(0)
 
@@ -142,7 +142,7 @@ def make_plot(infile):
     users = users.reset_index()
 
     # Limit graphs to the study period
-    users = users.loc[users["date"] < bok.constants.MAX_DATE]
+    users = users.loc[users["date"] < infra.constants.MAX_DATE]
 
     # Compute a rolling average
     users["Active 7-Day Average"] = users["Unique Daily Online"].rolling(
@@ -208,7 +208,7 @@ def make_plot(infile):
 
 
 if __name__ == "__main__":
-    platform = bok.platform.read_config()
+    platform = infra.platform.read_config()
 
     # Module specific format options
     pd.set_option('display.max_columns', None)
@@ -220,7 +220,7 @@ if __name__ == "__main__":
     if platform.large_compute_support:
         print("Running compute tasks")
         print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
-        client = bok.dask_infra.setup_platform_tuned_dask_client(10, platform)
+        client = infra.dask_infra.setup_platform_tuned_dask_client(10, platform)
         reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
         client.close()
 

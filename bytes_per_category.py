@@ -4,10 +4,10 @@
 import altair as alt
 import pandas as pd
 
-import bok.constants
-import bok.dask_infra
-import bok.pd_infra
-import bok.platform
+import infra.constants
+import infra.dask_infra
+import infra.pd_infra
+import infra.platform
 
 
 # Module specific format options
@@ -18,7 +18,7 @@ pd.set_option('display.max_rows', 40)
 
 
 def reduce_to_pandas(outfile, dask_client):
-    flows = bok.dask_infra.read_parquet(
+    flows = infra.dask_infra.read_parquet(
         "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["category", "org", "bytes_up", "bytes_down", "protocol", "dest_port"]]
 
     # Compress to days
@@ -30,11 +30,11 @@ def reduce_to_pandas(outfile, dask_client):
     flows = flows.groupby(["start_bin", "category", "org"]).sum()
     flows = flows.compute()
 
-    bok.pd_infra.clean_write_parquet(flows, outfile)
+    infra.pd_infra.clean_write_parquet(flows, outfile)
 
 
 def make_category_plot(infile):
-    grouped_flows = bok.pd_infra.read_parquet(infile)
+    grouped_flows = infra.pd_infra.read_parquet(infile)
     grouped_flows = grouped_flows.reset_index()
     grouped_flows["bytes_total"] = grouped_flows["bytes_up"] + grouped_flows["bytes_down"]
 
@@ -44,7 +44,7 @@ def make_category_plot(infile):
     grouped_flows = grouped_flows.reset_index()
 
     # Generate an outage annotation overlay
-    outage_info = pd.DataFrame([{"start": bok.constants.OUTAGE_START, "end": bok.constants.OUTAGE_END}])
+    outage_info = pd.DataFrame([{"start": infra.constants.OUTAGE_START, "end": infra.constants.OUTAGE_END}])
     outage_annotation = alt.Chart(outage_info).mark_rect(
         opacity=0.7,
         # cornerRadius=2,
@@ -121,7 +121,7 @@ def make_category_plot(infile):
 
 
 def make_category_aggregate_bar_chart(infile):
-    grouped_flows = bok.pd_infra.read_parquet(infile).reset_index()
+    grouped_flows = infra.pd_infra.read_parquet(infile).reset_index()
 
     # Consolidate by week instead of by day
     grouped_flows = grouped_flows[
@@ -167,7 +167,7 @@ def make_category_aggregate_bar_chart(infile):
 
 
 def compute_stats(infile, dimension):
-    grouped_flows = bok.pd_infra.read_parquet(infile)
+    grouped_flows = infra.pd_infra.read_parquet(infile)
     grouped_flows = grouped_flows.reset_index()
     grouped_flows["bytes_total"] = grouped_flows["bytes_up"] + grouped_flows["bytes_down"]
 
@@ -193,7 +193,7 @@ def compute_stats(infile, dimension):
 def make_org_plot(infile):
     """ Generate plots to explore the traffic distribution across organizations
     """
-    grouped_flows = bok.pd_infra.read_parquet(infile)
+    grouped_flows = infra.pd_infra.read_parquet(infile)
     grouped_flows = grouped_flows.reset_index()
     grouped_flows["bytes_total"] = grouped_flows["bytes_up"] + grouped_flows["bytes_down"]
 
@@ -203,7 +203,7 @@ def make_org_plot(infile):
     grouped_flows = grouped_flows.reset_index()
 
     # Generate an outage annotation overlay
-    outage_info = pd.DataFrame([{"start": bok.constants.OUTAGE_START, "end": bok.constants.OUTAGE_END}])
+    outage_info = pd.DataFrame([{"start": infra.constants.OUTAGE_START, "end": infra.constants.OUTAGE_END}])
     outage_annotation = alt.Chart(outage_info).mark_rect(
         opacity=0.7,
         # cornerRadius=2,
@@ -341,11 +341,11 @@ def make_org_plot(infile):
 
 
 if __name__ == "__main__":
-    platform = bok.platform.read_config()
+    platform = infra.platform.read_config()
 
     graph_temporary_file = "scratch/graphs/bytes_per_category"
     if platform.large_compute_support:
-        client = bok.dask_infra.setup_platform_tuned_dask_client(10, platform)
+        client = infra.dask_infra.setup_platform_tuned_dask_client(10, platform)
         reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
         client.close()
 

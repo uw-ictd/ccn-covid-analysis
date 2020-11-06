@@ -2,9 +2,9 @@ import altair as alt
 import numpy as np
 import pandas as pd
 
-import bok.dask_infra
-import bok.pd_infra
-import bok.platform
+import infra.dask_infra
+import infra.pd_infra
+import infra.platform
 
 
 def compute_cdf(frame, value_column, base_column):
@@ -17,7 +17,7 @@ def compute_cdf(frame, value_column, base_column):
 
 
 def make_plot(inpath):
-    activity = bok.pd_infra.read_parquet(inpath)
+    activity = infra.pd_infra.read_parquet(inpath)
 
     # Drop users that have been active less than a week.
     activity = activity.loc[
@@ -89,7 +89,7 @@ def make_plot(inpath):
 
 
 if __name__ == "__main__":
-    platform = bok.platform.read_config()
+    platform = infra.platform.read_config()
 
     # Module specific format options
     pd.set_option('display.max_columns', None)

@@ -5,26 +5,26 @@ import altair as alt
 import numpy as np
 import pandas as pd
 
-import bok.dask_infra
-import bok.domains
-import bok.pd_infra
-import bok.platform
+import infra.dask_infra
+import infra.domains
+import infra.pd_infra
+import infra.platform
 
 
 def reduce_to_pandas(outfile, dask_client):
-    flows = bok.dask_infra.read_parquet(
+    flows = infra.dask_infra.read_parquet(
         "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["user", "category", "org", "bytes_up", "bytes_down"]]
 
     # Do the grouping
     flows = flows.groupby(["user", "category", "org"]).sum()
     flows = flows.compute()
 
-    bok.pd_infra.clean_write_parquet(flows, outfile)
+    infra.pd_infra.clean_write_parquet(flows, outfile)
 
 
 def make_category_plot(infile):
     pd.set_option('display.max_columns', None)
-    grouped_flows = bok.pd_infra.read_parquet(infile)
+    grouped_flows = infra.pd_infra.read_parquet(infile)
     grouped_flows = grouped_flows.reset_index()
     grouped_flows["bytes_total"] = grouped_flows["bytes_up"] + grouped_flows["bytes_down"]
 
@@ -43,7 +43,7 @@ def make_category_plot(infile):
     grouped_flows["logGB"] = grouped_flows["GB"].transform(np.log10)
 
     # Filter users by time in network to eliminate early incomplete samples
-    user_active_ranges = bok.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")[["user", "days_since_first_active", "days_active"]]
+    user_active_ranges = infra.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")[["user", "days_since_first_active", "days_active"]]
     # Drop users that joined less than a week ago or were active for less than a week.
     users_to_analyze = user_active_ranges.loc[
         user_active_ranges["days_since_first_active"] >= 7
@@ -143,7 +143,7 @@ def make_category_plot_separate_top_n(infile, n_to_separate=20):
     pd.set_option('display.max_columns', None)
     pd.set_option('display.max_rows', None)
     pd.set_option('display.width', None)
-    grouped_flows = bok.pd_infra.read_parquet(infile)
+    grouped_flows = infra.pd_infra.read_parquet(infile)
     grouped_flows = grouped_flows.reset_index()
     grouped_flows["bytes_total"] = grouped_flows["bytes_up"] + grouped_flows["bytes_down"]
 
@@ -203,7 +203,7 @@ def make_org_plot(infile):
     """ Generate plots to explore the traffic distribution across organizations
     """
     pd.set_option('display.max_columns', None)
-    grouped_flows = bok.pd_infra.read_parquet(infile)
+    grouped_flows = infra.pd_infra.read_parquet(infile)
     grouped_flows = grouped_flows.reset_index()
     grouped_flows["bytes_total"] = grouped_flows["bytes_up"] + grouped_flows["bytes_down"]
 
@@ -219,7 +219,7 @@ def make_org_plot(infile):
     grouped_flows = grouped_flows.replace(small_orgs.values, value="Aggregated (Users < 5)")
 
     # Filter users by time in network to eliminate early incomplete samples
-    user_active_ranges = bok.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")[["user", "days_since_first_active", "days_active"]]
+    user_active_ranges = infra.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")[["user", "days_since_first_active", "days_active"]]
     # Drop users that joined less than a week ago or were active for less than a week.
     users_to_analyze = user_active_ranges.loc[
         user_active_ranges["days_since_first_active"] >= 7
@@ -297,12 +297,12 @@ def make_org_plot(infile):
 
 
 if __name__ == "__main__":
-    platform = bok.platform.read_config()
+    platform = infra.platform.read_config()
     graph_temporary_file = "scratch/graphs/users_per_category"
 
     if platform.large_compute_support:
         print("Running compute tasks")
-        client = bok.dask_infra.setup_platform_tuned_dask_client(10, platform)
+        client = infra.dask_infra.setup_platform_tuned_dask_client(10, platform)
         reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
         client.close()
 

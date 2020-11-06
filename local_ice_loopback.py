@@ -2,9 +2,9 @@ import altair as alt
 import numpy as np
 import pandas as pd
 
-import bok.dask_infra
-import bok.pd_infra
-import bok.platform
+import infra.dask_infra
+import infra.pd_infra
+import infra.platform
 
 
 def compute_cdf(frame, value_column, base_column):
@@ -17,7 +17,7 @@ def compute_cdf(frame, value_column, base_column):
 
 
 def reduce_to_pandas(outpath, client):
-    flows = bok.dask_infra.read_parquet(
+    flows = infra.dask_infra.read_parquet(
         "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["user", "category", "fqdn", "bytes_up", "bytes_down", "dest_ip"]]
 
     flows = flows.loc[(flows["category"] == "Peer to Peer") | (flows["category"] == "ICE (STUN/TURN)")]
@@ -37,11 +37,11 @@ def reduce_to_pandas(outpath, client):
 
     flows = flows.rename(columns={"user": "user_count"})
 
-    bok.pd_infra.clean_write_parquet(flows.compute(), outpath)
+    infra.pd_infra.clean_write_parquet(flows.compute(), outpath)
 
 
 def make_plot(inpath):
-    flows = bok.pd_infra.read_parquet(inpath)
+    flows = infra.pd_infra.read_parquet(inpath)
 
     flows = flows.reset_index()
     flows = flows.sort_values("total_bytes")
@@ -76,7 +76,7 @@ def make_plot(inpath):
 
 
 if __name__ == "__main__":
-    platform = bok.platform.read_config()
+    platform = infra.platform.read_config()
 
     # Module specific format options
     pd.set_option('display.max_columns', None)
@@ -88,7 +88,7 @@ if __name__ == "__main__":
 
     if platform.large_compute_support:
         print("Running compute subcommands")
-        client = bok.dask_infra.setup_platform_tuned_dask_client(per_worker_memory_GB=10, platform=platform)
+        client = infra.dask_infra.setup_platform_tuned_dask_client(per_worker_memory_GB=10, platform=platform)
         reduce_to_pandas(graph_temp_file, client)
         client.close()
 

@@ -4,10 +4,10 @@
 import datetime
 import pandas as pd
 
-import bok.constants
-import bok.dask_infra
-import bok.pd_infra
-import bok.platform
+import infra.constants
+import infra.dask_infra
+import infra.pd_infra
+import infra.platform
 
 
 # Module specific format options
@@ -22,7 +22,7 @@ def reduce_flows_to_pandas(in_path, out_path):
     in_path must point to a dask dataframe with a time index and user flows
     """
     # Immediately downselect to only needed columns
-    flow_frame = bok.dask_infra.read_parquet(in_path)[["user", "end"]]
+    flow_frame = infra.dask_infra.read_parquet(in_path)[["user", "end"]]
     flow_frame = flow_frame.reset_index()
 
     # Find the first and last time the user was active
@@ -43,13 +43,13 @@ def reduce_flows_to_pandas(in_path, out_path):
     user_range_frame = user_range_frame.merge(user_days, left_index=True, right_index=True)
 
     user_range_frame = user_range_frame.compute()
-    bok.pd_infra.clean_write_parquet(user_range_frame, out_path)
+    infra.pd_infra.clean_write_parquet(user_range_frame, out_path)
 
 
 def compute_purchase_range_frame():
     """Generates a frame with the range a user has made purchases in the net
     """
-    transactions = bok.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
+    transactions = infra.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
 
     # Each user's total amount of data purchased directly.
     purchases = transactions.loc[transactions["kind"] == "purchase"]
@@ -85,7 +85,7 @@ def _count_gap_days(row, gap_day_frame):
 
 
 def compute_user_deltas(flow_range_intermediate_file, active_delta_out_file):
-    flow_ranges = bok.pd_infra.read_parquet(flow_range_intermediate_file)
+    flow_ranges = infra.pd_infra.read_parquet(flow_range_intermediate_file)
     purchase_ranges = compute_purchase_range_frame()
     network_gap_days = compute_full_gap_days("data/clean/log_gaps_TM.parquet")
 
@@ -101,7 +101,7 @@ def compute_user_deltas(flow_range_intermediate_file, active_delta_out_file):
 
     # Actually compute the deltas
     user_ranges["delta_since_first_active"] = \
-        bok.constants.MAX_DATE - user_ranges["earliest"]
+        infra.constants.MAX_DATE - user_ranges["earliest"]
 
     user_ranges["delta_active"] = \
         user_ranges["latest"] - user_ranges["earliest"]
@@ -120,12 +120,12 @@ def compute_user_deltas(flow_range_intermediate_file, active_delta_out_file):
     # Drop un-needed intermediate columns
     user_ranges = user_ranges.drop(["start", "end", "first_purchase", "last_purchase"], axis="columns")
 
-    bok.pd_infra.clean_write_parquet(user_ranges, active_delta_out_file)
+    infra.pd_infra.clean_write_parquet(user_ranges, active_delta_out_file)
 
 
 def compute_full_gap_days(log_gaps_file):
     """Compute a dataframe with all of the days the network was completely offline"""
-    gap_df = bok.pd_infra.read_parquet(log_gaps_file)
+    gap_df = infra.pd_infra.read_parquet(log_gaps_file)
     gap_df["gap_duration"] = gap_df["end"] - gap_df["start"]
 
     long_gaps = gap_df.loc[gap_df["gap_duration"] > datetime.timedelta(days=1)]
@@ -149,7 +149,7 @@ def compute_full_gap_days(log_gaps_file):
 
 
 if __name__ == "__main__":
-    platform = bok.platform.read_config()
+    platform = infra.platform.read_config()
 
     flow_source_file = "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
     temporary_file = "scratch/graphs/compute_user_active_time"
@@ -157,7 +157,7 @@ if __name__ == "__main__":
     if platform.large_compute_support:
         print("Running compute tasks")
         print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
-        client = bok.dask_infra.setup_platform_tuned_dask_client(per_worker_memory_GB=10, platform=platform)
+        client = infra.dask_infra.setup_platform_tuned_dask_client(per_worker_memory_GB=10, platform=platform)
         reduce_flows_to_pandas(flow_source_file, temporary_file)
         client.close()
 

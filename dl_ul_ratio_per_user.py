@@ -8,14 +8,14 @@ from sklearn.linear_model import LinearRegression
 import statsmodels.api as sm
 from sklearn.metrics import r2_score
 
-import bok.dask_infra
-import bok.domains
-import bok.pd_infra
-import bok.platform
+import infra.dask_infra
+import infra.domains
+import infra.pd_infra
+import infra.platform
 
 
 def reduce_to_pandas(outfile, dask_client):
-    flows = bok.dask_infra.read_parquet(
+    flows = infra.dask_infra.read_parquet(
         "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
     )[["user", "bytes_up", "bytes_down", "category"]]
 
@@ -23,7 +23,7 @@ def reduce_to_pandas(outfile, dask_client):
     flows = flows.groupby(["user", "category"]).sum()
     flows = flows.compute()
 
-    bok.pd_infra.clean_write_parquet(flows, outfile)
+    infra.pd_infra.clean_write_parquet(flows, outfile)
 
 
 def _find_user_top_category(df):
@@ -42,11 +42,11 @@ def _find_user_top_category(df):
 
 
 def make_ul_dl_scatter_plot(infile):
-    user_cat = bok.pd_infra.read_parquet(infile)
+    user_cat = infra.pd_infra.read_parquet(infile)
     user_cat = user_cat.reset_index()
 
     # Filter users to only users who made purchases in the network with registered ips
-    users = bok.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")[["user"]]
+    users = infra.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")[["user"]]
     user_cat = users.merge(user_cat, on="user", how="left")
 
     # Compute total bytes for each user across categories
@@ -60,7 +60,7 @@ def make_ul_dl_scatter_plot(infile):
     print(user_totals)
 
     # Filter users by time in network to eliminate early incomplete samples
-    user_active_ranges = bok.pd_infra.read_parquet(
+    user_active_ranges = infra.pd_infra.read_parquet(
         "data/clean/user_active_deltas.parquet")[["user", "days_since_first_active", "days_active", "days_online"]]
     # Drop users that joined less than a week ago.
     users_to_analyze = user_active_ranges.loc[
@@ -205,12 +205,12 @@ def make_ul_dl_scatter_plot(infile):
 
 
 if __name__ == "__main__":
-    platform = bok.platform.read_config()
+    platform = infra.platform.read_config()
     graph_temporary_file = "scratch/graphs/dl_ul_ratio_per_user"
 
     if platform.large_compute_support:
         print("Running compute tasks")
-        client = bok.dask_infra.setup_platform_tuned_dask_client(10, platform)
+        client = infra.dask_infra.setup_platform_tuned_dask_client(10, platform)
         reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
         client.close()
 

@@ -4,22 +4,22 @@
 import altair
 import pandas as pd
 
-import bok.constants
-import bok.platform
-import bok.pd_infra
+import infra.constants
+import infra.platform
+import infra.pd_infra
 
 
 def make_expenses():
-    maintenance = pd.DataFrame({"timestamp": pd.date_range(bok.constants.MIN_DATE, bok.constants.MAX_DATE, freq="1M")})
+    maintenance = pd.DataFrame({"timestamp": pd.date_range(infra.constants.MIN_DATE, infra.constants.MAX_DATE, freq="1M")})
     # Monthly power system maintenance
     maintenance = maintenance.assign(amount_idr=1300000)
-    maintenance["amount_usd"] = maintenance["amount_idr"] * bok.constants.IDR_TO_USD
+    maintenance["amount_usd"] = maintenance["amount_idr"] * infra.constants.IDR_TO_USD
 
-    vsat = pd.DataFrame({"timestamp": pd.date_range(bok.constants.MIN_DATE, bok.constants.MAX_DATE, freq="1M")})
+    vsat = pd.DataFrame({"timestamp": pd.date_range(infra.constants.MIN_DATE, infra.constants.MAX_DATE, freq="1M")})
     vsat = vsat.assign(amount_usd=300)
 
     initial = pd.DataFrame({
-        "timestamp": [bok.constants.MIN_DATE, bok.constants.OUTAGE_END],
+        "timestamp": [infra.constants.MIN_DATE, infra.constants.OUTAGE_END],
         "amount_usd": [9334, 1000],
     })
 
@@ -30,11 +30,11 @@ def make_expenses():
 
 
 def make_plot():
-    transactions = bok.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
+    transactions = infra.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
     purchases = transactions.loc[(transactions["kind"] == "purchase") | (transactions["kind"] == "admin_topup")]
     purchases = purchases[["timestamp", "amount_idr", "kind", "user"]]
 
-    purchases["amount_usd"] = purchases["amount_idr"] * bok.constants.IDR_TO_USD
+    purchases["amount_usd"] = purchases["amount_idr"] * infra.constants.IDR_TO_USD
     purchases = purchases.loc[purchases["kind"] == "purchase"]
 
     # Bin by days to limit the number of tuples
@@ -122,7 +122,7 @@ def make_plot():
 
 
 if __name__ == "__main__":
-    platform = bok.platform.read_config()
+    platform = infra.platform.read_config()
 
     # Module specific format options
     pd.set_option('display.max_columns', None)

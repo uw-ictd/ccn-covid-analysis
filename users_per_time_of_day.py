@@ -1,11 +1,11 @@
 import altair as alt
-import bok.dask_infra
-import bok.pd_infra
-import bok.platform
+import infra.dask_infra
+import infra.pd_infra
+import infra.platform
 
 
 def reduce_to_pandas(outfile, dask_client):
-    flows = bok.dask_infra.read_parquet(
+    flows = infra.dask_infra.read_parquet(
         "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["user"]]
 
     # Compress to days
@@ -21,11 +21,11 @@ def reduce_to_pandas(outfile, dask_client):
 
     flows = flows.compute()
 
-    bok.pd_infra.clean_write_parquet(flows, outfile)
+    infra.pd_infra.clean_write_parquet(flows, outfile)
 
 
 def make_plot(infile):
-    grouped_flows = bok.pd_infra.read_parquet(infile)
+    grouped_flows = infra.pd_infra.read_parquet(infile)
     grouped_flows = grouped_flows.reset_index()
 
     working_times = grouped_flows.loc[(grouped_flows["day_bin"] < "2019-07-30") | (grouped_flows["day_bin"] > "2019-08-31")]
@@ -135,11 +135,11 @@ def make_plot(infile):
 
 
 if __name__ == "__main__":
-    platform = bok.platform.read_config()
+    platform = infra.platform.read_config()
     graph_temporary_file = "scratch/graphs/users_per_time_of_day"
 
     if platform.large_compute_support:
-        client = bok.dask_infra.setup_platform_tuned_dask_client(10, platform)
+        client = infra.dask_infra.setup_platform_tuned_dask_client(10, platform)
         reduce_to_pandas(outfile=graph_temporary_file, dask_client=client)
         client.close()
 

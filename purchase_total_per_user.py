@@ -1,15 +1,15 @@
 import pandas as pd
 import altair as alt
 
-import bok.constants
-import bok.dask_infra
-import bok.pd_infra
+import infra.constants
+import infra.dask_infra
+import infra.pd_infra
 
-transactions = bok.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
+transactions = infra.pd_infra.read_parquet("data/clean/transactions_TM.parquet")
 
 # Find the first day the user was active. Define "active" as making first
 # purchase or first data in network.
-user_active_ranges = bok.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")[["user", "days_since_first_active", "days_active"]]
+user_active_ranges = infra.pd_infra.read_parquet("data/clean/user_active_deltas.parquet")[["user", "days_since_first_active", "days_active"]]
 
 # Drop users that have been active less than a week.
 users_to_analyze = user_active_ranges.loc[
@@ -31,7 +31,7 @@ aggregate_frame = aggregated_purchases[["amount_idr", "amount_bytes"]].sum()
 aggregate_frame = aggregate_frame.reset_index()
 
 aggregate_frame["amount_GB"] = aggregate_frame["amount_bytes"] * float(1) / (1000 ** 3)
-aggregate_frame["amount_USD"] = aggregate_frame["amount_idr"] * bok.constants.IDR_TO_USD
+aggregate_frame["amount_USD"] = aggregate_frame["amount_idr"] * infra.constants.IDR_TO_USD
 
 # Merge in the active times
 aggregate_frame = aggregate_frame.merge(users_to_analyze, on="user", how="inner")
