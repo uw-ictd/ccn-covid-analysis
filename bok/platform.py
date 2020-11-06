@@ -1,4 +1,4 @@
-import toml
+import tomlkit
 
 
 def read_config(location=None):
@@ -10,7 +10,7 @@ def read_config(location=None):
 
     try:
         with open(location) as f:
-            config = toml.load(f)
+            config = tomlkit.parse(f.read())
             print("Parsed config: {}".format(config))
             return Platform(large_compute_support=config["capabilities"]["large_compute"],
                             altair_support=config["capabilities"]["altair_render"],
