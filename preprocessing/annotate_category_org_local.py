@@ -330,7 +330,7 @@ if __name__ == "__main__":
         print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
         client = infra.dask.setup_platform_tuned_dask_client(20, platform)
 
-        #augment_all_user_flows(in_parent_directory, annotated_parent_directory, client)
+        augment_all_user_flows(in_parent_directory, annotated_parent_directory, client)
         stun_augment_all_user_flows(annotated_parent_directory, stun_annotated_parent_directory, client)
         merge_parquet_frames(stun_annotated_parent_directory, merged_out_directory)
 
