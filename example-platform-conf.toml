@@ -1,0 +1,13 @@
+[capabilities]
+# Should large dask compute tasks be run on this platform?
+large_compute = false
+# Does this plaform support rendering altair graphs and interactive browsing?
+altair_render= true
+
+[system]
+# Total memory available to dask
+max_memory_GB = 10
+# Total system processor count
+processor_count = 4
+# Disk scratch directory that should be used for overflow storage.
+temp_directory = "/tmp/dask-tmp"
