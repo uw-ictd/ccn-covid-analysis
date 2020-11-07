@@ -6,30 +6,8 @@ import infra.constants
 import infra.dask
 import infra.pd
 import infra.platform
-import dask.config
-import dask.dataframe
-import dask.distributed
 import datetime
-import math
-import numpy as np
 import pandas as pd
-
-# Configs
-day_intervals = 7
-# IMPORTANT: Run get_data_range() to update these values when loading in a new dataset!
-max_date = infra.constants.MAX_DATE
-
-def cohort_as_date_interval(x):
-    cohort_start = max_date - datetime.timedelta(day_intervals * x + day_intervals - 1)
-    cohort_end = max_date - datetime.timedelta(day_intervals * x)
-
-    return cohort_start.strftime("%Y/%m/%d") + "-" + cohort_end.strftime("%Y/%m/%d")
-
-def get_cohort(x):
-    return x["start"].apply(lambda x_1: (max_date - x_1).days // day_intervals, meta=('start', 'int64'))
-
-def get_date(x):
-    return x["cohort"].apply(cohort_as_date_interval, meta=('cohort', 'object'))
 
 
 def get_registered_users_query(transactions):
