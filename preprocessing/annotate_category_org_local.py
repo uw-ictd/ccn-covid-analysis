@@ -6,6 +6,7 @@ import dask.delayed
 import ipaddress
 import os
 
+from mappers.mapped_ips import IpProcessor
 import infra.dask
 import mappers.domains
 import infra.platform
@@ -318,6 +319,45 @@ def _print_heavy_hitter_unmapped_domains(infile):
     print(panda.sort_values("bytes_up", ascending=False).head(50))
 
 
+def annotate_category_org_from_ip(in_path, out_path):
+    flows = infra.dask.read_parquet(in_path)
+    flows = flows.reset_index()
+    flows = flows.astype({
+        "org": object,
+        "category": object,
+    })
+
+    ip_processor = IpProcessor()
+    flows["iporg"] = flows.loc[
+        (flows["category"] == "Unknown (No DNS)") | (flows["org"] == "Unknown (No DNS)")
+        ].apply(
+        lambda row: ip_processor.process_ip(row["dest_ip"])[0],
+        axis=1,
+        meta=("iporg", object),
+    )
+
+    flows["ipcategory"] = flows.loc[
+        (flows["category"] == "Unknown (No DNS)") | (flows["org"] == "Unknown (No DNS)")
+        ].apply(
+        lambda row: ip_processor.process_ip(row["dest_ip"])[1],
+        axis=1,
+        meta=("ipcategory", object),
+    )
+
+    flows["category"] = flows["category"].mask(
+        ((flows["category"] == "Unknown (No DNS)") & (flows["ipcategory"] != None)),
+        other=flows["ipcategory"]
+    )
+    flows["org"] = flows["org"].mask(
+        ((flows["org"] == "Unknown (No DNS)") & (flows["iporg"] != None)),
+        other=flows["iporg"]
+    )
+
+    flows = flows.drop(["ipcategory", "iporg"], axis=1)
+    # flows = flows.categorize(columns=["fqdn_source", "org", "category"])
+    infra.dask.clean_write_parquet(flows, out_path)
+
+
 if __name__ == "__main__":
     platform = infra.platform.read_config()
 
@@ -333,6 +373,11 @@ if __name__ == "__main__":
         augment_all_user_flows(in_parent_directory, annotated_parent_directory, client)
         stun_augment_all_user_flows(annotated_parent_directory, stun_annotated_parent_directory, client)
         merge_parquet_frames(stun_annotated_parent_directory, merged_out_directory)
+
+        annotate_category_org_from_ip(
+            "data/internal/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start",
+            "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start",
+        )
 
         client.close()
 
