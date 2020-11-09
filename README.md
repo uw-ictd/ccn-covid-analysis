@@ -1,28 +1,28 @@
-# Bokondini Data Analysis
+# Community Cellular Network Data Analysis, 2019-2020
 
 This analysis is a continuation of excellent work begun by [Michelle
 Lin](https://github.com/IntOwl).
 
 ## Data
 
-Data for this analysis can be requested from the UW ICTD lab and
-shared for research purposes on a valid case-by-case basis. See the
-data specific [data-readme](data/README.md) for specific information.
+Data for this analysis is available from the ____ external data archive. See the
+data specific [data-readme](data/README.md) for specific information on how to 
+extract the data into your working directory.  
 
 ## Running Computations
 
 ### Dependencies
 
-Dependencies for the project are managed with Pipenv. After checking
-out the repository, run `pipenv shell` in the root directory to get a
-shell in a virtual environment. Then run `pipenv sync` to install all
-the dependencies from the lockfile. If this command gives you errors,
-you may need to install some supporting libraries (libsnappy) for your
-platform. You will need to be in the pipenv shell or run commands with
-pipenv run to actually run scripts with the appropriate dependencies.
+Dependencies for the project are managed with poetry, an external tool you may
+need to install. After checking out the repository, run `poetry shell` in the
+root directory to get a shell in a virtual environment. Then run `poetry install`
+to install all the dependencies from the lockfile. If this command gives you
+errors, you may need to install some supporting libraries (libsnappy) for your
+platform. You will need to be in the poetry shell or run commands with poetry
+run to actually run scripts with the appropriate dependencies.
 
 ### Dask
-The uncompressed dataset size as of Feb 2020 is too large to fit on
+The uncompressed dataset size as of March 2020 is too large to fit on
 one reasonable sized machine (~70M rows / 29GB just for flows). For
 now the project uses [dask](https://docs.dask.org/en/latest/), a
 framework for python that extends pandas data frames to support
