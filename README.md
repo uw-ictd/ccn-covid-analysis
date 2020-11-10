@@ -7,12 +7,19 @@ Lin](https://github.com/IntOwl).
 
 Data for this analysis is available from the ____ external data archive. See the
 data specific [data-readme](data/README.md) for specific information on how to 
-extract the data into your working directory.  
+extract the data into your working directory.
+
+Some analysis uses intermediate datasets derived from the archival dataset, and
+may fail if the `generate_shared_intermediates.py` module has not been run.
 
 ## Running Computations
 
-Before running other modules, the generate_shared_intermediates module must be
+Before running other modules, the `generate_shared_intermediates.py` module must be
 run to generate datasets derived from the archival data used by other modules.
+
+```shell script
+poetry run python generate_shared_intermediates.py
+```
 
 Analysis files which generate graphs or statistics from the data are located in
 the root directory of the project, and can be run individually after the shared
@@ -23,6 +30,8 @@ computation from visualization. Create a new `platform-conf.toml` file in the
 project root directory from the `example-platform-conf.toml` to customize the
 platform behavior. This can be useful when using a different server or cloud
 resources to prepare data with a local machine to generate visualizations.
+Details of the specific entries in `platform-conf.toml` are included as comments
+in the example file.
 
 ### Dependencies
 
