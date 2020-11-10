@@ -3,6 +3,7 @@
 
 import datetime
 import pandas as pd
+import os.path
 
 import infra.constants
 import infra.dask
@@ -46,10 +47,10 @@ def reduce_flows_to_pandas(in_path, out_path):
     infra.pd.clean_write_parquet(user_range_frame, out_path)
 
 
-def compute_purchase_range_frame():
+def compute_purchase_range_frame(transaction_source_file):
     """Generates a frame with the range a user has made purchases in the net
     """
-    transactions = infra.pd.read_parquet("data/clean/transactions_TM.parquet")
+    transactions = infra.pd.read_parquet(transaction_source_file)
 
     # Each user's total amount of data purchased directly.
     purchases = transactions.loc[transactions["kind"] == "purchase"]
@@ -84,10 +85,10 @@ def _count_gap_days(row, gap_day_frame):
     return count
 
 
-def compute_user_deltas(flow_range_intermediate_file, active_delta_out_file):
+def compute_user_deltas(log_gap_source_file, transaction_source_file, flow_range_intermediate_file, active_delta_out_file):
     flow_ranges = infra.pd.read_parquet(flow_range_intermediate_file)
-    purchase_ranges = compute_purchase_range_frame()
-    network_gap_days = compute_full_gap_days("data/clean/log_gaps_TM.parquet")
+    purchase_ranges = compute_purchase_range_frame(transaction_source_file)
+    network_gap_days = compute_full_gap_days(log_gap_source_file)
 
     # Merge on user
     flow_ranges = flow_ranges.reset_index()
@@ -148,23 +149,36 @@ def compute_full_gap_days(log_gaps_file):
     return gap_days
 
 
-if __name__ == "__main__":
-    platform = infra.platform.read_config()
-
-    flow_source_file = "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
-    temporary_file = "scratch/graphs/compute_user_active_time"
-    delta_out_file = "data/clean/user_active_deltas.parquet"
-    if platform.large_compute_support:
+def run(dask_client, basedir):
+    flow_source_file = os.path.join(
+        basedir,
+        "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
+    )
+    transaction_source_file = os.path.join(basedir, "data/clean/transactions_TM.parquet")
+    log_gap_source_file = os.path.join(basedir, "data/derived/log_gaps_TM.parquet")
+    temporary_file = os.path.join(basedir, "scratch/graphs/compute_user_active_time")
+    delta_out_file = os.path.join(basedir, "data/derived/user_active_deltas.parquet")
+    if dask_client is not None:
         print("Running compute tasks")
         print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
-        client = infra.dask.setup_platform_tuned_dask_client(per_worker_memory_GB=10, platform=platform)
+
         reduce_flows_to_pandas(flow_source_file, temporary_file)
+
+    compute_user_deltas(log_gap_source_file, transaction_source_file, temporary_file, delta_out_file)
+
+
+if __name__ == "__main__":
+    platform = infra.platform.read_config()
+    basedir = "../"
+
+    if platform.large_compute_support:
+        client = infra.dask.setup_platform_tuned_dask_client(per_worker_memory_GB=10, platform=platform)
+    else:
+        client = None
+
+    run(client, basedir)
+
+    if client is not None:
         client.close()
 
-    compute_user_deltas(temporary_file, delta_out_file)
-
     print("Done!")
-
-
-
-

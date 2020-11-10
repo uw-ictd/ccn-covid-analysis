@@ -42,7 +42,8 @@ def compute_filtered_purchase_and_use_intermediate(outfile, client):
     ).loc[:, ["user", "bytes_up", "bytes_down", "local", "end"]]
 
     # Filter the balances included to users who have been minimally active
-    user_active_ranges = infra.pd.read_parquet("data/clean/user_active_deltas.parquet")
+    user_active_ranges = infra.pd.read_parquet(
+        "../data/clean/user_active_deltas.parquet")
     # Drop users new to the network first active less than a week ago.
     users_to_analyze = user_active_ranges.loc[
         user_active_ranges["days_since_first_active"] >= 7,
@@ -369,7 +370,7 @@ def reduce_to_user_pd_frame(user, outpath):
 
 
 def make_plot(inpath):
-    gap_df = infra.pd.read_parquet("data/clean/log_gaps_TM.parquet")
+    gap_df = infra.pd.read_parquet("../data/clean/log_gaps_TM.parquet")
     running_user_balance = infra.pd.read_parquet(inpath)
     print(running_user_balance)
     # Limit the domain instead of the time resolution

@@ -3,16 +3,21 @@
 Note this could be _before_ the trimmed data start time.
 """
 
-import dask.dataframe
+import logging
+import os.path
 
-source_file = "data/clean/transactions_TZ"
-destination_file = "data/clean/first_time_user_transactions.csv"
+import infra.pd
 
-if __name__ == "__main__":
-    frame = dask.dataframe.read_parquet(source_file,
-                                        engine="fastparquet").compute()
+logger = logging.getLogger(__name__)
+
+
+def run(dask_client, basedir):
+    source_file = os.path.join(basedir, "data/clean/transactions_TM.parquet")
+    destination_file = os.path.join(basedir, "data/derived/first_time_user_transactions.csv")
+
+    frame = infra.pd.read_parquet(source_file)
     frame = frame.sort_values("timestamp")
-    print(frame)
+    logger.debug(frame)
 
     # Open file to write to
     with open(destination_file, "w") as df:
@@ -39,5 +44,10 @@ if __name__ == "__main__":
                     str(purchase.amount_bytes),
                     str(purchase.amount_idr),
                 ])
-                print(csv_string)
+                logger.debug(csv_string)
                 df.write(csv_string + "\n")
+
+
+if __name__ == "__main__":
+    basedir = "../"
+    run(dask_client=None, basedir=basedir)
