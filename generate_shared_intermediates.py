@@ -1,4 +1,5 @@
 import intermediates.compute_first_time_user_transactions
+import intermediates.compute_log_gaps
 import intermediates.compute_user_active_deltas
 
 import infra.dask
@@ -16,6 +17,7 @@ if __name__ == "__main__":
 
     print("Running all intermediate computations")
     intermediates.compute_first_time_user_transactions.run(client, basedir)
+    intermediates.compute_log_gaps.run(client, basedir)
     intermediates.compute_user_active_deltas.run(client, basedir)
 
     if client is not None:
