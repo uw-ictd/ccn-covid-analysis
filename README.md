@@ -11,6 +11,19 @@ extract the data into your working directory.
 
 ## Running Computations
 
+Before running other modules, the generate_shared_intermediates module must be
+run to generate datasets derived from the archival data used by other modules.
+
+Analysis files which generate graphs or statistics from the data are located in
+the root directory of the project, and can be run individually after the shared
+intermediates have been generated.
+
+The project has a concept of a "platform", which allows splitting data-intensive
+computation from visualization. Create a new `platform-conf.toml` file in the
+project root directory from the `example-platform-conf.toml` to customize the
+platform behavior. This can be useful when using a different server or cloud
+resources to prepare data with a local machine to generate visualizations.
+
 ### Dependencies
 
 Dependencies for the project are managed with poetry, an external tool you may
