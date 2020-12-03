@@ -455,8 +455,8 @@ def consolidate_datasets(input_directory,
     print("Removed {} duplicates!".format(results[0] - results[1]))
 
 
-def _clean_write_parquet(dataframe, path, engine="fastparquet", compute=True):
-    return infra.dask.clean_write_parquet(dataframe, path, engine, compute)
+def _clean_write_parquet(dataframe, path):
+    return infra.dask.clean_write_parquet(dataframe, path)
 
 
 def split_by_user(flowlog_path, dns_path, client):
