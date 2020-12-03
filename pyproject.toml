@@ -6,7 +6,7 @@ authors = ["Matt Johnson <matt9j@cs.washington.edu>"]
 license = "MPL-2.0"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = ">=3.6.1"
 pandas = "^1.1.3"
 altair = "^4.1.0"
 numba = "^0.51.2"
