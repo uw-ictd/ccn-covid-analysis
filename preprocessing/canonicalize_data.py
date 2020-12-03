@@ -763,9 +763,6 @@ if __name__ == "__main__":
                 print("Row count ", filename, ":", index, ":", len(working_log))
                 # Strip the .xz extension on output
                 parquet_name = filename[:-3]
-                working_log = working_log.set_index("start")
-                working_log = working_log.repartition(partition_size="32M",
-                                                      force=True)
 
                 flow_type = None
                 if index == 0:
@@ -820,9 +817,7 @@ if __name__ == "__main__":
                 print("Row count ", filename, ":", index, ":", len(working_log))
                 # Strip the .xz extension on output
                 parquet_name = filename[:-3]
-                working_log = working_log.set_index("timestamp")
-                working_log = working_log.repartition(partition_size="64M",
-                                                      force=True)
+
                 dns_type = None
                 if index == 0:
                     dns_type = "typical"
