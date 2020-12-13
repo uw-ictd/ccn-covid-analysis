@@ -10,6 +10,7 @@ import dask.dataframe
 import dask.distributed
 import ipaddress
 import lzma
+import gzip
 import pandas as pd
 import pickle
 import os
@@ -102,7 +103,7 @@ def split_lzma_file(input_path, out_format_pattern, chunksize):
         chunk_i = 0
         should_continue = True
         while should_continue:
-            with lzma.open(out_format_pattern.format(chunk_i), mode="wb") as outfile:
+            with gzip.open(out_format_pattern.format(chunk_i), mode="wb") as outfile:
                 for i in range(chunksize):
                     try:
                         flowlog = pickle.load(infile)
@@ -267,7 +268,7 @@ def import_flowlog_to_dataframes(file_path):
               dask.dataframe.from_pandas(pd.DataFrame(), chunksize=max_rows_per_division),
               ]
 
-    with lzma.open(file_path, mode="rb") as f:
+    with gzip.open(file_path, mode="rb") as f:
         i = 0
         while True:
             try:
@@ -334,7 +335,7 @@ def import_dnslog_to_dataframes(file_path):
     frames = [dask.dataframe.from_pandas(pd.DataFrame(), chunksize=max_rows_per_division),
               ]
 
-    with lzma.open(file_path, mode="rb") as f:
+    with gzip.open(file_path, mode="rb") as f:
         i = 0
         response_count = 0
         while True:
@@ -706,7 +707,9 @@ if __name__ == "__main__":
 
     CLEAN_TRANSACTIONS = False
 
+    SPLIT_DNS_LOGS = False
     SPLIT_FLOWLOGS = False
+
     INGEST_FLOWLOGS = False
     DEDUPLICATE_FLOWLOGS = False
 
@@ -729,20 +732,28 @@ if __name__ == "__main__":
             "../data/transactions.log")
         transactions = dask.dataframe.from_pandas(transactions, chunksize=100000)
 
-        infra.dask.clean_write_parquet(transactions,
-                                           "../data/clean/transactions")
+        infra.dask.clean_write_parquet(transactions, "../data/clean/transactions")
+
+    if SPLIT_DNS_LOGS:
+        split_lzma_file("data/original-raw-archives/2020-11-16-dns_archive.xz",
+                        "scratch/splits/dns/archives/2020-11-16-dns_archive-{:03d}.gz",
+                        1000000)
 
     if SPLIT_FLOWLOGS:
         split_lzma_file("data/originals/2019-05-17-flowlog_archive.xz",
-                        "scratch/splits/flows/archives/2019-05-17-flowlog_archive-{:03d}.xz",
+                        "scratch/splits/flows/archives/2019-05-17-flowlog_archive-{:03d}.gz",
                         1000000)
 
         split_lzma_file("data/originals/2020-02-13-flowlog_archive.xz",
-                        "scratch/splits/flows/archives/2020-02-13-flowlog_archive-{:03d}.xz",
+                        "scratch/splits/flows/archives/2020-02-13-flowlog_archive-{:03d}.gz",
                         1000000)
 
         split_lzma_file("data/originals/2020-05-04-flowlog_archive.xz",
-                        "scratch/splits/flows/archives/2020-05-04-flowlog_archive-{:03d}.xz",
+                        "scratch/splits/flows/archives/2020-05-04-flowlog_archive-{:03d}.gz",
+                        1000000)
+
+        split_lzma_file("data/original-raw-archives/2020-11-16-flowlog_archive.xz",
+                        "scratch/splits/flows/archives/2020-11-16-flowlog_archive-{:03d}.gz",
                         1000000)
 
     if INGEST_FLOWLOGS:
@@ -750,7 +761,7 @@ if __name__ == "__main__":
         split_dir = os.path.join("scratch", "splits", "flows")
         archive_dir = os.path.join(split_dir, "archives")
         for filename in sorted(os.listdir(archive_dir)):
-            if not filename.endswith(".xz"):
+            if not filename.endswith(".gz"):
                 print("Skipping:", filename)
                 continue
 
@@ -804,7 +815,7 @@ if __name__ == "__main__":
         # Import dns logs and archive to parquet
         dns_archives_directory = os.path.join("scratch", "splits", "dns", "archives")
         for filename in sorted(os.listdir(dns_archives_directory)):
-            if not filename.endswith(".xz"):
+            if not filename.endswith(".gz"):
                 print("Skipping:", filename)
                 continue
 
