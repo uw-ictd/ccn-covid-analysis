@@ -4,6 +4,7 @@
 import mappers.domains
 import infra.dask
 import infra.parsers
+import infra.platform
 import csv
 import dask.config
 import dask.dataframe
@@ -703,7 +704,9 @@ def categorize_fqdn_from_parquet(in_path, out_path, compute=True):
 
 
 if __name__ == "__main__":
-    client = infra.dask.setup_dask_client()
+    platform = infra.platform.read_config()
+
+    client = infra.dask.setup_platform_tuned_dask_client(100, platform)
 
     CLEAN_TRANSACTIONS = False
 
