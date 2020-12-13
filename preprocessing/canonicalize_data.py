@@ -391,6 +391,58 @@ def import_dnslog_to_dataframes(file_path):
     return frames
 
 
+def _import_flowlog_file(archive_dir, filename, split_dir):
+    print("Converting", filename, "to parquet")
+    frames = import_flowlog_to_dataframes(os.path.join(archive_dir, filename))
+    for index, working_log in enumerate(frames):
+        if (working_log is None) or (len(working_log) == 0):
+            continue
+
+        print("Row count ", filename, ":", index, ":", len(working_log))
+        # Strip the .xz extension on output
+        parquet_name = filename[:-3]
+
+        flow_type = None
+        if index == 0:
+            flow_type = "typical"
+        elif index == 1:
+            flow_type = "p2p"
+        elif index == 2:
+            flow_type = "nouser"
+
+        out_path = os.path.join(split_dir,
+                                "parquet",
+                                flow_type,
+                                parquet_name)
+
+        _clean_write_parquet(working_log, out_path)
+
+
+def _import_dnslog_file(dns_archives_directory, filename, split_dir):
+    print("Converting", filename, "to parquet")
+    frames = import_dnslog_to_dataframes(os.path.join(dns_archives_directory, filename))
+    for index, working_log in enumerate(frames):
+        if (working_log is None) or (len(working_log) == 0):
+            continue
+
+        print("Row count ", filename, ":", index, ":", len(working_log))
+        # Strip the .xz extension on output
+        parquet_name = filename[:-3]
+
+        dns_type = None
+        if index == 0:
+            dns_type = "typical"
+        else:
+            raise RuntimeError("PANICCCSSSSS")
+
+        out_path = os.path.join(split_dir,
+                                "parquet",
+                                dns_type,
+                                parquet_name)
+
+        _clean_write_parquet(working_log, out_path)
+
+
 def consolidate_datasets(input_directory,
                          output,
                          index_column,
@@ -714,9 +766,9 @@ if __name__ == "__main__":
     SPLIT_FLOWLOGS = False
 
     INGEST_FLOWLOGS = False
-    DEDUPLICATE_FLOWLOGS = False
-
     INGEST_DNSLOGS = False
+
+    DEDUPLICATE_FLOWLOGS = False
     DEDUPLICATE_DNSLOGS = False
 
     BUILD_PER_USER_INDEXES = False
@@ -763,35 +815,30 @@ if __name__ == "__main__":
         # Import split files and archive to parquet
         split_dir = os.path.join("scratch", "splits", "flows")
         archive_dir = os.path.join(split_dir, "archives")
+        tokens = []
         for filename in sorted(os.listdir(archive_dir)):
             if not filename.endswith(".gz"):
                 print("Skipping:", filename)
                 continue
 
-            print("Converting", filename, "to parquet")
-            frames = import_flowlog_to_dataframes(os.path.join(archive_dir, filename))
-            for index, working_log in enumerate(frames):
-                if (working_log is None) or (len(working_log) == 0):
-                    continue
+            token = dask.delayed(_import_flowlog_file)(archive_dir, filename, split_dir)
+            tokens.append(token)
 
-                print("Row count ", filename, ":", index, ":", len(working_log))
-                # Strip the .xz extension on output
-                parquet_name = filename[:-3]
+        client.compute(tokens, sync=True)
 
-                flow_type = None
-                if index == 0:
-                    flow_type = "typical"
-                elif index == 1:
-                    flow_type = "p2p"
-                elif index == 2:
-                    flow_type = "nouser"
+    if INGEST_DNSLOGS:
+        # Import dns logs and archive to parquet
+        dns_archives_directory = os.path.join("scratch", "splits", "dns", "archives")
+        split_dir = os.path.join("scratch", "splits", "dns")
+        tokens = []
+        for filename in sorted(os.listdir(dns_archives_directory)):
+            if not filename.endswith(".gz"):
+                print("Skipping:", filename)
+                continue
+            token = dask.delayed(_import_dnslog_file)(dns_archives_directory, filename, split_dir)
+            tokens.append(token)
 
-                out_path = os.path.join(split_dir,
-                                        "parquet",
-                                        flow_type,
-                                        parquet_name)
-
-                _clean_write_parquet(working_log, out_path)
+        client.compute(tokens, sync=True)
 
     if DEDUPLICATE_FLOWLOGS:
         input_path = os.path.join("scratch", "splits", "flows", "parquet")
@@ -813,37 +860,6 @@ if __name__ == "__main__":
                                  time_slice="4H",
                                  checkpoint=True,
                                  client=client)
-
-    if INGEST_DNSLOGS:
-        # Import dns logs and archive to parquet
-        dns_archives_directory = os.path.join("scratch", "splits", "dns", "archives")
-        for filename in sorted(os.listdir(dns_archives_directory)):
-            if not filename.endswith(".gz"):
-                print("Skipping:", filename)
-                continue
-
-            print("Converting", filename, "to parquet")
-            frames = import_dnslog_to_dataframes(os.path.join(dns_archives_directory, filename))
-            for index, working_log in enumerate(frames):
-                if (working_log is None) or (len(working_log) == 0):
-                    continue
-
-                print("Row count ", filename, ":", index, ":", len(working_log))
-                # Strip the .xz extension on output
-                parquet_name = filename[:-3]
-
-                dns_type = None
-                if index == 0:
-                    dns_type = "typical"
-                else:
-                    raise RuntimeError("PANICCCSSSSS")
-
-                out_path = os.path.join(dns_archives_directory,
-                                        "parquet",
-                                        dns_type,
-                                        parquet_name)
-
-                _clean_write_parquet(working_log, out_path)
 
     if DEDUPLICATE_DNSLOGS:
         input_path = os.path.join("scratch", "splits", "dns", "parquet")
