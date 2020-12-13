@@ -248,8 +248,6 @@ def canonicalize_dnslog_dict(dns_response):
         return logs_to_return
 
     return [dns_response]
-    raise NotImplementedError("Unsupported DNS log: {}".format(
-        str(dns_response)))
 
 
 def import_flowlog_to_dataframes(file_path):
