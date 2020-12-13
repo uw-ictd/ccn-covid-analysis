@@ -262,12 +262,7 @@ def import_flowlog_to_dataframes(file_path):
     """
     max_rows_per_division = 10000
     chunks = [list(), list(), list()]
-    # Initialize an empty dask dataframe from an empty pandas dataframe. No
-    # native dask empty frame constructor is available.
-    frames = [dask.dataframe.from_pandas(pd.DataFrame(), chunksize=max_rows_per_division),
-              dask.dataframe.from_pandas(pd.DataFrame(), chunksize=max_rows_per_division),
-              dask.dataframe.from_pandas(pd.DataFrame(), chunksize=max_rows_per_division),
-              ]
+    frames = [None, None, None]
 
     with gzip.open(file_path, mode="rb") as f:
         i = 0
@@ -293,12 +288,15 @@ def import_flowlog_to_dataframes(file_path):
                 # Create a new division if needed.
                 for index, chunk in enumerate(chunks):
                     if len(chunk) >= max_rows_per_division:
-                        frames[index] = frames[index].append(
-                            dask.dataframe.from_pandas(
-                                pd.DataFrame(chunk),
-                                chunksize=max_rows_per_division,
-                            )
+                        new_frame = dask.dataframe.from_pandas(
+                            pd.DataFrame(chunk),
+                            chunksize=max_rows_per_division,
                         )
+                        if frames[index] is None:
+                            frames[index] = new_frame
+                        else:
+                            frames[index] = frames[index].append(new_frame)
+
                         chunks[index] = list()
 
             except EOFError as e:
@@ -310,12 +308,14 @@ def import_flowlog_to_dataframes(file_path):
     # Clean up and add any remaining entries.
     for index, chunk in enumerate(chunks):
         if len(chunk) > 0:
-            frames[index] = frames[index].append(
-                dask.dataframe.from_pandas(
-                    pd.DataFrame(chunk),
-                    chunksize=max_rows_per_division,
-                )
+            new_frame = dask.dataframe.from_pandas(
+                pd.DataFrame(chunk),
+                chunksize=max_rows_per_division,
             )
+            if frames[index] is None:
+                frames[index] = new_frame
+            else:
+                frames[index] = frames[index].append(new_frame)
 
     print("Finished processing {} with {} rows".format(
           file_path, i))
@@ -331,10 +331,7 @@ def import_dnslog_to_dataframes(file_path):
     """
     max_rows_per_division = 10000
     chunks = [list()]
-    # Initialize an empty dask dataframe from an empty pandas dataframe. No
-    # native dask empty frame constructor is available.
-    frames = [dask.dataframe.from_pandas(pd.DataFrame(), chunksize=max_rows_per_division),
-              ]
+    frames = [None]
 
     with gzip.open(file_path, mode="rb") as f:
         i = 0
@@ -361,12 +358,15 @@ def import_dnslog_to_dataframes(file_path):
                 # Create a new division if needed.
                 for index, chunk in enumerate(chunks):
                     if len(chunk) >= max_rows_per_division:
-                        frames[index] = frames[index].append(
-                            dask.dataframe.from_pandas(
-                                pd.DataFrame(chunk),
-                                chunksize=max_rows_per_division,
-                            )
+                        new_frame = dask.dataframe.from_pandas(
+                            pd.DataFrame(chunk),
+                            chunksize=max_rows_per_division,
                         )
+                        if frames[index] is None:
+                            frames[index] = new_frame
+                        else:
+                            frames[index] = frames[index].append(new_frame)
+
                         chunks[index] = list()
 
             except EOFError as e:
@@ -378,12 +378,14 @@ def import_dnslog_to_dataframes(file_path):
     # Clean up and add any remaining entries.
     for index, chunk in enumerate(chunks):
         if len(chunk) > 0:
-            frames[index] = frames[index].append(
-                dask.dataframe.from_pandas(
-                    pd.DataFrame(chunk),
-                    chunksize=max_rows_per_division,
-                )
+            new_frame = dask.dataframe.from_pandas(
+                pd.DataFrame(chunk),
+                chunksize=max_rows_per_division,
             )
+            if frames[index] is None:
+                frames[index] = new_frame
+            else:
+                frames[index] = frames[index].append(new_frame)
 
     print("Finished processing {} with {} rows and {} responses".format(
         file_path, i, response_count))
@@ -771,7 +773,7 @@ if __name__ == "__main__":
             print("Converting", filename, "to parquet")
             frames = import_flowlog_to_dataframes(os.path.join(archive_dir, filename))
             for index, working_log in enumerate(frames):
-                if len(working_log) == 0:
+                if (working_log is None) or (len(working_log) == 0):
                     continue
 
                 print("Row count ", filename, ":", index, ":", len(working_log))
@@ -825,7 +827,7 @@ if __name__ == "__main__":
             print("Converting", filename, "to parquet")
             frames = import_dnslog_to_dataframes(os.path.join(dns_archives_directory, filename))
             for index, working_log in enumerate(frames):
-                if len(working_log) == 0:
+                if (working_log is None) or (len(working_log) == 0):
                     continue
 
                 print("Row count ", filename, ":", index, ":", len(working_log))
