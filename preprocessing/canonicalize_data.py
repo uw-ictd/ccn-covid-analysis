@@ -745,7 +745,7 @@ def categorize_fqdn_from_parquet(in_path, out_path, compute=True):
 if __name__ == "__main__":
     platform = infra.platform.read_config()
 
-    client = infra.dask.setup_platform_tuned_dask_client(30, platform)
+    client = infra.dask.setup_platform_tuned_dask_client(30, platform, single_threaded_workers=True)
 
     CLEAN_TRANSACTIONS = False
 

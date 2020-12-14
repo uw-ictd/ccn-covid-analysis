@@ -15,18 +15,20 @@ def setup_dask_client():
     return setup_tuned_dask_client(1, 3, 4, temporary_directory=None)
 
 
-def setup_platform_tuned_dask_client(per_worker_memory_GB, platform):
+def setup_platform_tuned_dask_client(per_worker_memory_GB, platform, single_threaded_workers=False):
     """Setup dask client configured for the platform and task memory requirement
     """
     return setup_tuned_dask_client(
         per_worker_memory_GB,
         platform.max_memory_gigabytes,
         platform.max_processors,
+        single_threaded_workers,
         platform.temp_directory,
     )
 
 
-def setup_tuned_dask_client(per_worker_memory_GB, system_memory_GB, system_processors, temporary_directory):
+def setup_tuned_dask_client(
+        per_worker_memory_GB, system_memory_GB, system_processors, single_threaded, temporary_directory):
     # Compression sounds nice, but results in spikes on decompression
     # that can lead to unstable RAM use and overflow.
     dask.config.set({"dataframe.shuffle-compression": False})
@@ -41,9 +43,14 @@ def setup_tuned_dask_client(per_worker_memory_GB, system_memory_GB, system_proce
             1, system_processors, memory_limit
         ))
 
+        if single_threaded:
+            thread_count = 1
+        else:
+            thread_count = system_processors
+
         # The memory limit parameter is undocumented and applies to each worker.
         cluster = dask.distributed.LocalCluster(n_workers=1,
-                                                threads_per_worker=system_processors,
+                                                threads_per_worker=thread_count,
                                                 memory_limit=memory_limit,
                                                 silence_logs=logging.CRITICAL,
                                                 local_directory=temporary_directory,
@@ -64,8 +71,12 @@ def setup_tuned_dask_client(per_worker_memory_GB, system_memory_GB, system_proce
 
         worker_count = min(system_processors, worker_count)
 
-        # Allocate extra processors to threads
-        thread_count = int(system_processors/worker_count)
+        if single_threaded:
+            thread_count = 1
+        else:
+            # Allocate extra processors to threads
+            thread_count = int(system_processors/worker_count)
+
         memory_limit = "{}GB".format(per_worker_memory_GB)
         print("Operating with {} workers, with {} threads and {} of memory per worker.".format(
             worker_count, thread_count, memory_limit
