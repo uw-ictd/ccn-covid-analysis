@@ -398,7 +398,6 @@ def _import_flowlog_file(archive_dir, filename, split_dir):
         if (working_log is None) or (len(working_log) == 0):
             continue
 
-        print("Row count ", filename, ":", index, ":", len(working_log))
         # Strip the .xz extension on output
         parquet_name = filename[:-3]
 
@@ -425,7 +424,6 @@ def _import_dnslog_file(dns_archives_directory, filename, split_dir):
         if (working_log is None) or (len(working_log) == 0):
             continue
 
-        print("Row count ", filename, ":", index, ":", len(working_log))
         # Strip the .xz extension on output
         parquet_name = filename[:-3]
 
