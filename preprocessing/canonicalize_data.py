@@ -453,8 +453,7 @@ def consolidate_datasets(input_directory,
 
     for archive in os.listdir(input_directory):
         archive_path = os.path.join(input_directory, archive)
-        partial_log = dask.dataframe.read_parquet(archive_path,
-                                                  engine="fastparquet")
+        partial_log = infra.dask.read_parquet(archive_path)
         logs_to_aggregate.append(partial_log)
 
     aggregated_log = dask.dataframe.multi.concat(logs_to_aggregate,
@@ -478,29 +477,19 @@ def consolidate_datasets(input_directory,
 
         print("Wrote deduplication checkpoint!")
 
-        aggregated_log = dask.dataframe.read_parquet("scratch/checkpoint",
-                                                     engine="fastparquet")
+        aggregated_log = infra.dask.read_parquet("scratch/checkpoint")
 
     aggregate_length = aggregated_log.shape[0]
 
     # Run deduplicate on the log subparts binned by date.
-    # This only works since timestamp is part of the uniqueness criteria!
-    deduped_logs_to_aggregate = list()
-    for i in range(aggregated_log.npartitions):
-        subpart = aggregated_log.get_partition(i)
-        subpart = subpart.drop_duplicates()
-        deduped_logs_to_aggregate.append(subpart)
+    # This only works since the index column is part of the uniqueness criteria!
+    deduped_log = aggregated_log.map_partitions(lambda df: df.drop_duplicates())
 
-    deduped_log = dask.dataframe.multi.concat(deduped_logs_to_aggregate,
-                                              interleave_partitions=False)
     dedupe_length = deduped_log.shape[0]
 
-    write_delayed = deduped_log.to_parquet(output,
-                                           compression="snappy",
-                                           engine="fastparquet",
-                                           compute=False)
-    results = client.compute([aggregate_length, dedupe_length, write_delayed],
-                             sync=True)
+    write_delayed = infra.dask.clean_write_parquet(deduped_log, output, compute=False)
+
+    results = client.compute([aggregate_length, dedupe_length, write_delayed], sync=True)
 
     print("Raw concat size:", results[0])
     print("Final size:", results[1])
