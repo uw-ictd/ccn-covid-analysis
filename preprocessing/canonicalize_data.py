@@ -513,7 +513,7 @@ def _clean_write_parquet(dataframe, path):
 
 
 def _slim_dns_entry(input_dataset, output_dataset):
-    df = infra.dask.read_parquet(input_dataset).reset_index()["timestamp", "user", "domain_name", "ip_address"]
+    df = infra.dask.read_parquet(input_dataset).reset_index()[["timestamp", "user", "domain_name", "ip_address"]]
     df = df.set_index("timestamp")
     infra.dask.clean_write_parquet(df, output_dataset)
 
