@@ -514,28 +514,43 @@ def _clean_write_parquet(dataframe, path):
 
 def _slim_dns_entry(input_dataset, output_dataset):
     df = infra.dask.read_parquet(input_dataset).reset_index()[["timestamp", "user", "domain_name", "ip_address"]]
-    df = df.set_index("timestamp")
+    df = df.set_index("timestamp").repartition(
+        partition_size="128M",
+        force=True
+    )
     infra.dask.clean_write_parquet(df, output_dataset)
 
 
-def _hard_div_by_column(input_dataset, out_path, split_column, index_column):
+def _hard_div_by_column(input_dataset, out_path, split_column, index_column, client):
     df = infra.dask.read_parquet(input_dataset)
 
     print("setting div to '{}' and reindexing to '{}'".format(split_column, index_column))
     df = df.reset_index()
     df = df.set_index(split_column)
 
+    # Checkpoint the indexed dataframe
+    infra.dask.clean_write_parquet(df, "scratch/checkpoint")
+    print("Wrote division checkpoint!")
+    df = infra.dask.read_parquet("scratch/checkpoint")
+
     df_by_split = df.groupby(split_column)
 
-    for div in df.index.unique():
+    unique_divisions = df.index.unique().compute()
+    print("Unique Divisions:", unique_divisions)
+
+    write_tokens = list()
+    for div in unique_divisions:
         div_frame = df_by_split.get_group(div)
-        div_frame = div_frame.reset_index().set_index(
-            index_column
-        ).repartition(
-            partition_size="128M",
-            force=True
+        div_frame = div_frame.reset_index().set_index(index_column)
+        write_tokens.append(
+            infra.dask.clean_write_parquet(
+                div_frame,
+                os.path.join(out_path, div),
+                compute=False,
+            )
         )
-        infra.dask.clean_write_parquet(div_frame, os.path.join(out_path, div))
+
+    client.compute(write_tokens, sync=True)
 
 
 def augment_user_flow_with_dns(flow_frame,
@@ -815,6 +830,7 @@ if __name__ == "__main__":
             "scratch/dns/slim_DIV_user_INDEX_timestamp",
             "user",
             "timestamp",
+            client=client,
         )
 
         _hard_div_by_column(
@@ -822,6 +838,7 @@ if __name__ == "__main__":
             "scratch/flows/typical_DIV_user_INDEX_start",
             "user",
             "start",
+            client=client,
         )
 
     if COMBINE_DNS_WITH_FLOWS:
