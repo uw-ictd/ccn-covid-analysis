@@ -482,7 +482,18 @@ def consolidate_datasets(input_directory,
 
     # Run deduplicate on the log subparts binned by date.
     # This only works since the index column is part of the uniqueness criteria!
-    deduped_log = aggregated_log.map_partitions(lambda df: df.drop_duplicates())
+
+    dedupe_tokens = list()
+    for i in range(aggregated_log.npartitions):
+        subpart = aggregated_log.get_partition(i)
+        token = dask.delayed(lambda x: x.drop_duplicates())(subpart)
+        dedupe_tokens.append(token)
+
+    deduped_logs_to_aggregate = client.compute(dedupe_tokens, sync=True)
+    deduped_log = dask.dataframe.multi.concat(
+        deduped_logs_to_aggregate,
+        interleave_partitions=False,
+    ).clear_divisions()
 
     dedupe_length = deduped_log.shape[0]
 
