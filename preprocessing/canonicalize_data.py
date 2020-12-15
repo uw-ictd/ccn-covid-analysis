@@ -459,13 +459,12 @@ def consolidate_datasets(input_directory,
     aggregated_log = dask.dataframe.multi.concat(logs_to_aggregate,
                                                  interleave_partitions=False)
 
-    # Reset the index since partitioning may be broken by not
-    # using interleaving in the concatenation above and the source
-    # divisions are coming from different database
-    # dumps. Interleaving results in partitions that are too large
-    # to hold in memory on a laptop, and I was not able to find a
-    # good way to tune the number of divisions created.
-    aggregated_log = aggregated_log.reset_index()
+    # Set the index to trigger shuffling and sorting the data since
+    # partitioning may be broken by not using interleaving in the
+    # concatenation above and the source divisions are coming from different
+    # database dumps. Interleaving results in partitions that are too large
+    # to hold in memory on a laptop, and I was not able to find a good way to
+    # tune the number of divisions created.
     aggregated_log = aggregated_log.set_index(index_column)
 
     # This repartition must be done on one of the keys we wish to check
