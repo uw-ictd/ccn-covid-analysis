@@ -519,7 +519,7 @@ def _slim_dns_entry(input_dataset, output_dataset):
 def _hard_div_by_column(input_dataset, out_path, split_column, index_column):
     df = infra.dask.read_parquet(input_dataset)
 
-    print("setting index to '{}'".format(split_column))
+    print("setting div to '{}' and reindexing to '{}'".format(split_column, index_column))
     df = df.reset_index()
     df = df.set_index(split_column)
 
