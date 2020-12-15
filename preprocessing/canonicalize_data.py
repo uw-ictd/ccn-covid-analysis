@@ -414,6 +414,7 @@ def _import_flowlog_file(archive_dir, filename, split_dir):
                                 flow_type,
                                 parquet_name)
 
+        working_log = working_log.repartition(partition_size="128M", force=True)
         _clean_write_parquet(working_log, out_path)
 
 
@@ -438,6 +439,7 @@ def _import_dnslog_file(dns_archives_directory, filename, split_dir):
                                 dns_type,
                                 parquet_name)
 
+        working_log = working_log.repartition(partition_size="128M", force=True)
         _clean_write_parquet(working_log, out_path)
 
 
