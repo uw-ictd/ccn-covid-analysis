@@ -675,26 +675,6 @@ def augment_user_flow_with_dns(flow_frame,
     return out_frame
 
 
-def categorize_fqdn_from_parquet(in_path, out_path, compute=True):
-    """Run categorization over the input parquet file and write to the output
-
-    Requires the input parquet file specify an `fqdn` column
-    """
-    frame = dask.dataframe.read_parquet(
-        in_path,
-        engine="fastparquet")
-
-    frame["category"] = frame.apply(
-        lambda row: mappers.domains.assign_category(row["fqdn"]),
-        axis="columns",
-        meta=("category", object))
-
-    return _clean_write_parquet(
-        frame,
-        out_path,
-        compute=compute)
-
-
 if __name__ == "__main__":
     platform = infra.platform.read_config()
 
@@ -904,45 +884,6 @@ if __name__ == "__main__":
         print("Completed DNS augmentation")
         print("The following users had no DNS logs")
         print(missing_dns_users)
-
-    if CATEGORIZE_USER_FLOWS:
-        print("Categorizing user flows")
-        users = sorted(os.listdir("scratch/flows/typical_fqdn_DIV_user_INDEX_start"))
-
-        computation_futures = []
-        for user in users:
-            print("Categorizing flows for:", user)
-            in_path = "scratch/flows/typical_fqdn_DIV_user_INDEX_start/" + str(user)
-            out_path = "scratch/flows/typical_fqdn_category_DIV_user_INDEX_start/" + str(user)
-            handle = categorize_fqdn_from_parquet(in_path, out_path, compute=False)
-            computation_futures.append(handle)
-
-        print("Realizing futures")
-        results = client.compute(computation_futures, sync=True)
-
-    if RE_MERGE_FLOWS:
-        merged_frame = None
-
-        users_on_disk = sorted(os.listdir("scratch/flows/typical_fqdn_category_DIV_user_INDEX_start/"))
-        for user in users_on_disk:
-            flow_frame = dask.dataframe.read_parquet(
-                "scratch/flows/typical_fqdn_category_DIV_user_INDEX_start/" + str(user),
-                engine="fastparquet")
-
-            if merged_frame is None:
-                merged_frame = flow_frame
-            else:
-                merged_frame = merged_frame.append(flow_frame)
-
-        merged_frame = merged_frame.reset_index().set_index(
-            "start"
-        ).repartition(
-            partition_size="64M",
-            force=True
-        )
-
-        print("writing")
-        _clean_write_parquet(merged_frame, "scratch/flows/typical_fqdn_category_DIV_none_INDEX_start/")
 
     client.close()
     print("Exiting hopefully cleanly...")
