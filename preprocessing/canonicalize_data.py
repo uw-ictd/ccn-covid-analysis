@@ -889,7 +889,6 @@ if __name__ == "__main__":
                                                               reverse_dns_cache,
                                                               dns_fail_cache)
             print(augmented_flow_frame)
-            print(augmented_flow_frame.head(10, compute=True))
             _clean_write_parquet(
                 augmented_flow_frame,
                 "scratch/flows/typical_fqdn_DIV_user_INDEX_start/" + str(user))
