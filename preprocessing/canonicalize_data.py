@@ -522,9 +522,8 @@ def _slim_dns_entry(input_dataset, output_dataset):
 
 
 def _hard_div_by_column(input_dataset, out_path, split_column, index_column, client):
+    print("Setting div to '{}' and reindexing to '{}'".format(split_column, index_column))
     df = infra.dask.read_parquet(input_dataset)
-
-    print("setting div to '{}' and reindexing to '{}'".format(split_column, index_column))
     df = df.reset_index()
     df = df.set_index(split_column)
 
@@ -532,25 +531,34 @@ def _hard_div_by_column(input_dataset, out_path, split_column, index_column, cli
     infra.dask.clean_write_parquet(df, "scratch/checkpoint")
     print("Wrote division checkpoint!")
     df = infra.dask.read_parquet("scratch/checkpoint")
+    df = client.persist(df)
 
     df_by_split = df.groupby(split_column)
 
     unique_divisions = df.index.unique().compute()
     print("Unique Divisions:", unique_divisions)
 
-    write_tokens = list()
-    for div in unique_divisions:
+    for i, div in enumerate(unique_divisions):
+        print("Processing {}/{} : {}".format(i, len(unique_divisions), div))
         div_frame = df_by_split.get_group(div)
         div_frame = div_frame.reset_index().set_index(index_column)
-        write_tokens.append(
-            infra.dask.clean_write_parquet(
-                div_frame,
-                os.path.join(out_path, div),
-                compute=False,
-            )
+        persisted_div_frame = client.persist(div_frame)
+        persisted_div_frame = persisted_div_frame.repartition(
+            partition_size="128M",
+            force=True,
         )
+        # Write data synchronously to the result file
+        infra.dask.clean_write_parquet(persisted_div_frame, os.path.join(out_path, div))
+        # Clear loop intermediates from cluster memory
+        client.cancel(persisted_div_frame)
+        del persisted_div_frame
+        del div_frame
 
-    client.compute(write_tokens, sync=True)
+    print("COMPLETE setting div to '{}' and reindexing to '{}'".format(split_column, index_column))
+    # Clear base dataframe
+    client.cancel(df)
+    del df
+    del df_by_split
 
 
 def augment_user_flow_with_dns(flow_frame,
