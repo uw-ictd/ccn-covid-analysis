@@ -590,7 +590,7 @@ def augment_user_flow_with_dns(flow_frame,
         flow_start_time = flow.Index
 
         if (pending_dns_log is not None and
-            pending_dns_log.Index < flow_start_time):
+            pending_dns_log.Index <= flow_start_time):
             # Handle any dangling DNS logs from previous flow loop iterations
             dns_state[pending_dns_log.ip_address] = pending_dns_log.domain_name
             dns_ambiguity_state[pending_dns_log.ip_address].add(
@@ -602,7 +602,7 @@ def augment_user_flow_with_dns(flow_frame,
                (pending_dns_log is None)):
             try:
                 dns_log = next(dns_iterator)
-                if dns_log.Index < flow_start_time:
+                if dns_log.Index <= flow_start_time:
                     # Account for the dns log immediately.
                     dns_state[dns_log.ip_address] = dns_log.domain_name
                     dns_ambiguity_state[dns_log.ip_address].add(dns_log.domain_name)
