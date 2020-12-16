@@ -866,7 +866,7 @@ if __name__ == "__main__":
             # Start the cache fresh
             dns_fail_cache = set()
 
-        users_in_dns_log = sorted(os.listdir("scratch/dns/successful_DIV_user_INDEX_timestamp/"))
+        users_in_dns_log = sorted(os.listdir("scratch/dns/slim_DIV_user_INDEX_timestamp/"))
         users_in_flow_log = sorted(os.listdir("scratch/flows/typical_DIV_user_INDEX_start/"))
         missing_dns_users = list()
         for user in users_in_flow_log:
@@ -881,7 +881,7 @@ if __name__ == "__main__":
                 engine="fastparquet")
 
             dns_frame = dask.dataframe.read_parquet(
-                "scratch/dns/successful_DIV_user_INDEX_timestamp/" + str(user),
+                "scratch/dns/slim_DIV_user_INDEX_timestamp/" + str(user),
                 engine="fastparquet")
 
             augmented_flow_frame = augment_user_flow_with_dns(flow_frame,
