@@ -842,7 +842,7 @@ if __name__ == "__main__":
         )
 
     if COMBINE_DNS_WITH_FLOWS:
-        dns_cache_path = "../scratch/reverse_dns_cache.pickle"
+        dns_cache_path = "scratch/reverse_dns_cache.pickle"
         try:
             with open(dns_cache_path, mode="rb") as f:
                 reverse_dns_cache = pickle.load(f)
@@ -850,7 +850,7 @@ if __name__ == "__main__":
             # Start the cache fresh
             reverse_dns_cache = dict()
 
-        dns_fail_cache_path = "../scratch/reverse_dns_failures.pickle"
+        dns_fail_cache_path = "scratch/reverse_dns_failures.pickle"
         try:
             with open(dns_fail_cache_path, mode="rb") as f:
                 dns_fail_cache = pickle.load(f)
