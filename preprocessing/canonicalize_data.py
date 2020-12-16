@@ -888,10 +888,10 @@ if __name__ == "__main__":
                                                               dns_frame,
                                                               reverse_dns_cache,
                                                               dns_fail_cache)
-            print(augmented_flow_frame)
-            _clean_write_parquet(
+            infra.dask.clean_write_parquet(
                 augmented_flow_frame,
-                "scratch/flows/typical_fqdn_DIV_user_INDEX_start/" + str(user))
+                "scratch/flows/typical_fqdn_DIV_user_INDEX_start/" + str(user)
+            )
 
             print("Saving reverse dns cache to:", dns_cache_path)
             with open(dns_cache_path, mode="w+b") as f:
