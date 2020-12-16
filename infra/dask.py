@@ -92,9 +92,9 @@ def setup_tuned_dask_client(
         # Less aggressively write to disk than in the constrained case,
         # but still don't kill worker processes if they stray and rely on the
         # OOM killer if there is a runaway process.
-        dask.config.set({"distributed.worker.memory.target": 0.5})
+        dask.config.set({"distributed.worker.memory.target": 0.7})
         dask.config.set({"distributed.worker.memory.spill": 0.8})
-        dask.config.set({"distributed.worker.memory.pause": 0.9})
+        dask.config.set({"distributed.worker.memory.pause": 0.95})
         dask.config.set({"distributed.worker.memory.terminate": False})
 
     return dask.distributed.Client(cluster)
