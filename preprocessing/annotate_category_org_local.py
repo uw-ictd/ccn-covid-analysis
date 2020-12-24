@@ -361,10 +361,11 @@ def annotate_category_org_from_ip(in_path, out_path):
 if __name__ == "__main__":
     platform = infra.platform.read_config()
 
-    in_parent_directory = "scratch/flows/typical_fqdn_TM_DIV_user_INDEX_start/"
-    annotated_parent_directory = "scratch/flows/typical_fqdn_category_org_local_TM_DIV_user_INDEX_start"
-    stun_annotated_parent_directory = "scratch/flows/typical_fqdn_category_stun_org_local_TM_DIV_user_INDEX_start"
-    merged_out_directory = "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
+    in_parent_directory = "scratch/flows/typical_fqdn_DIV_user_INDEX_start/"
+    annotated_parent_directory = "scratch/flows/typical_fqdn_category_org_local_DIV_user_INDEX_start"
+    stun_annotated_parent_directory = "scratch/flows/typical_fqdn_category_stun_org_local_DIV_user_INDEX_start"
+    merged_out_directory = "scratch/flows/typical_fqdn_org_category_local_no_ip_DIV_none_INDEX_start"
+    final_out_directory = "scratch/flows/typical_fqdn_org_category_local_DIV_none_INDEX_start"
 
     if platform.large_compute_support:
         print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
@@ -373,11 +374,7 @@ if __name__ == "__main__":
         augment_all_user_flows(in_parent_directory, annotated_parent_directory, client)
         stun_augment_all_user_flows(annotated_parent_directory, stun_annotated_parent_directory, client)
         merge_parquet_frames(stun_annotated_parent_directory, merged_out_directory)
-
-        annotate_category_org_from_ip(
-            "data/internal/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start",
-            "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start",
-        )
+        annotate_category_org_from_ip(merged_out_directory, final_out_directory)
 
         client.close()
 
