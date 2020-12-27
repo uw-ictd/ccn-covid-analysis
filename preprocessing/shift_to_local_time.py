@@ -102,24 +102,29 @@ def _shift_existing_data(client):
                                     "data/clean/transactions_TZ")
 
 
-if __name__ == "__main__":
-    platform = infra.platform.read_config()
-    client = infra.dask.setup_platform_tuned_dask_client(10, platform)
+def shift_all(client):
+    future_handles = [
+        shift_flows(
+            "scratch/flows/typical_fqdn_org_category_local_DIV_none_INDEX_start",
+            "scratch/flows/typical_fqdn_org_category_local_TZ_DIV_none_INDEX_start",
+        ),
+        shift_flows(
+            "scratch/flows/p2p_DIV_none_INDEX_start",
+            "scratch/flows/p2p_TZ_DIV_none_INDEX_start",
+        ),
+        shift_flows(
+            "scratch/flows/nouser_DIV_none_INDEX_start",
+            "scratch/flows/nouser_TZ_DIV_none_INDEX_start",
+        )
+    ]
 
-    shift_flows(
-        "scratch/flows/typical_fqdn_org_category_local_DIV_none_INDEX_start",
-        "scratch/flows/typical_fqdn_org_category_local_TZ_DIV_none_INDEX_start",
-    )
-
-    shift_flows(
-        "scratch/flows/p2p_DIV_none_INDEX_start",
-        "scratch/flows/p2p_TZ_DIV_none_INDEX_start",
-    )
-
-    shift_flows(
-        "scratch/flows/nouser_DIV_none_INDEX_start",
-        "scratch/flows/nouser_TZ_DIV_none_INDEX_start",
-    )
+    client.compute(future_handles, sync=True)
 
     shift_transactions_flat_noindex("scratch/transactions.parquet",
                                     "scratch/transactions_TZ.parquet")
+
+if __name__ == "__main__":
+    platform = infra.platform.read_config()
+    dask_client = infra.dask.setup_platform_tuned_dask_client(10, platform)
+
+    shift_all(client=dask_client)
