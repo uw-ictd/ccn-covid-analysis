@@ -11,7 +11,7 @@ MIN_DATE = datetime.datetime.strptime('2019-03-10 00:00:00', '%Y-%m-%d %H:%M:%S'
 # The max date is defined for the dataset and needs to be updated if the
 # dataset changes.
 # MAX_DATE = datetime.datetime.strptime('2019-05-03 00:00:00', '%Y-%m-%d %H:%M:%S')
-MAX_DATE = MIN_DATE + datetime.timedelta(weeks=53)
+MAX_DATE = MIN_DATE + datetime.timedelta(weeks=88)
 
 # Notable events
 OUTAGE_START = datetime.datetime.strptime('2019-07-30 00:00:00', '%Y-%m-%d %H:%M:%S')
