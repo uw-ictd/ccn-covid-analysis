@@ -354,6 +354,7 @@ def annotate_category_org_from_ip(in_path, out_path):
     )
 
     flows = flows.drop(["ipcategory", "iporg"], axis=1)
+    flows = flows.set_index("start")
     # flows = flows.categorize(columns=["fqdn_source", "org", "category"])
     infra.dask.clean_write_parquet(flows, out_path)
 
