@@ -4,6 +4,7 @@
 import mappers.domains
 import infra.dask
 import infra.parsers
+import infra.pd
 import infra.platform
 import csv
 import dask.config
@@ -706,14 +707,13 @@ if __name__ == "__main__":
 
     if CLEAN_TRANSACTIONS:
         remove_nuls_from_file(
-            "../data/original-raw-archives/transactions-encoded-2020-05-04.log",
-            "data/transactions.log")
+            "data/original-raw-archives/transactions-encoded-2020-11-16.log",
+            "scratch/transactions.log")
 
         transactions = infra.parsers.parse_transactions_log(
-            "../data/transactions.log")
-        transactions = dask.dataframe.from_pandas(transactions, chunksize=100000)
+            "scratch/transactions.log")
 
-        infra.dask.clean_write_parquet(transactions, "../data/clean/transactions")
+        infra.pd.clean_write_parquet(transactions, "scratch/transactions.parquet")
 
     if SPLIT_DNS_LOGS:
         split_lzma_file("data/original-raw-archives/2019-05-17-dns_archive.xz",
