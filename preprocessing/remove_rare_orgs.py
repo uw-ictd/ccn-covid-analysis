@@ -19,7 +19,6 @@ def anonymize_rare_orgs(in_path, out_path):
         flows_with_counts["user_count"] < infra.constants.MIN_K_ANON,
         other="[Other Anonymized U<{}]".format(infra.constants.MIN_K_ANON),
         )
-    flows_with_counts = flows_with_counts.categorize(columns=["fqdn_source", "org", "category"])
     flows = flows_with_counts.drop("user_count", axis=1)
     infra.dask.clean_write_parquet(flows, out_path)
 
@@ -37,7 +36,6 @@ def anonymize_rare_fqdns(in_path, out_path):
         flows_with_counts["user_count"] < infra.constants.MIN_K_ANON,
         other="[Other Anonymized U<{}]".format(infra.constants.MIN_K_ANON),
         )
-    flows_with_counts = flows_with_counts.categorize(columns=["fqdn_source", "fqdn", "category"])
     flows = flows_with_counts.drop("user_count", axis=1)
     infra.dask.clean_write_parquet(flows, out_path)
 
