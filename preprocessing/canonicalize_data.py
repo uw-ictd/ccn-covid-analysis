@@ -27,6 +27,7 @@ from infra.datatypes import (TypicalFlow,
                              DnsResponse)
 
 from preprocessing import (
+    annotate_category_org_local,
     shift_to_local_time,
     trim_to_consistent_size
 )
@@ -916,7 +917,7 @@ if __name__ == "__main__":
         )
 
     if ANNOTATE_CATEGORY_ORG_LOCAL:
-        pass
+        annotate_category_org_local.annotate_all(client)
 
     if SHIFT_TO_LOCAL_TIME:
         shift_to_local_time.shift_all(client)
