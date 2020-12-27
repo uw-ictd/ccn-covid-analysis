@@ -1,5 +1,8 @@
 import datetime
 
+# The amount of time to shift to align UTC with local time
+LOCAL_TIME_UTC_OFFSET_HOURS = 9
+
 # Define a conversion rate based on the current global market exchange rate.
 IDR_TO_USD = 1.0 / 14150
 
