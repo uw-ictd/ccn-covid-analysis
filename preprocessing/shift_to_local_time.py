@@ -4,6 +4,7 @@ import os
 
 import infra.constants
 import infra.dask
+import infra.pd
 import infra.platform
 
 
@@ -62,13 +63,15 @@ def shift_dns_flat(in_path, out_path):
 
 
 def shift_transactions_flat_noindex(in_path, out_path):
-    df = dask.dataframe.read_parquet(in_path, engine="fastparquet")
+    df = infra.pd.read_parquet(in_path)
     df["timestamp"] = df["timestamp"] + pd.tseries.offsets.DateOffset(hours=9)
     print("Single layer timestamp shift now")
-    infra.dask.clean_write_parquet(df, out_path)
+    infra.pd.clean_write_parquet(df, out_path)
 
 
 def _shift_existing_data(client):
+    """A legacy function used to apply the shift to all existing data. Not
+    part of the normal pipeline. """
     map_directory_recursive(
         "data/clean/flows/typical_fqdn_DIV_user_INDEX_start",
         "data/clean/flows/typical_fqdn_TZ_DIV_user_INDEX_start",
@@ -92,13 +95,31 @@ def _shift_existing_data(client):
     shift_flows_flat_noindex("data/clean/flows/p2p_DIV_none_INDEX_none",
                              "data/clean/flows/p2p_TZ_DIV_none_INDEX_none")
 
-    shift_dns_recursive("data/clean/dns/successful_DIV_user_INDEX_timestamp",
-                        "data/clean/dns/successful_TZ_DIV_user_INDEX_timestamp",
-                        client)
-
     shift_dns_flat("data/clean/dns/successful_DIV_none_INDEX_timestamp",
                    "data/clean/dns/successful_TZ_DIV_none_INDEX_timestamp")
 
     shift_transactions_flat_noindex("data/clean/transactions",
                                     "data/clean/transactions_TZ")
 
+
+if __name__ == "__main__":
+    platform = infra.platform.read_config()
+    client = infra.dask.setup_platform_tuned_dask_client(10, platform)
+
+    shift_flows(
+        "scratch/flows/typical_fqdn_org_category_local_DIV_none_INDEX_start",
+        "scratch/flows/typical_fqdn_org_category_local_TZ_DIV_none_INDEX_start",
+    )
+
+    shift_flows(
+        "scratch/flows/p2p_DIV_none_INDEX_start",
+        "scratch/flows/p2p_TZ_DIV_none_INDEX_start",
+    )
+
+    shift_flows(
+        "scratch/flows/nouser_DIV_none_INDEX_start",
+        "scratch/flows/nouser_TZ_DIV_none_INDEX_start",
+    )
+
+    shift_transactions_flat_noindex("scratch/transactions.parquet",
+                                    "scratch/transactions_TZ.parquet")
