@@ -9,7 +9,16 @@ import infra.platform
 def optimize_typical_flow_frame(in_path, out_path):
     df = infra.dask.read_parquet(in_path)
     print(df)
+    print(df.index)
     df = df.categorize(columns=["fqdn_source", "org", "category", "user", "dest_ip"])
+    df = df.astype({
+        "user_port": int,
+        "dest_port": int,
+        "bytes_up": int,
+        "bytes_down": int,
+        "protocol": int,
+        "ambiguous_fqdn_count": int
+        })
     print(df)
     df = df.repartition(partition_size="128M", force=True)
     df = df.reset_index().set_index("start")
@@ -32,6 +41,8 @@ if __name__ == "__main__":
     pd.set_option('display.max_columns', None)
     pd.set_option('display.width', None)
     pd.set_option('display.max_rows', None)
+
+    optimize_all(dask_client)
 
     dask_client.close()
 
