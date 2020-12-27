@@ -26,6 +26,11 @@ from infra.datatypes import (TypicalFlow,
                              AnomalyNoUserFlow,
                              DnsResponse)
 
+from preprocessing import (
+    shift_to_local_time,
+    trim_to_consistent_size
+)
+
 
 def remove_nuls_from_file(source_path, dest_path):
     with open(source_path, mode='rb') as sourcefile:
@@ -705,6 +710,15 @@ if __name__ == "__main__":
     RE_MERGE_FLOWS = False
     MOVE_ATYPICAL_FLOWS = False
 
+    ANNOTATE_CATEGORY_ORG_LOCAL = False
+
+    SHIFT_TO_LOCAL_TIME = False
+    TRIM_TO_CONSISTENT_SIZE = False
+
+    ANONYMIZE = False
+    OPTIMIZE = False
+    FINALIZE = False
+
     if CLEAN_TRANSACTIONS:
         remove_nuls_from_file(
             "data/original-raw-archives/transactions-encoded-2020-11-16.log",
@@ -900,6 +914,24 @@ if __name__ == "__main__":
             "scratch/flows/aggregated/nouser",
             "scratch/flows/nouser_DIV_none_INDEX_start",
         )
+
+    if ANNOTATE_CATEGORY_ORG_LOCAL:
+        pass
+
+    if SHIFT_TO_LOCAL_TIME:
+        shift_to_local_time.shift_all(client)
+
+    if TRIM_TO_CONSISTENT_SIZE:
+        trim_to_consistent_size.trim_all(client)
+
+    if ANONYMIZE:
+        pass
+
+    if OPTIMIZE:
+        pass
+
+    if FINALIZE:
+        pass
 
     client.close()
     print("Exiting hopefully cleanly...")
