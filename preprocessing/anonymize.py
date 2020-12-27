@@ -55,36 +55,31 @@ def anonymize_rare_ips(in_path, out_path):
     infra.dask.clean_write_parquet(flows, out_path)
 
 
-def optimize_flow_frame(in_path, out_path):
-    pass
-    # flows_with_counts = flows_with_counts.categorize(columns=["fqdn_source", "dest_ip", "category"])
+def anonymize_all(client):
+    anonymize_rare_orgs(
+        "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start",
+        "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start_ANON_org",
+    )
+    anonymize_rare_fqdns(
+        "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start_ANON_org",
+        "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start_ANON_org_fqdn",
+    )
+    anonymize_rare_ips(
+        "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start_ANON_org_fqdn",
+        "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start_ANON_org_fqdn_ip",
+    )
 
 
 if __name__ == "__main__":
     platform = infra.platform.read_config()
+    dask_client = infra.dask.setup_platform_tuned_dask_client(20, platform)
 
     # Module specific format options
     pd.set_option('display.max_columns', None)
     pd.set_option('display.width', None)
     pd.set_option('display.max_rows', None)
 
-    if platform.large_compute_support:
-        print("Running compute tasks")
-        client = infra.dask.setup_platform_tuned_dask_client(20, platform)
+    anonymize_all(dask_client)
 
-        anonymize_rare_orgs(
-            "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start",
-            "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start_ANON_org",
-        )
-        anonymize_rare_fqdns(
-            "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start_ANON_org",
-            "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start_ANON_org_fqdn",
-        )
-        anonymize_rare_ips(
-            "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start_ANON_org_fqdn",
-            "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start_ANON_org_fqdn_ip",
-        )
-
-        client.close()
-
+    dask_client.close()
     print("Done!")

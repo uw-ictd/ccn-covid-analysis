@@ -28,6 +28,7 @@ from infra.datatypes import (TypicalFlow,
 
 from preprocessing import (
     annotate_category_org_local,
+    anonymize,
     shift_to_local_time,
     trim_to_consistent_size
 )
@@ -926,7 +927,7 @@ if __name__ == "__main__":
         trim_to_consistent_size.trim_all(client)
 
     if ANONYMIZE:
-        pass
+        anonymize.anonymize_all(client)
 
     if OPTIMIZE:
         pass
