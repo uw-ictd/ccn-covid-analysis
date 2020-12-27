@@ -2,30 +2,35 @@ import pandas as pd
 import dask.dataframe
 import os
 
+import infra.constants
 import infra.dask
+import infra.platform
 
 
-def shift_flows(in_path, out_path, offset_hours):
+def shift_flows(in_path, out_path):
     df = infra.dask.read_parquet(in_path)
 
     df = df.reset_index()
-    df["start"] = df["start"] + pd.tseries.offsets.DateOffset(hours=offset_hours)
-    df["end"] = df["end"] + pd.tseries.offsets.DateOffset(hours=offset_hours)
+    df["start"] = df["start"] + pd.tseries.offsets.DateOffset(
+        hours=infra.constants.LOCAL_TIME_UTC_OFFSET_HOURS)
+    df["end"] = df["end"] + pd.tseries.offsets.DateOffset(
+        hours=infra.constants.LOCAL_TIME_UTC_OFFSET_HOURS)
     df = df.set_index("start")
 
     return infra.dask.clean_write_parquet(df, out_path, compute=False)
 
 
-def shift_dns(in_path, out_path, offset_hours):
+def shift_dns(in_path, out_path):
     df = infra.dask.read_parquet(in_path)
     df = df.reset_index()
-    df["timestamp"] = df["timestamp"] + pd.tseries.offsets.DateOffset(hours=offset_hours)
+    df["timestamp"] = df["timestamp"] + pd.tseries.offsets.DateOffset(
+        hours=infra.constants.LOCAL_TIME_UTC_OFFSET_HOURS)
     df = df.set_index("timestamp")
 
     return infra.dask.clean_write_parquet(df, out_path, compute=False)
 
 
-def shift_flows_recursive(in_path, out_path, client):
+def map_directory_recursive(in_path, out_path, map_fn, client):
     subfiles = sorted(os.listdir(in_path))
 
     future_handles = []
@@ -33,23 +38,9 @@ def shift_flows_recursive(in_path, out_path, client):
         df_path = os.path.join(in_path, subfile)
         df_out_path = os.path.join(out_path, subfile)
 
-        future_handles.append(shift_flows(df_path, df_out_path, 9))
+        future_handles.append(map_fn(df_path, df_out_path))
 
     print("Recursive flow shift now")
-    client.compute(future_handles, sync=True)
-
-
-def shift_dns_recursive(in_path, out_path, client):
-    subfiles = sorted(os.listdir(in_path))
-
-    future_handles = []
-    for subfile in subfiles:
-        df_path = os.path.join(in_path, subfile)
-        df_out_path = os.path.join(out_path, subfile)
-
-        future_handles.append(shift_dns(df_path, df_out_path, 9))
-
-    print("Recursive dns shift now")
     client.compute(future_handles, sync=True)
 
 
@@ -77,11 +68,20 @@ def shift_transactions_flat_noindex(in_path, out_path):
     infra.dask.clean_write_parquet(df, out_path)
 
 
-if __name__ == "__main__":
-    client = infra.dask.setup_dask_client()
-    shift_flows_recursive("data/clean/flows/typical_fqdn_DIV_user_INDEX_start",
-                          "data/clean/flows/typical_fqdn_TZ_DIV_user_INDEX_start",
-                          client)
+def _shift_existing_data(client):
+    map_directory_recursive(
+        "data/clean/flows/typical_fqdn_DIV_user_INDEX_start",
+        "data/clean/flows/typical_fqdn_TZ_DIV_user_INDEX_start",
+        shift_flows,
+        client,
+    )
+
+    map_directory_recursive(
+        "data/clean/dns/successful_DIV_user_INDEX_timestamp",
+        "data/clean/dns/successful_TZ_DIV_user_INDEX_timestamp",
+        shift_dns,
+        client,
+    )
 
     shift_flows_flat_noindex("data/clean/flows/typical_DIV_none_INDEX_user",
                              "data/clean/flows/typical_TZ_DIV_none_INDEX_user")
