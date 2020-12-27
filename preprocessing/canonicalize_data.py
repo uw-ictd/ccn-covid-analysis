@@ -675,6 +675,11 @@ def augment_user_flow_with_dns(flow_frame,
     return out_frame
 
 
+def copy_frame(in_path, out_path):
+    df = infra.dask.read_parquet(in_path)
+    infra.dask.clean_write_parquet(df, out_path)
+
+
 if __name__ == "__main__":
     platform = infra.platform.read_config()
 
@@ -697,6 +702,7 @@ if __name__ == "__main__":
     CATEGORIZE_USER_FLOWS = False
 
     RE_MERGE_FLOWS = False
+    MOVE_ATYPICAL_FLOWS = False
 
     if CLEAN_TRANSACTIONS:
         remove_nuls_from_file(
@@ -884,6 +890,16 @@ if __name__ == "__main__":
         print("Completed DNS augmentation")
         print("The following users had no DNS logs")
         print(missing_dns_users)
+
+    if MOVE_ATYPICAL_FLOWS:
+        copy_frame(
+            "scratch/flows/aggregated/p2p",
+            "scratch/flows/p2p_DIV_none_INDEX_start",
+        )
+        copy_frame(
+            "scratch/flows/aggregated/nouser",
+            "scratch/flows/nouser_DIV_none_INDEX_start",
+        )
 
     client.close()
     print("Exiting hopefully cleanly...")
