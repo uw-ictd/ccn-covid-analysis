@@ -1,17 +1,14 @@
 # Data layout for the bok analysis project
 
 Data is contained in 2 main directories, the clean directory and the originals
-directory. The originals files are the raw files from Bokondini, and have some
+directory. The originals files are the raw files from the field, and have some
 issues. These issues are addressed in the `canonicalize_data.py` module which
 generates the cleaned and consolidated dataset in the clean directory.
 
-Additionally, outside the canonicalize data function, there are also cleaning
-scripts to shift the data into the local timezone and trim the datasets to a
-consistent range and datatype. These scripts are not well-maintained and need to
-be run somewhat manually and interactively. First run canonicalize, then shift,
-then trim. The scripts can be found in the `cleaning` directory
+An archive is provided of the cleaned and anonymized dataset, which can be
+extracted here and then used to generate all the plots in the root directory.
 
-## Steps taken to clean data
+## Steps taken to clean and prepare the data
 
 1. Remove nil characters from the transactions log. This is likely due to nodejs
 buffering the file and then having the power yanked out from underneath it.
@@ -39,3 +36,11 @@ log.
 
 9. Add FQDN information where available, either from a previous DNS request by
 the user, or if not available, via a reverse DNS lookup.
+
+10. Map domain names, protocols, and ip addresses to organizations and traffic
+    categories.
+
+11. Remove organizations, domain names, and ip addresses visited by fewer than 5
+    users.
+
+12. Repartition the data and optimize the datatypes of all columns.
