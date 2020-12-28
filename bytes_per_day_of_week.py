@@ -9,7 +9,7 @@ import infra.platform
 
 def create_all_flows(dask_client):
     typical_flows = infra.dask.read_parquet(
-        "data/clean/flows/typical_fqdn_category_local_TM_DIV_none_INDEX_start")[["end", "protocol", "bytes_up", "bytes_down"]]
+        "data/clean/flows_typical_DIV_none_INDEX_start")[["end", "protocol", "bytes_up", "bytes_down"]]
 
     p2p_flows = infra.dask.read_parquet("data/clean/flows/p2p_TM_DIV_none_INDEX_start")[["end", "protocol", "bytes_a_to_b", "bytes_b_to_a"]]
 
@@ -30,7 +30,7 @@ def create_all_flows(dask_client):
 
 def reduce_to_pandas(outfile, dask_client):
     flows = infra.dask.read_parquet(
-        "data/clean/flows/all_TM_DIV_none_INDEX_start")[["bytes_total"]]
+        "data/clean/flows_typical_DIV_none_INDEX_start")[["bytes_total"]]
 
     # Compress to days
     flows = flows.reset_index()

@@ -152,10 +152,10 @@ def compute_full_gap_days(log_gaps_file):
 def run(dask_client, basedir):
     flow_source_file = os.path.join(
         basedir,
-        "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
+        "data/clean/flows_typical_DIV_none_INDEX_start"
     )
-    transaction_source_file = os.path.join(basedir, "data/clean/transactions_TM.parquet")
-    log_gap_source_file = os.path.join(basedir, "data/derived/log_gaps_TM.parquet")
+    transaction_source_file = os.path.join(basedir, "data/clean/transactions_DIV_none_INDEX_timestamp.parquet")
+    log_gap_source_file = os.path.join(basedir, "data/derived/log_gaps.parquet")
     temporary_file = os.path.join(basedir, "scratch/graphs/compute_user_active_time")
     delta_out_file = os.path.join(basedir, "data/derived/user_active_deltas.parquet")
     if dask_client is not None:

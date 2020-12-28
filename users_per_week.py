@@ -45,7 +45,7 @@ def reduce_to_pandas(outfile, dask_client):
     #
     # Importantly, dask is lazy and doesn't actually import the whole thing,
     # but just keeps track of where the file shards live on disk.
-    df = infra.dask.read_parquet("data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")
+    df = infra.dask.read_parquet("data/clean/flows_typical_DIV_none_INDEX_start")
 
     df = df.reset_index()
     df["day"] = df["start"].dt.floor("d")

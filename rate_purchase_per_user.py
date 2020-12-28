@@ -11,7 +11,7 @@ import infra.pd
 
 
 def make_rate_chart():
-    transactions = infra.pd.read_parquet("data/clean/transactions_TM.parquet")
+    transactions = infra.pd.read_parquet("data/clean/transactions_DIV_none_INDEX_timestamp.parquet")
 
     # Each user's total amount of data purchased directly.
     purchases = transactions.loc[transactions["kind"] == "purchase"]

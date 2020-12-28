@@ -6,7 +6,7 @@ import infra.platform
 
 def reduce_to_pandas(outfile, dask_client):
     flows = infra.dask.read_parquet(
-        "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["user"]]
+        "data/clean/flows_typical_DIV_none_INDEX_start")[["user"]]
 
     # Compress to days
     flows = flows.reset_index()

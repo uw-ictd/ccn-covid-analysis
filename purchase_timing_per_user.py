@@ -9,7 +9,7 @@ import infra.pd
 
 def generate_consolidated_purchases(outfile):
     transactions = infra.pd.read_parquet(
-        "data/clean/transactions_TM.parquet")
+        "data/clean/transactions_DIV_none_INDEX_timestamp.parquet")
 
     # Consolidate together closely spaced small purchases by iterating
     # through each user's history.

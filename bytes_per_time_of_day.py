@@ -6,14 +6,14 @@ import infra.platform
 
 def reduce_to_pandas(outfile, dask_client):
     typical = infra.dask.read_parquet(
-        "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
+        "data/clean/flows_typical_DIV_none_INDEX_start"
     )[["bytes_up", "bytes_down", "category"]]
     typical["bytes_total"] = typical["bytes_up"] + typical["bytes_down"]
     typical = typical.reset_index()
     typical = typical[["start", "category", "bytes_total"]]
 
     p2p = infra.dask.read_parquet(
-        "data/clean/flows/p2p_TM_DIV_none_INDEX_start"
+        "data/clean/flows_p2p_DIV_none_INDEX_start"
     )[["bytes_a_to_b", "bytes_b_to_a"]]
     p2p["bytes_total"] = p2p["bytes_a_to_b"] + p2p["bytes_b_to_a"]
     p2p = p2p.assign(category="Peer to Peer")

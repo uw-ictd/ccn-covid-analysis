@@ -10,7 +10,7 @@ import infra.platform
 
 def reduce_to_pandas(outpath, dask_client):
     flows = infra.dask.read_parquet(
-        "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["user", "bytes_up", "bytes_down"]]
+        "data/clean/flows_typical_DIV_none_INDEX_start")[["user", "bytes_up", "bytes_down"]]
 
     flows["bytes_total"] = flows["bytes_up"] + flows["bytes_down"]
 

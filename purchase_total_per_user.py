@@ -5,7 +5,7 @@ import infra.constants
 import infra.dask
 import infra.pd
 
-transactions = infra.pd.read_parquet("data/clean/transactions_TM.parquet")
+transactions = infra.pd.read_parquet("data/clean/transactions_DIV_none_INDEX_timestamp.parquet")
 
 # Find the first day the user was active. Define "active" as making first
 # purchase or first data in network.

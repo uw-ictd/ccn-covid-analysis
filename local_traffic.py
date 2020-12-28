@@ -13,11 +13,11 @@ import infra.platform
 
 def reduce_to_pandas(outfile, dask_client):
     flows = infra.dask.read_parquet(
-        "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
+        "data/clean/flows_typical_DIV_none_INDEX_start"
     )[["bytes_up", "bytes_down", "local"]]
 
     peer_flows = infra.dask.read_parquet(
-        "data/clean/flows/p2p_TM_DIV_none_INDEX_start"
+        "data/clean/flows_p2p_DIV_none_INDEX_start"
     )[["bytes_a_to_b", "bytes_b_to_a"]]
 
     # All peer flows are local

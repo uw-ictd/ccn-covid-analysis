@@ -15,7 +15,7 @@ def compute_user_data_purchase_histories():
     """Compute the running ledger of total data purchased by each user
     """
     # Extract data from the transactions file into a resolved pandas frame
-    transactions = infra.dask.read_parquet("data/clean/transactions_TM").compute()
+    transactions = infra.pd.read_parquet("data/clean/transactions_DIV_none_INDEX_timestamp.parquet")
 
     # Track purchases as positive balance
     purchases = transactions.loc[
@@ -38,7 +38,7 @@ def compute_filtered_purchase_and_use_intermediate(outfile, client):
     """
 
     all_flows = infra.dask.read_parquet(
-        "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start"
+        "data/clean/flows_typical_DIV_none_INDEX_start"
     ).loc[:, ["user", "bytes_up", "bytes_down", "local", "end"]]
 
     # Filter the balances included to users who have been minimally active

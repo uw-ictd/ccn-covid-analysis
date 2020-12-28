@@ -18,7 +18,7 @@ def compute_cdf(frame, value_column, base_column):
 
 def reduce_to_pandas(outpath, client):
     flows = infra.dask.read_parquet(
-        "data/clean/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start")[["user", "category", "fqdn", "bytes_up", "bytes_down", "dest_ip"]]
+        "data/clean/flows_typical_DIV_none_INDEX_start")[["user", "category", "fqdn", "bytes_up", "bytes_down", "dest_ip"]]
 
     flows = flows.loc[(flows["category"] == "Peer to Peer") | (flows["category"] == "ICE (STUN/TURN)")]
 
