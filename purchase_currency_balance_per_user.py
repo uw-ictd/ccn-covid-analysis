@@ -20,9 +20,9 @@ def compute_user_currency_histories():
     # Extract data from the transactions file into a resolved pandas frame
     # Importantly, use the timezone adjusted log but NOT the trimmed log to
     # avoid clipping state from early users.
-    transactions = infra.dask.read_parquet(
-        "data/internal/transactions_TZ"
-    ).compute()
+    transactions = infra.pd.read_parquet(
+        "data/clean/transactions_TZ.parquet"
+    )
 
     # Split transfers into positive components for the dest and negative for
     # the source
