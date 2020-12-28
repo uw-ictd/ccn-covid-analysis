@@ -29,6 +29,7 @@ from infra.datatypes import (TypicalFlow,
 from preprocessing import (
     annotate_category_org_local,
     anonymize,
+    optimize_frames,
     shift_to_local_time,
     trim_to_consistent_size
 )
@@ -683,9 +684,14 @@ def augment_user_flow_with_dns(flow_frame,
     return out_frame
 
 
-def copy_frame(in_path, out_path):
+def copy_dask_frame(in_path, out_path):
     df = infra.dask.read_parquet(in_path)
     infra.dask.clean_write_parquet(df, out_path)
+
+
+def copy_pandas_frame(in_path, out_path):
+    df = infra.pd.read_parquet(in_path)
+    infra.pd.clean_write_parquet(df, out_path)
 
 
 if __name__ == "__main__":
@@ -908,11 +914,11 @@ if __name__ == "__main__":
         print(missing_dns_users)
 
     if MOVE_ATYPICAL_FLOWS:
-        copy_frame(
+        copy_dask_frame(
             "scratch/flows/aggregated/p2p",
             "scratch/flows/p2p_DIV_none_INDEX_start",
         )
-        copy_frame(
+        copy_dask_frame(
             "scratch/flows/aggregated/nouser",
             "scratch/flows/nouser_DIV_none_INDEX_start",
         )
@@ -930,10 +936,26 @@ if __name__ == "__main__":
         anonymize.anonymize_all(client)
 
     if OPTIMIZE:
-        pass
+        optimize_frames.optimize_all(client)
 
     if FINALIZE:
-        pass
+        copy_dask_frame(
+            "scratch/flows/p2p_OPT_DIV_none_INDEX_start",
+            "scratch/clean/flows_p2p_DIV_none_INDEX_start",
+        )
+        copy_dask_frame(
+            "scratch/flows/nouser_OPT_DIV_none_INDEX_start",
+            "scratch/clean/flows_nouser_DIV_none_INDEX_start",
+        )
+        copy_dask_frame(
+            "scratch/flows/typical_OPT_DIV_none_INDEX_start",
+            "scratch/clean/flows_typical_DIV_none_INDEX_start",
+        )
+        copy_pandas_frame(
+            "scratch/transactions_OPT_DIV_none_INDEX_timestamp.parquet",
+            "scratch/clean/transactions_DIV_none_INDEX_timestamp.parquet",
+        )
+
 
     client.close()
     print("Exiting hopefully cleanly...")
