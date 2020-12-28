@@ -6,10 +6,8 @@ import infra.pd
 import infra.platform
 
 
-def optimize_typical_flow_frame(in_path, out_path):
+def optimize_typical_flow_frame(in_path, out_path, client):
     df = infra.dask.read_parquet(in_path)
-    print(df)
-    print(df.index)
     df = df.categorize(columns=["fqdn_source", "org", "category", "user", "dest_ip"])
     df = df.astype({
         "user_port": int,
@@ -19,18 +17,76 @@ def optimize_typical_flow_frame(in_path, out_path):
         "protocol": int,
         "ambiguous_fqdn_count": int
         })
-    print(df)
-    df = df.repartition(partition_size="128M", force=True)
-    df = df.reset_index().set_index("start")
-    print(df)
 
-    infra.dask.clean_write_parquet(df, out_path)
+    df = df.set_index("start")
+    persisted_df = client.persist(df)
+
+    persisted_df = persisted_df.repartition(partition_size="128M", force=True)
+
+    infra.dask.clean_write_parquet(persisted_df, out_path)
+    client.cancel(persisted_df)
+    del persisted_df
+
+
+def optimize_p2p_flow_frame(in_path, out_path, client):
+    df = infra.dask.read_parquet(in_path)
+    df = df.categorize(columns=["user_a", "user_b"])
+    persisted_df = client.persist(df)
+    persisted_df = persisted_df.repartition(partition_size="128M", force=True)
+
+    infra.dask.clean_write_parquet(persisted_df, out_path)
+    client.cancel(persisted_df)
+    del persisted_df
+
+
+def optimize_nouser_flow_frame(in_path, out_path, client):
+    df = infra.dask.read_parquet(in_path)
+    df = df.categorize(columns=["ip_a", "ip_b"])
+    persisted_df = client.persist(df)
+    persisted_df = persisted_df.repartition(partition_size="128M", force=True)
+
+    infra.dask.clean_write_parquet(persisted_df, out_path)
+    client.cancel(persisted_df)
+    del persisted_df
+
+
+def optimize_transactions_frame(in_path, out_path):
+    df = infra.pd.read_parquet(in_path)
+    df["amount_bytes"] = df["amount_bytes"].fillna(0)
+    df["user"] = df["user"].fillna("[None]")
+    df["dest_user"] = df["dest_user"].fillna("[None]")
+    df = df.astype({
+        "amount_bytes": int,
+        "user": "category",
+        "dest_user": "category",
+    })
+    df = df.set_index("timestamp")
+    infra.pd.clean_write_parquet(df, out_path)
 
 
 def optimize_all(client):
+    optimize_transactions_frame(
+        "scratch/transactions.parquet",
+        "scratch/transactions_OPT_DIV_none_INDEX_timestamp.parquet",
+    )
+
+    optimize_p2p_flow_frame(
+        "scratch/flows/p2p_DIV_none_INDEX_start",
+        "scratch/flows/p2p_OPT_DIV_none_INDEX_start",
+        client,
+    )
+
+    optimize_nouser_flow_frame(
+        "scratch/flows/nouser_DIV_none_INDEX_start",
+        "scratch/flows/nouser_OPT_DIV_none_INDEX_start",
+        client,
+    )
+
     optimize_typical_flow_frame(
-        "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_start_ANON_org_fqdn_ip",
-    "scratch/flows/typical_OPT_INDEX_start")
+        "scratch/flows/typical_fqdn_org_category_local_TM_DIV_none_INDEX_none_ANON_org_fqdn_ip",
+        "scratch/flows/typical_OPT_DIV_none_INDEX_start",
+        client,
+    )
 
 
 if __name__ == "__main__":
@@ -40,7 +96,7 @@ if __name__ == "__main__":
     # Module specific format options
     pd.set_option('display.max_columns', None)
     pd.set_option('display.width', None)
-    pd.set_option('display.max_rows', None)
+    pd.set_option('display.max_rows', 20)
 
     optimize_all(dask_client)
 
