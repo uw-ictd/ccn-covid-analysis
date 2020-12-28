@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def run(dask_client, basedir):
-    source_file = os.path.join(basedir, "data/clean/transactions_TM.parquet")
+    source_file = os.path.join(basedir, "data/clean/transactions_DIV_none_INDEX_timestamp.parquet")
     destination_file = os.path.join(basedir, "data/derived/first_time_user_transactions.csv")
 
     frame = infra.pd.read_parquet(source_file)
