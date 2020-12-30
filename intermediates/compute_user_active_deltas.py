@@ -50,7 +50,7 @@ def reduce_flows_to_pandas(in_path, out_path):
 def compute_purchase_range_frame(transaction_source_file):
     """Generates a frame with the range a user has made purchases in the net
     """
-    transactions = infra.pd.read_parquet(transaction_source_file)
+    transactions = infra.pd.read_parquet(transaction_source_file).reset_index()
 
     # Each user's total amount of data purchased directly.
     purchases = transactions.loc[transactions["kind"] == "purchase"]
