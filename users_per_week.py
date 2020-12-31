@@ -58,7 +58,7 @@ def reduce_to_pandas(outfile, dask_client):
 
 
 def make_plot(infile):
-    registered_users = infra.pd.read_parquet("data/clean/early_registered_users.parquet")
+    registered_users = infra.pd.read_parquet("data/derived/early_registered_users.parquet")
     registered_users = registered_users.assign(start=infra.constants.MIN_DATE)
 
     transactions = pd.read_csv("data/clean/first_time_user_transactions.csv")[["start", "user"]]
