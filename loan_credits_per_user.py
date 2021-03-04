@@ -11,7 +11,7 @@ import infra.dask
 import infra.pd
 import infra.platform
 
-def explore_table():
+def get_data(timeline):
  
   transactions = infra.pd.read_parquet("data/clean/transactions_TZ.parquet")
 
@@ -20,41 +20,60 @@ def explore_table():
   
   # excluded retailers
   retailers = df_admin["dest_user"].unique()
-  df = transactions[~transactions['user'].isin(retailers)]
+  data_cleaned = transactions[~transactions['user'].isin(retailers)]
+
+  # TODO only get users present bf - after
+
+  # TODO normalize by time 1) 7month before/after  2) taking temperal average divide by months
 
   # split the timeline before and after COVID
   ## March 25th, 2020 school closes  April 1st, 2020 roads to capital closed to town 
-  transactions_before =  df.query("timestamp < '2020-04-01 00:00:00' ")
-  transactions_after =  df.query("timestamp >= '2020-04-01 00:00:00' ")
+  if timeline == 'before':
+    data_cleaned =  data_cleaned.query("timestamp < '2020-04-01 00:00:00' ")
+  elif timeline == 'after':
+    data_cleaned =  data_cleaned.query("timestamp >= '2020-04-01 00:00:00' ")
+  else:
+    print("Timeline should be only 'before' or 'after' the pandemic lockdown.")
+    return NULL
 
-  users = df.groupby(["user", "dest_user"]).agg({"amount_idr" : 'sum'})
+  # total loan for each user
+  total_loan = data_cleaned.groupby(["user", "dest_user"]).agg({"amount_idr" : 'sum'})
+  
+  # optional: exclude the maximum amount of loan (entire row)
+  total_loan = total_loan[total_loan['amount_idr'] != total_loan['amount_idr'].max()]
 
   # drop the rows of retailers
-  data_cleaned = pd.DataFrame(users).reset_index()
+  df = pd.DataFrame(total_loan).reset_index()
 
+  return df
 
+def make_plot(df, timeline):
 
-  
-  
-
-  # exclude the maximum amount of loan (entire row)
-  # data_cleaned = data_cleaned[data_cleaned['amount_idr'] != data['amount_idr'].max()]
- 
-
+  count_origin = df['user'].nunique()
+  count_dest =df['dest_user'].nunique()
 
   chrt = alt.Chart(
-    data_cleaned,
-    title="Loaning money from user to user"
+    df,
+    title="Loaning Between User-User " + timeline + " Covid"
   ).mark_rect().encode(
-    x=alt.X('user:N', title="Origin Users"),
-    y=alt.Y('dest_user:N', title="Destination Users"),
-    color=alt.Color('amount_idr:Q', title="Amount Loans"),\
-  ).save("./misc/charts/loan_credits_per_user.html", scale_factor=2.0)
+    alt.X('user:N', 
+      title= str(count_origin) +" Origin Users",
+      sort=alt.EncodingSortField(field='dest_user', order='descending')
+      # TODO making axis more static - build all the empty users to fill in 0 
 
+     ),
+    alt.Y('dest_user:N',
+     title= str(count_dest) + " Destination Users",
+     sort=alt.EncodingSortField(field='dest_user', order='descending')
+      # TODO making axis more static - build all the empty users to fill in 0 
+     ),
+    alt.Color('amount_idr:Q', 
+      title="Amount Loans",
 
-
-# def make_plot(df):
-#   # to be refactor
+      #TODO should I apply log scale? Do in panda handle log0 = 0
+      scale=alt.Scale(type='linear', nice=True),          #  TODO cheange  scale in domain 
+      ),
+  ).save("./misc/charts/loan_credits_" + timeline +".html", scale_factor=2.0)
 
 
 if __name__ == "__main__":
@@ -62,5 +81,5 @@ if __name__ == "__main__":
     pd.set_option('display.width', None)
     pd.set_option('display.max_rows', None)
     
-    explore_table()
-    # make_plot()
+    make_plot(get_data("before"), "before")
+    make_plot(get_data("after"), "after")
