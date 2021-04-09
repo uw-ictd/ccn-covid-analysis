@@ -737,39 +737,67 @@ if __name__ == "__main__":
 
         infra.pd.clean_write_parquet(transactions, "scratch/transactions.parquet")
 
+    archives_to_split = []
     if SPLIT_DNS_LOGS:
-        split_lzma_file("data/original-raw-archives/2019-05-17-dns_archive.xz",
-                        "scratch/splits/dns/archives/2019-05-17-dns_archive-{:03d}.gz",
-                        1000000)
-        split_lzma_file("data/original-raw-archives/2020-02-13-dns_archive.xz",
-                        "scratch/splits/dns/archives/2020-02-13-dns_archive-{:03d}.gz",
-                        1000000)
-        split_lzma_file("data/original-raw-archives/2020-05-04-dns_archive.xz",
-                        "scratch/splits/dns/archives/2020-05-04-dns_archive-{:03d}.gz",
-                        1000000)
-        split_lzma_file("data/original-raw-archives/2020-11-16-dns_archive.xz",
-                        "scratch/splits/dns/archives/2020-11-16-dns_archive-{:03d}.gz",
-                        1000000)
-        split_lzma_file("data/original-raw-archives/2021-02-11-dns_archive.xz",
-                        "scratch/splits/dns/archives/2021-02-11-dns_archive-{:03d}.gz",
-                        1000000)
+        archives_to_split.append(
+            ("data/original-raw-archives/2019-05-17-dns_archive.xz",
+             "scratch/splits/dns/archives/2019-05-17-dns_archive-{:03d}.gz",
+             1000000))
+        archives_to_split.append(
+            ("data/original-raw-archives/2020-02-13-dns_archive.xz",
+             "scratch/splits/dns/archives/2020-02-13-dns_archive-{:03d}.gz",
+             1000000
+            ))
+        archives_to_split.append(
+            ("data/original-raw-archives/2020-05-04-dns_archive.xz",
+             "scratch/splits/dns/archives/2020-05-04-dns_archive-{:03d}.gz",
+             1000000
+            ))
+        archives_to_split.append(
+            ("data/original-raw-archives/2020-11-16-dns_archive.xz",
+             "scratch/splits/dns/archives/2020-11-16-dns_archive-{:03d}.gz",
+             1000000
+            ))
+        archives_to_split.append(
+            ("data/original-raw-archives/2021-02-11-dns_archive.xz",
+             "scratch/splits/dns/archives/2021-02-11-dns_archive-{:03d}.gz",
+             1000000
+            ))
 
     if SPLIT_FLOWLOGS:
-        split_lzma_file("data/original-raw-archives/2019-05-17-flowlog_archive.xz",
-                        "scratch/splits/flows/archives/2019-05-17-flowlog_archive-{:03d}.gz",
-                        1000000)
-        split_lzma_file("data/original-raw-archives/2020-02-13-flowlog_archive.xz",
-                        "scratch/splits/flows/archives/2020-02-13-flowlog_archive-{:03d}.gz",
-                        1000000)
-        split_lzma_file("data/original-raw-archives/2020-05-04-flowlog_archive.xz",
-                        "scratch/splits/flows/archives/2020-05-04-flowlog_archive-{:03d}.gz",
-                        1000000)
-        split_lzma_file("data/original-raw-archives/2020-11-16-flowlog_archive.xz",
-                        "scratch/splits/flows/archives/2020-11-16-flowlog_archive-{:03d}.gz",
-                        1000000)
-        split_lzma_file("data/original-raw-archives/2021-02-11-flowlog_archive.xz",
-                        "scratch/splits/flows/archives/2021-02-11-flowlog_archive-{:03d}.gz",
-                        1000000)
+        archives_to_split.append(
+            ("data/original-raw-archives/2019-05-17-flowlog_archive.xz",
+             "scratch/splits/flows/archives/2019-05-17-flowlog_archive-{:03d}.gz",
+             1000000
+            ))
+        archives_to_split.append(
+            ("data/original-raw-archives/2020-02-13-flowlog_archive.xz",
+             "scratch/splits/flows/archives/2020-02-13-flowlog_archive-{:03d}.gz",
+             1000000
+            ))
+        archives_to_split.append(
+            ("data/original-raw-archives/2020-05-04-flowlog_archive.xz",
+             "scratch/splits/flows/archives/2020-05-04-flowlog_archive-{:03d}.gz",
+             1000000
+            ))
+        archives_to_split.append(
+            ("data/original-raw-archives/2020-11-16-flowlog_archive.xz",
+             "scratch/splits/flows/archives/2020-11-16-flowlog_archive-{:03d}.gz",
+             1000000
+            ))
+        archives_to_split.append(
+            ("data/original-raw-archives/2021-02-11-flowlog_archive.xz",
+             "scratch/splits/flows/archives/2021-02-11-flowlog_archive-{:03d}.gz",
+             1000000
+            ))
+
+    if SPLIT_FLOWLOGS or SPLIT_DNS_LOGS:
+        tokens = []
+        for archive in archives_to_split:
+            token = dask.delayed(split_lzma_file)(archive[0], archive[1], archive[2])
+            tokens.append(token)
+
+        client.compute(tokens, sync=True)
 
     if INGEST_FLOWLOGS:
         # Import split files and archive to parquet
