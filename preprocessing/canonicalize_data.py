@@ -729,7 +729,7 @@ if __name__ == "__main__":
 
     if CLEAN_TRANSACTIONS:
         remove_nuls_from_file(
-            "data/original-raw-archives/transactions-encoded-2020-11-16.log",
+            "data/original-raw-archives/transactions-encoded-2021-02-11.log",
             "scratch/transactions.log")
 
         transactions = infra.parsers.parse_transactions_log(
@@ -750,22 +750,25 @@ if __name__ == "__main__":
         split_lzma_file("data/original-raw-archives/2020-11-16-dns_archive.xz",
                         "scratch/splits/dns/archives/2020-11-16-dns_archive-{:03d}.gz",
                         1000000)
+        split_lzma_file("data/original-raw-archives/2021-02-11-dns_archive.xz",
+                        "scratch/splits/dns/archives/2021-02-11-dns_archive-{:03d}.gz",
+                        1000000)
 
     if SPLIT_FLOWLOGS:
         split_lzma_file("data/original-raw-archives/2019-05-17-flowlog_archive.xz",
                         "scratch/splits/flows/archives/2019-05-17-flowlog_archive-{:03d}.gz",
                         1000000)
-
         split_lzma_file("data/original-raw-archives/2020-02-13-flowlog_archive.xz",
                         "scratch/splits/flows/archives/2020-02-13-flowlog_archive-{:03d}.gz",
                         1000000)
-
         split_lzma_file("data/original-raw-archives/2020-05-04-flowlog_archive.xz",
                         "scratch/splits/flows/archives/2020-05-04-flowlog_archive-{:03d}.gz",
                         1000000)
-
         split_lzma_file("data/original-raw-archives/2020-11-16-flowlog_archive.xz",
                         "scratch/splits/flows/archives/2020-11-16-flowlog_archive-{:03d}.gz",
+                        1000000)
+        split_lzma_file("data/original-raw-archives/2021-02-11-flowlog_archive.xz",
+                        "scratch/splits/flows/archives/2021-02-11-flowlog_archive-{:03d}.gz",
                         1000000)
 
     if INGEST_FLOWLOGS:
