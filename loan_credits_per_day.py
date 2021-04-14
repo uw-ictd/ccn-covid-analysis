@@ -22,6 +22,10 @@ def get_data(timeline):
   # excluded retailers
   retailers = df_admin["dest_user"].unique()
   excluded_retailers = transactions[~transactions['user'].isin(retailers)]
+  excluded_retailers = excluded_retailers[excluded_retailers['kind'] == 'user_transfer']
+
+  #excluded self-transfer bug
+  excluded_self = excluded_retailers[excluded_retailers['user'] != excluded_retailers['dest_user']]
 
   # normalize by time: taking temperal average divide by months
   # temperal average -- 238 days after (@11/24/2020) and before (@8/7/2019)
@@ -34,7 +38,7 @@ def get_data(timeline):
   # Normalization: only get users present bf - after
   ## get only users from 238 days before
   query_start = f"(timestamp >= '{start_date}') & (timestamp < '{end_date}')"
-  df_range = excluded_retailers.query(query_start)
+  df_range = excluded_self.query(query_start)
 
   df_range = df_range[df_range['user'].notnull()]
   df_range = df_range[df_range['dest_user'].notnull()]
@@ -46,8 +50,11 @@ def get_data(timeline):
   # split the timeline before and after COVID
   ## March 25th, 2020 school closes  April 1st, 2020 roads to capital closed to town 
   query_before = f"(timestamp >= '{start_date}') & (timestamp < '{lockdown_date}')"
-  # TODO: cut the last day
+  # cut the last day
   query_after = f"(timestamp >= '{lockdown_date}') & (timestamp < '{end_date}')"
+
+  df_before = df_range.query(query_before)
+  df_after = df_range.query(query_after)
 
   if timeline == 'before':
     data_cleaned = df_range.query(query_before)
@@ -55,6 +62,9 @@ def get_data(timeline):
     data_cleaned = df_range.query(query_after)
   else:
     raise ValueError("Timeline should be only 'before' or 'after' the pandemic lockdown.")
+
+  # TODO: right dataset to get?
+  get_count(df_before, df_after, timeline)
 
   data_cleaned = data_cleaned.merge(x_users, on=['user', 'dest_user'], how='outer')
   data_cleaned['amount_idr'] = data_cleaned['amount_idr'].fillna(0)
@@ -66,7 +76,7 @@ def get_data(timeline):
   # # optional: exclude the maximum amount of loan (entire row)
   # total_loan = total_loan[total_loan['amount_idr'] != total_loan['amount_idr'].max()]
 
-  # drop the rows of retailers
+  # reset index for plotting
   df = pd.DataFrame(total_loan).reset_index()
 
   return df
@@ -83,8 +93,6 @@ def make_plot(df, timeline):
     alt.X('user:N', 
       title= str(count_origin) +" Origin Users",
       sort=alt.EncodingSortField(field='dest_user', order='descending')
-      # TODO making axis more static - build all the empty users to fill in 0 
-
      ),
     alt.Y('dest_user:N',
      title= str(count_dest) + " Destination Users",
@@ -98,15 +106,49 @@ def make_plot(df, timeline):
       ),
   ).save("./misc/charts/loan_credits_" + timeline +".html", scale_factor=2.0)
 
+def get_count(df_before, def_after, timeline):
+
+  if timeline == 'before': 
+    total_loan = df_before['amount_idr'].sum(skipna= True)
+    total_freq = len(df_before.index)
+  elif timeline == 'after':
+    total_loan = def_after['amount_idr'].sum(skipna= True)
+    total_freq = len(def_after.index)
+  else:
+    raise ValueError("Timeline should be only 'before' or 'after' the pandemic lockdown.")
+
+  print("Total loan all users for " + timeline + ": " + str(total_loan))
+  print("Total frequency all users for " + timeline + ": " + str(total_freq))
+  print(" ")
+  print(" ")
+
+  # loan_before = df_before.groupby(['user']).agg({"amount_idr" : 'sum'})
+  # loan_before['time'] = 'before'
+
+  # loan_after = def_after.groupby(['user']).agg({"amount_idr" : 'sum'})
+  # loan_after['time'] = 'after'
+
+  # loan = pd.concat([loan_before['user'], loan_after['user']]).to_frame()
+  # print(loan.head())
+
+
+  # alt.Chart(loan).mark_line().encode(
+  #   x='user',
+  #   y='amount_idr',
+  #   color='time'
+  # ).save("./misc/charts/amount.html", scale_factor=2.0)
+
+  
+
+  # return total_each_user
 
 if __name__ == "__main__":
     pd.set_option('display.max_columns', None)
     pd.set_option('display.width', None)
     pd.set_option('display.max_rows', None)
     
-    get_data("before")
-    
-    get_data("after")
+    df_before = get_data("before")
+    df_after = get_data("after")
 
-    make_plot(get_data("before"), "before")
-    make_plot(get_data("after"), "after")
+    # make_plot(get_data("before"), "before")
+    # make_plot(get_data("after"), "after")
