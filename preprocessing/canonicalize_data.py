@@ -367,7 +367,7 @@ def import_dnslog_to_dataframes(file_path):
                     if len(chunk) >= max_rows_per_division:
                         new_frame = dask.dataframe.from_pandas(
                             pd.DataFrame(chunk),
-                            chunksize=max_rows_per_division,
+                            npartitions=1,
                         )
                         if frames[index] is None:
                             frames[index] = new_frame
@@ -387,7 +387,7 @@ def import_dnslog_to_dataframes(file_path):
         if len(chunk) > 0:
             new_frame = dask.dataframe.from_pandas(
                 pd.DataFrame(chunk),
-                chunksize=max_rows_per_division,
+                npartitions=1,
             )
             if frames[index] is None:
                 frames[index] = new_frame
