@@ -818,15 +818,11 @@ if __name__ == "__main__":
         # Import dns logs and archive to parquet
         dns_archives_directory = os.path.join("scratch", "splits", "dns", "archives")
         split_dir = os.path.join("scratch", "splits", "dns")
-        tokens = []
         for filename in sorted(os.listdir(dns_archives_directory)):
             if not filename.endswith(".gz"):
                 print("Skipping:", filename)
                 continue
-            token = dask.delayed(_import_dnslog_file)(dns_archives_directory, filename, split_dir)
-            tokens.append(token)
-
-        client.compute(tokens, sync=True)
+            _import_dnslog_file(dns_archives_directory, filename, split_dir)
 
     if DEDUPLICATE_FLOWLOGS:
         input_path = os.path.join("scratch", "splits", "flows", "parquet")
