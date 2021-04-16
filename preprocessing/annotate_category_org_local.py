@@ -7,6 +7,7 @@ import ipaddress
 import os
 
 from mappers.mapped_ips import IpProcessor
+from mappers.ip_passthrough_domains import PassthroughDomainProcessor
 import infra.dask
 import mappers.domains
 import infra.platform
@@ -359,17 +360,62 @@ def annotate_category_org_from_ip(in_path, out_path):
     infra.dask.clean_write_parquet(flows, out_path)
 
 
+def annotate_category_org_from_ip_passthrough_domain(in_path, out_path):
+    """ Annotate passthrough domains found via NS lookup as peers
+    """
+    print("Beginning passthrough domain analysis")
+    flows = infra.dask.read_parquet(in_path)
+    flows = flows.reset_index()
+    flows = flows.astype({
+        "org": object,
+        "category": object,
+    })
+
+    processor = PassthroughDomainProcessor()
+    flows["iporg"] = flows.loc[
+        (flows["category"] == "Unknown (Not Mapped)") & (flows["org"] == "Unknown (Not Mapped)") & (flows["fqdn_source"] == "reverse_dns")
+        ].apply(
+        lambda row: processor.process_ip_fqdn(row["dest_ip"], row["fqdn"])[0],
+        axis=1,
+        meta=("iporg", object),
+    )
+
+    flows["ipcategory"] = flows.loc[
+        (flows["category"] == "Unknown (Not Mapped)") & (flows["org"] == "Unknown (Not Mapped)") & (flows["fqdn_source"] == "reverse_dns")
+        ].apply(
+        lambda row: processor.process_ip_fqdn(row["dest_ip"], row["fqdn"])[1],
+        axis=1,
+        meta=("ipcategory", object),
+    )
+
+    flows["category"] = flows["category"].mask(
+        ((flows["category"] == "Unknown (Not Mapped)") & (flows["ipcategory"] != None)),
+        other=flows["ipcategory"]
+    )
+    flows["org"] = flows["org"].mask(
+        ((flows["org"] == "Unknown (Not Mapped)") & (flows["iporg"] != None)),
+        other=flows["iporg"]
+    )
+
+    flows = flows.drop(["ipcategory", "iporg"], axis=1)
+    flows = flows.set_index("start")
+    # flows = flows.categorize(columns=["fqdn_source", "org", "category"])
+    infra.dask.clean_write_parquet(flows, out_path)
+
+
 def annotate_all(client):
     in_parent_directory = "scratch/flows/typical_fqdn_DIV_user_INDEX_start/"
     annotated_parent_directory = "scratch/flows/typical_fqdn_category_org_local_DIV_user_INDEX_start"
     stun_annotated_parent_directory = "scratch/flows/typical_fqdn_category_stun_org_local_DIV_user_INDEX_start"
     merged_out_directory = "scratch/flows/typical_fqdn_org_category_local_no_ip_DIV_none_INDEX_start"
+    ip_annotated_directory = "scratch/flows/typical_fqdn_org_category_local_ip_no_ip_fqdns_DIV_none_INDEX_start"
     final_out_directory = "scratch/flows/typical_fqdn_org_category_local_DIV_none_INDEX_start"
 
     augment_all_user_flows(in_parent_directory, annotated_parent_directory, client)
     stun_augment_all_user_flows(annotated_parent_directory, stun_annotated_parent_directory, client)
     merge_parquet_frames(stun_annotated_parent_directory, merged_out_directory)
-    annotate_category_org_from_ip(merged_out_directory, final_out_directory)
+    annotate_category_org_from_ip(merged_out_directory, ip_annotated_directory)
+    annotate_category_org_from_ip_passthrough_domain(ip_annotated_directory, final_out_directory)
 
 
 if __name__ == "__main__":
