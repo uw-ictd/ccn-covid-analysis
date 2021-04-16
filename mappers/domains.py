@@ -137,6 +137,7 @@ class FqdnProcessor(object):
         self.google_compiled_re = [re.compile(x) for x in self.google_re.keys()]
         self.facebook_re = FACEBOOK_REGEXES
         self.facebook_compiled_re = [re.compile(x) for x in self.facebook_re.keys()]
+        self.result_cache = dict()
 
     def _process_google_category(self, fqdn):
         match_regex = None
@@ -185,6 +186,12 @@ class FqdnProcessor(object):
         if fqdn is None or fqdn == "":
             return "Unknown (No DNS)", "Unknown (No DNS)"
 
+        if fqdn not in self.result_cache:
+            self.result_cache[fqdn] = self._process_unchached_fqdn(fqdn)
+
+        return self.result_cache[fqdn]
+
+    def _process_unchached_fqdn(self, fqdn):
         if 'google' in fqdn or 'gmail' in fqdn or 'ytimg' in fqdn or 'youtube' in fqdn or "gstatic.com" in fqdn or "ggpht.com" in fqdn or "app-measurement.com" in fqdn or "gvt1.com" in fqdn or "ampproject" in fqdn or "crashlytics.com" in fqdn or "2mdn.net" in fqdn or "doubleclick.net" in fqdn or "1e100.net" in fqdn or "gvt2.com" in fqdn:
             return "Google", self._process_google_category(fqdn)
 
