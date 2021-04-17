@@ -713,9 +713,6 @@ if __name__ == "__main__":
     BUILD_PER_USER_INDEXES = False
 
     COMBINE_DNS_WITH_FLOWS = False
-    CATEGORIZE_USER_FLOWS = False
-
-    RE_MERGE_FLOWS = False
     MOVE_ATYPICAL_FLOWS = False
 
     ANNOTATE_CATEGORY_ORG_LOCAL = False
