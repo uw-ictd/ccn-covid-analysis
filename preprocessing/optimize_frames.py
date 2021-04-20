@@ -66,18 +66,18 @@ def optimize_transactions_frame(in_path, out_path):
 
 def optimize_all(client):
     optimize_transactions_frame(
-        "scratch/transactions.parquet",
+        "scratch/transactions_TM.parquet",
         "scratch/transactions_OPT_DIV_none_INDEX_timestamp.parquet",
     )
 
     optimize_p2p_flow_frame(
-        "scratch/flows/p2p_DIV_none_INDEX_start",
+        "scratch/flows/p2p_TM_DIV_none_INDEX_start",
         "scratch/flows/p2p_OPT_DIV_none_INDEX_start",
         client,
     )
 
     optimize_nouser_flow_frame(
-        "scratch/flows/nouser_DIV_none_INDEX_start",
+        "scratch/flows/nouser_TM_DIV_none_INDEX_start",
         "scratch/flows/nouser_OPT_DIV_none_INDEX_start",
         client,
     )
