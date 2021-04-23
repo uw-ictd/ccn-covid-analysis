@@ -9,6 +9,7 @@ import infra.platform
 
 def compute_all_intermediate_aggregations(outpath, dask_client):
     compute_bytes_per_category_per_user_per_day(Path(outpath)/"bytes_per_category_per_user_per_day.parquet")
+    compute_bytes_per_org_per_user_per_day(outpath/"bytes_per_org_per_user_per_day.parquet")
 
 
 def compute_bytes_per_category_per_user_per_day(outfile):
@@ -21,6 +22,22 @@ def compute_bytes_per_category_per_user_per_day(outfile):
 
     # Do the grouping
     flows = flows.groupby(["user", "category", "day"]).sum()
+    flows = flows.compute()
+    print(flows)
+
+    infra.pd.clean_write_parquet(flows, outfile)
+
+
+def compute_bytes_per_org_per_user_per_day(outfile):
+    flows = infra.dask.read_parquet(
+        "data/clean/flows_typical_DIV_none_INDEX_start")[["user", "org", "bytes_up", "bytes_down"]]
+
+    flows = flows.reset_index()
+    flows["day"] = flows["start"].dt.floor("d")
+    flows = flows[["user", "org", "day", "bytes_up", "bytes_down"]]
+
+    # Do the grouping
+    flows = flows.groupby(["user", "org", "day"]).sum()
     flows = flows.compute()
     print(flows)
 
