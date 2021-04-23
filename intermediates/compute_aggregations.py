@@ -59,7 +59,7 @@ if __name__ == "__main__":
     if platform.large_compute_support:
         print("Running compute tasks")
         print("To see execution status, check out the dask status page at localhost:8787 while the computation is running.")
-        client = infra.dask.setup_platform_tuned_dask_client(10, platform)
+        client = infra.dask.setup_platform_tuned_dask_client(40, platform, single_threaded_workers=True)
         compute_all_intermediate_aggregations(outpath=aggregate_location, dask_client=client)
         client.close()
     else:
