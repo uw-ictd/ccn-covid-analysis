@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import intermediates.compute_log_gaps
 import intermediates.compute_user_active_deltas
 
@@ -14,6 +16,10 @@ if __name__ == "__main__":
     else:
         print("Without dask compute support some intermediates will not be made!")
         client = None
+
+    # Ensure destination directories exist.
+    Path("data/derived").mkdir(parents=True, exist_ok=True)
+    Path("scratch/graphs").mkdir(parents=True, exist_ok=True)
 
     intermediates.compute_log_gaps.run(client, basedir)
     intermediates.compute_user_active_deltas.run(client, basedir)
