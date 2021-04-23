@@ -29,6 +29,7 @@ from infra.datatypes import (TypicalFlow,
 from preprocessing import (
     annotate_category_org_local,
     anonymize,
+    determine_initial_conditions,
     optimize_frames,
     shift_to_local_time,
     trim_to_consistent_size
@@ -954,6 +955,10 @@ if __name__ == "__main__":
         shift_to_local_time.shift_all(client)
 
     if TRIM_TO_CONSISTENT_SIZE:
+        determine_initial_conditions.compute_initial_conditions(
+            "scratch/transactions_TZ.parquet",
+            "scratch/initial_user_balances.parquet",
+        )
         trim_to_consistent_size.trim_all(client)
 
     if ANONYMIZE:
@@ -978,6 +983,10 @@ if __name__ == "__main__":
         copy_pandas_frame(
             "scratch/transactions_OPT_DIV_none_INDEX_timestamp.parquet",
             "scratch/clean/transactions_DIV_none_INDEX_timestamp.parquet",
+        )
+        copy_pandas_frame(
+            "scratch/initial_user_balances.parquet",
+            "scratch/clean/initial_user_balances_INDEX_none.parquet",
         )
 
 
