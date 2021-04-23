@@ -10,36 +10,6 @@ import infra.pd
 import infra.platform
 
 
-def get_registered_users_query(transactions):
-    # Set down the types for the dataframe
-    types = {
-        'start': 'datetime64[ns]',
-        "user": "object",
-    }
-
-    # Update the types in the dataframe
-    query = transactions.astype(types)[["start", "user"]].copy()
-    query = query.set_index("start")
-    # Abuse cumsum to get a counter, since the users are already
-    # distinct and sorted.
-    query = query.assign(temp=1)
-    query["count"] = query["temp"].cumsum()
-    query = query.drop(["temp"], axis="columns")
-
-    # Compute the number of users at each week, and store in the
-    # "user" column
-    query = query.drop("user", axis="columns").rename(columns={"count": "user"})
-    # For weeks that had no new users added, use the total from previous weeks.
-    query["user"] = query["user"].fillna(method="ffill")
-
-    # Get the start column back
-    query = query.reset_index()
-    # Map each start to a cohort
-    query["day"] = query["start"].dt.floor("d")
-
-    return query
-
-
 def reduce_to_pandas(outfile, dask_client):
     # Import the flows dataset
     #
