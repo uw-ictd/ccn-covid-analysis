@@ -1,4 +1,3 @@
-import intermediates.compute_first_time_user_transactions
 import intermediates.compute_log_gaps
 import intermediates.compute_user_active_deltas
 
@@ -16,7 +15,6 @@ if __name__ == "__main__":
         print("Without dask compute support some intermediates will not be made!")
         client = None
 
-    intermediates.compute_first_time_user_transactions.run(client, basedir)
     intermediates.compute_log_gaps.run(client, basedir)
     intermediates.compute_user_active_deltas.run(client, basedir)
 
