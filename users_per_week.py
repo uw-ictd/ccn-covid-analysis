@@ -2,12 +2,12 @@
 """
 
 import altair
+import pandas as pd
+
 import infra.constants
 import infra.dask
 import infra.pd
 import infra.platform
-import datetime
-import pandas as pd
 
 
 def get_registered_users_query(transactions):
