@@ -49,6 +49,7 @@ def reduce_to_pandas(outfile, dask_client):
 
     df = df.reset_index()
     df["day"] = df["start"].dt.floor("d")
+    df["user"] = df["user"].astype(object)
 
     # Group by cohorts and get the all the users
     df = df.groupby(["day", "user"]).sum().reset_index()
