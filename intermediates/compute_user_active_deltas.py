@@ -47,13 +47,16 @@ def reduce_flows_to_pandas(in_path, out_path):
     infra.pd.clean_write_parquet(user_range_frame, out_path)
 
 
-def compute_purchase_range_frame(transaction_source_file):
+def compute_purchase_range_frame(transaction_source_file, early_users_file):
     """Generates a frame with the range a user has made purchases in the net
     """
     transactions = infra.pd.read_parquet(transaction_source_file).reset_index()
+    early_users = infra.pd.read_parquet(early_users_file)
+    early_users = early_users.assign(timestamp=infra.constants.MIN_DATE)
 
     # Each user's total amount of data purchased directly.
     purchases = transactions.loc[transactions["kind"] == "purchase"]
+    purchases = purchases.append(early_users)
 
     # Find the first day the user made a purchase
     first_purchases = purchases.sort_values("timestamp").groupby("user").first().reset_index()[["user", "timestamp"]]
@@ -85,9 +88,9 @@ def _count_gap_days(row, gap_day_frame):
     return count
 
 
-def compute_user_deltas(log_gap_source_file, transaction_source_file, flow_range_intermediate_file, active_delta_out_file):
+def compute_user_deltas(log_gap_source_file, transaction_source_file, early_users_file, flow_range_intermediate_file, active_delta_out_file):
+    purchase_ranges = compute_purchase_range_frame(transaction_source_file, early_users_file)
     flow_ranges = infra.pd.read_parquet(flow_range_intermediate_file)
-    purchase_ranges = compute_purchase_range_frame(transaction_source_file)
     network_gap_days = compute_full_gap_days(log_gap_source_file)
 
     # Merge on user
@@ -155,6 +158,7 @@ def run(dask_client, basedir):
         "data/clean/flows_typical_DIV_none_INDEX_start"
     )
     transaction_source_file = os.path.join(basedir, "data/clean/transactions_DIV_none_INDEX_timestamp.parquet")
+    early_users_file = os.path.join(basedir, "data/clean/initial_user_balances_INDEX_none.parquet")
     log_gap_source_file = os.path.join(basedir, "data/derived/log_gaps.parquet")
     temporary_file = os.path.join(basedir, "scratch/graphs/compute_user_active_time")
     delta_out_file = os.path.join(basedir, "data/derived/user_active_deltas.parquet")
@@ -164,7 +168,7 @@ def run(dask_client, basedir):
 
         reduce_flows_to_pandas(flow_source_file, temporary_file)
 
-    compute_user_deltas(log_gap_source_file, transaction_source_file, temporary_file, delta_out_file)
+    compute_user_deltas(log_gap_source_file, transaction_source_file, early_users_file, temporary_file, delta_out_file)
 
 
 if __name__ == "__main__":
