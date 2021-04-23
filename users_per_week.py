@@ -59,20 +59,17 @@ def reduce_to_pandas(outfile, dask_client):
 
 
 def make_plot(infile):
-    registered_users = infra.pd.read_parquet("data/derived/early_registered_users.parquet")
-    registered_users = registered_users.assign(start=infra.constants.MIN_DATE)
+    early_users = infra.pd.read_parquet("data/clean/initial_user_balances_INDEX_none.parquet")
+    registered_users = early_users.assign(timestamp=infra.constants.MIN_DATE)
 
-    transactions = pd.read_csv("data/clean/first_time_user_transactions.csv")[["start", "user"]]
-    transactions = transactions.astype({
-        'start': 'datetime64[ns]',
-        "user": "object",
-    })[["start", "user"]].copy()
-    registered_users = registered_users.append(transactions).sort_values("start").groupby("user").first()
-    registered_users = registered_users.reset_index().sort_values("start").reset_index()
+    transactions = infra.pd.read_parquet("data/clean/transactions_DIV_none_INDEX_timestamp.parquet").reset_index()
+
+    registered_users = registered_users.append(transactions).sort_values("timestamp").groupby("user").first()
+    registered_users = registered_users.reset_index().sort_values("timestamp").reset_index()
     registered_users = registered_users.assign(temp=1)
     registered_users["count"] = registered_users["temp"].cumsum()
     registered_users = registered_users.drop(["temp", "user"], axis="columns").rename(columns={"count": "user"})
-    registered_users["day"] = registered_users["start"].dt.floor("d")
+    registered_users["day"] = registered_users["timestamp"].dt.floor("d")
 
     # Generate a dense dataframe with all days
     date_range = pd.DataFrame({"day": pd.date_range(infra.constants.MIN_DATE, infra.constants.MAX_DATE, freq="1D")})
