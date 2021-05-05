@@ -48,8 +48,7 @@ def get_data(timeline):
   df_range = excluded_self.query(query_start)
 
 
-  df_range = excluded_self[excluded_self['user'].notnull()]
-  # df_range = df_range[df_range['user'].notnull()]
+  df_range = df_range[df_range['user'].notnull()]
   df_range = df_range[df_range['dest_user'].notnull()]
 
   all_users = pd.concat([df_range['user'], df_range['dest_user']]).rename('user').to_frame().drop_duplicates()
@@ -80,7 +79,6 @@ def get_data(timeline):
   get_count(df_before, df_after, timeline)
 
   data_cleaned = df_range.merge(x_users, on=['user', 'dest_user'], how='outer')
-  data_cleaned = data_cleaned.merge(x_users, on=['user', 'dest_user'], how='outer')
   data_cleaned['amount_idr'] = data_cleaned['amount_idr'].fillna(0)
 
   # total loan for each user
