@@ -61,7 +61,6 @@ def anonymize_rare_ips(in_path, out_path):
         other="[Other Anonymized U<{}]".format(infra.constants.MIN_K_ANON),
         )
     flows = flows_with_counts.drop("user_count", axis=1)
-    print(flows)
     infra.dask.clean_write_parquet(flows, out_path)
 
 
