@@ -346,11 +346,11 @@ def annotate_category_org_from_ip(in_path, out_path):
     )
 
     flows["category"] = flows["category"].mask(
-        ((flows["category"] == "Unknown (No DNS)") & (flows["ipcategory"] != None)),
+        ((flows["category"] == "Unknown (No DNS)") & (flows["ipcategory"].notnull())),
         other=flows["ipcategory"]
     )
     flows["org"] = flows["org"].mask(
-        ((flows["org"] == "Unknown (No DNS)") & (flows["iporg"] != None)),
+        ((flows["org"] == "Unknown (No DNS)") & (flows["iporg"].notnull())),
         other=flows["iporg"]
     )
 
@@ -389,11 +389,11 @@ def annotate_category_org_from_ip_passthrough_domain(in_path, out_path):
     )
 
     flows["category"] = flows["category"].mask(
-        ((flows["category"] == "Unknown (Not Mapped)") & (flows["ipcategory"] != None)),
+        ((flows["category"] == "Unknown (Not Mapped)") & (flows["ipcategory"].notnull())),
         other=flows["ipcategory"]
     )
     flows["org"] = flows["org"].mask(
-        ((flows["org"] == "Unknown (Not Mapped)") & (flows["iporg"] != None)),
+        ((flows["org"] == "Unknown (Not Mapped)") & (flows["iporg"].notnull())),
         other=flows["iporg"]
     )
 
