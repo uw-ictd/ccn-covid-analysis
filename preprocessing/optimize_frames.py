@@ -18,6 +18,7 @@ def optimize_typical_flow_frame(in_path, out_path, client):
         "ambiguous_fqdn_count": int
         })
 
+    df["fqdn"] = df["fqdn"].apply(_qualify_domain_name)
     df = df.set_index("start")
     persisted_df = client.persist(df)
 
@@ -26,6 +27,17 @@ def optimize_typical_flow_frame(in_path, out_path, client):
     infra.dask.clean_write_parquet(persisted_df, out_path)
     client.cancel(persisted_df)
     del persisted_df
+
+def _qualify_domain_name(name):
+    """If the domain name provided is not fully qualified, make it so by adding
+       the top-level dot.
+    """
+    # Remove any extra whitespace from dirty data entry
+    plain_name = name.strip()
+    if plain_name.endswith("."):
+        return plain_name
+
+    return plain_name + "."
 
 
 def optimize_p2p_flow_frame(in_path, out_path, client):
