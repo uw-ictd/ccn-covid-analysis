@@ -722,8 +722,8 @@ if __name__ == "__main__":
     TRIM_TO_CONSISTENT_SIZE = False
 
     ANONYMIZE = False
-    OPTIMIZE = False
-    FINALIZE = False
+    OPTIMIZE = True
+    FINALIZE = True
 
     if CLEAN_TRANSACTIONS:
         remove_nuls_from_file(

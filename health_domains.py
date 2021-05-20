@@ -58,6 +58,8 @@ def make_health_domain_plots(infile):
     """
     df = infra.pd.read_parquet(infile)
     df = categorize_all_fqdns(df)
+    temp = df.loc[df["is_health"]]
+    print(temp["fqdn"].unique())
     _make_volume_comparison_plot(df)
     _make_relative_volume_plot(df)
     _make_unique_users_plot(df)
@@ -70,14 +72,14 @@ def _make_individual_domain_plot(df):
 
     # Consolidate by week instead of by day
     df = df[
-        ["start_bin", "fqdn", "GB_total"]
+        ["day", "fqdn", "GB_total"]
     ].groupby(
-        [pd.Grouper(key="start_bin", freq="W-MON"), "fqdn"]
+        [pd.Grouper(key="day", freq="W-MON"), "fqdn"]
     ).sum().reset_index()
 
     alt.Chart(df).mark_line(opacity=1.0).encode(
         x=alt.X(
-            "start_bin:T"
+            "day:T"
         ),
         y=alt.Y(
             "GB_total:Q",
@@ -106,14 +108,14 @@ def _make_unique_users_plot(df):
     print(temp_count)
 
     df = df[
-        ["start_bin", "user"]
+        ["day", "user"]
     ].groupby(
-        [pd.Grouper(key="start_bin", freq="W-MON")]
+        [pd.Grouper(key="day", freq="W-MON")]
     ).count().reset_index()
 
     alt.Chart(df).mark_line(opacity=1.0, interpolate='step-after').encode(
         x=alt.X(
-            "start_bin:T"
+            "day:T"
         ),
         y=alt.Y(
             "user:Q",
@@ -135,16 +137,16 @@ def _make_relative_volume_plot(df):
     df = df.loc[df["is_health"] == True]
     # Consolidate by week instead of by day
     df = df[
-        ["start_bin", "bytes_up", "bytes_down"]
+        ["day", "bytes_up", "bytes_down"]
     ].groupby(
-        [pd.Grouper(key="start_bin", freq="W-MON")]
+        [pd.Grouper(key="day", freq="W-MON")]
     ).sum().reset_index()
 
     df["bytes"] = df["bytes_up"] + df["bytes_down"]
 
     alt.Chart(df).mark_line(opacity=1.0, interpolate='step-after').encode(
         x=alt.X(
-            "start_bin:T"
+            "day:T"
         ),
         y=alt.Y(
             "bytes:Q",
@@ -164,13 +166,13 @@ def _make_relative_volume_plot(df):
 def _make_volume_comparison_plot(df):
     # Consolidate by week instead of by day
     df = df[
-        ["start_bin", "is_health", "bytes_up", "bytes_down"]
+        ["day", "is_health", "bytes_up", "bytes_down"]
     ].groupby(
-        [pd.Grouper(key="start_bin", freq="W-MON"), "is_health"]
+        [pd.Grouper(key="day", freq="W-MON"), "is_health"]
     ).sum().reset_index()
 
     df = df.melt(
-        id_vars=["is_health", "start_bin"],
+        id_vars=["is_health", "day"],
         value_vars=["bytes_up", "bytes_down"],
         var_name="direction",
         value_name="bytes"
@@ -180,7 +182,7 @@ def _make_volume_comparison_plot(df):
 
     alt.Chart(df).mark_point(opacity=1.0).encode(
         x=alt.X(
-            "start_bin:T"
+            "day:T"
         ),
         y=alt.Y(
             "bytes:Q",

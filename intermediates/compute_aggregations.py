@@ -8,60 +8,61 @@ import infra.platform
 
 
 def compute_all_intermediate_aggregations(outpath, dask_client):
-    compute_bytes_per_category_per_user_per_day(Path(outpath)/"bytes_per_category_per_user_per_day.parquet")
-    compute_bytes_per_org_per_user_per_day(outpath/"bytes_per_org_per_user_per_day.parquet")
-    compute_bytes_per_user_per_domain_per_day(outpath/"bytes_per_user_per_domain_per_day.parquet")
-
-
-def compute_bytes_per_category_per_user_per_day(outfile):
-    flows = infra.dask.read_parquet(
-        "data/clean/flows_typical_DIV_none_INDEX_start")[["user", "category", "bytes_up", "bytes_down"]]
-
+    flows = infra.dask.read_parquet("data/clean/flows_typical_DIV_none_INDEX_start")
     flows = flows.reset_index()
     flows["day"] = flows["start"].dt.floor("d")
+    flows = flows.astype({
+        "user": object,
+        "fqdn": object,
+        "org": object,
+        "category": object,
+    })
+    flows = dask_client.persist(flows)
+
+    compute_bytes_per_category_per_user_per_day(
+        flows,
+        outpath/"bytes_per_category_per_user_per_day.parquet"
+    )
+    print("Completed category per user per day")
+
+    compute_bytes_per_org_per_user_per_day(
+        flows,
+        outpath/"bytes_per_org_per_user_per_day.parquet"
+    )
+    print("Completed org per user per day")
+
+    compute_bytes_per_user_per_domain_per_day(
+        flows,
+        outpath/"bytes_per_user_per_domain_per_day.parquet"
+    )
+    print("Completed fqdn per user per day")
+
+
+def compute_bytes_per_category_per_user_per_day(flows, outfile):
     flows = flows[["user", "category", "day", "bytes_up", "bytes_down"]]
 
     # Do the grouping
-    flows = flows.groupby(["user", "category", "day"]).sum()
-    flows = flows.compute()
-    print(flows)
+    flows = flows.groupby(["user", "category", "day"]).sum().compute()
 
+    flows = flows.reset_index()
     infra.pd.clean_write_parquet(flows, outfile)
 
 
-def compute_bytes_per_org_per_user_per_day(outfile):
-    flows = infra.dask.read_parquet(
-        "data/clean/flows_typical_DIV_none_INDEX_start")[["user", "org", "bytes_up", "bytes_down"]]
-
-    flows = flows.reset_index()
-    flows["day"] = flows["start"].dt.floor("d")
+def compute_bytes_per_org_per_user_per_day(flows, outfile):
     flows = flows[["user", "org", "day", "bytes_up", "bytes_down"]]
 
     # Do the grouping
-    flows = flows.groupby(["user", "org", "day"]).sum()
-    flows = flows.compute()
-    print(flows)
+    flows = flows.groupby(["user", "org", "day"]).sum().compute()
 
+    flows = flows.reset_index()
     infra.pd.clean_write_parquet(flows, outfile)
 
 
-def compute_bytes_per_user_per_domain_per_day(outfile):
-    flows = infra.dask.read_parquet(
-        "data/clean/flows_typical_DIV_none_INDEX_start")[["fqdn", "user", "bytes_up", "bytes_down"]]
-
-    flows = flows.astype({
-        "user": object,
-        "fqdn": object
-    })
-
-    # Compress to days
-    flows = flows.reset_index()
-    flows["start_bin"] = flows["start"].dt.floor("d")
-    flows = flows.set_index("start_bin")
+def compute_bytes_per_user_per_domain_per_day(flows, outfile):
+    flows = flows[["user", "fqdn", "day", "bytes_up", "bytes_down"]]
 
     # Do the grouping
-    flows = flows.groupby(["start_bin", "fqdn", "user"]).sum()
-    flows = flows.compute()
+    flows = flows.groupby(["user", "fqdn", "day"]).sum().compute()
 
     flows = flows.reset_index()
     infra.pd.clean_write_parquet(flows, outfile)
