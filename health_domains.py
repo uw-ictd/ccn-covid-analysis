@@ -61,6 +61,41 @@ def make_health_domain_plots(infile):
     _make_volume_comparison_plot(df)
     _make_relative_volume_plot(df)
     _make_unique_users_plot(df)
+    _make_individual_domain_plot(df)
+
+
+def _make_individual_domain_plot(df):
+    df["GB_total"] = (df["bytes_up"] + df["bytes_down"])/(1000**3)
+    df = df.loc[df["is_health"] == True]
+
+    # Consolidate by week instead of by day
+    df = df[
+        ["start_bin", "fqdn", "GB_total"]
+    ].groupby(
+        [pd.Grouper(key="start_bin", freq="W-MON"), "fqdn"]
+    ).sum().reset_index()
+
+    alt.Chart(df).mark_line(opacity=1.0).encode(
+        x=alt.X(
+            "start_bin:T"
+        ),
+        y=alt.Y(
+            "GB_total:Q",
+            title="Weekly Total Traffic (GB)",
+            axis=alt.Axis(labels=True),
+            # scale=alt.Scale(
+            #     type="symlog"
+            # ),
+        ),
+        color=alt.Color(
+            "fqdn:N"
+        ),
+    ).properties(
+        width=500,
+    ).save(
+        "renders/health_domain_individual_domain_weekly.png",
+        scale_factor=2,
+    )
 
 
 def _make_unique_users_plot(df):
