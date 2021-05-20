@@ -33,32 +33,6 @@ HEALTH_FQDN_TOKENS = {
 }
 
 
-def reduce_to_pandas(infile, outfile, dask_client):
-    """The large aggregation that must be run on the cluster
-
-    Generates an aggregated output file for analysis on a normal machine.
-    """
-    flows = infra.dask.read_parquet(
-        infile)[["fqdn", "user", "bytes_up", "bytes_down"]]
-
-    flows = flows.astype({
-        "user": object,
-        "fqdn": object
-    })
-
-    # Compress to days
-    flows = flows.reset_index()
-    flows["start_bin"] = flows["start"].dt.floor("d")
-    flows = flows.set_index("start_bin")
-
-    # Do the grouping
-    flows = flows.groupby(["start_bin", "fqdn", "user"]).sum()
-    flows = flows.compute()
-
-    flows = flows.reset_index()
-    infra.pd.clean_write_parquet(flows, outfile)
-
-
 def categorize_all_fqdns(df):
     """Categorizes an fqdn, currently as health or not health
     """
@@ -208,12 +182,7 @@ if __name__ == "__main__":
 
     graph_temporary_file = "data/aggregates/bytes_per_user_per_domain_per_day.parquet"
     if platform.large_compute_support:
-        client = infra.dask.setup_platform_tuned_dask_client(120, platform, single_threaded_workers=True)
-        reduce_to_pandas(
-            infile="data/clean/flows_typical_DIV_none_INDEX_start",
-            outfile=graph_temporary_file,
-            dask_client=client)
-        client.close()
+        pass
 
     if platform.altair_support:
         make_health_domain_plots(graph_temporary_file)
