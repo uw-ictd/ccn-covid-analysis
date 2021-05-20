@@ -8,6 +8,7 @@ import infra.platform
 
 def optimize_typical_flow_frame(in_path, out_path, client):
     df = infra.dask.read_parquet(in_path)
+    df = client.persist(df)
     df = df.categorize(columns=["fqdn_source", "org", "category", "user", "dest_ip"])
     df = df.astype({
         "user_port": int,
@@ -18,15 +19,15 @@ def optimize_typical_flow_frame(in_path, out_path, client):
         "ambiguous_fqdn_count": int
         })
 
-    df["fqdn"] = df["fqdn"].apply(_qualify_domain_name)
+    df["fqdn"] = df["fqdn"].apply(_qualify_domain_name, meta={'fqdn', 'object'})
     df = df.set_index("start")
-    persisted_df = client.persist(df)
+    df = client.persist(df)
 
-    persisted_df = persisted_df.repartition(partition_size="128M", force=True)
+    df = df.repartition(partition_size="128M", force=True)
 
-    infra.dask.clean_write_parquet(persisted_df, out_path)
-    client.cancel(persisted_df)
-    del persisted_df
+    infra.dask.clean_write_parquet(df, out_path)
+    client.cancel(df)
+    del df
 
 def _qualify_domain_name(name):
     """If the domain name provided is not fully qualified, make it so by adding
@@ -42,24 +43,25 @@ def _qualify_domain_name(name):
 
 def optimize_p2p_flow_frame(in_path, out_path, client):
     df = infra.dask.read_parquet(in_path)
+    df = client.persist(df)
     df = df.categorize(columns=["user_a", "user_b"])
-    persisted_df = client.persist(df)
-    persisted_df = persisted_df.repartition(partition_size="128M", force=True)
+    df = df.repartition(partition_size="128M", force=True)
 
-    infra.dask.clean_write_parquet(persisted_df, out_path)
-    client.cancel(persisted_df)
-    del persisted_df
+    infra.dask.clean_write_parquet(df, out_path)
+    client.cancel(df)
+    del df
 
 
 def optimize_nouser_flow_frame(in_path, out_path, client):
     df = infra.dask.read_parquet(in_path)
+    df = client.persist(df)
     df = df.categorize(columns=["ip_a", "ip_b"])
-    persisted_df = client.persist(df)
-    persisted_df = persisted_df.repartition(partition_size="128M", force=True)
 
-    infra.dask.clean_write_parquet(persisted_df, out_path)
-    client.cancel(persisted_df)
-    del persisted_df
+    df = df.repartition(partition_size="128M", force=True)
+
+    infra.dask.clean_write_parquet(df, out_path)
+    client.cancel(df)
+    del df
 
 
 def optimize_transactions_frame(in_path, out_path):
