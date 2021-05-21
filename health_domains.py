@@ -58,6 +58,8 @@ def make_health_domain_plots(infile):
     """
     df = infra.pd.read_parquet(infile)
     df = categorize_all_fqdns(df)
+    temp = df.loc[df["is_health"]]
+    print(temp["fqdn"].unique())
     _make_volume_comparison_plot(df)
     _make_relative_volume_plot(df)
     _make_unique_users_plot(df)
