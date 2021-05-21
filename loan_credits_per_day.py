@@ -1,6 +1,6 @@
 """
 Exploring the loan credits per users.
-Version 3/24: It seems hard to find a meeting in the graphs without any sorting order or animations.
+Version 5/19: updated without self-transfer
 """
 
 import altair as alt
@@ -18,8 +18,7 @@ def get_data(timeline):
   # # df = pd.DataFrame(transactions).reset_index()
   # print(len(transactions.user))
   
-  # TODO to use the new dataset
-  transactions = infra.pd.read_parquet("data/clean/transactions_DIV_none_INDEX_timestamp.parquet")
+  transactions = infra.pd.read_parquet('./data/derived/untainted_transactions_INDEX_timestamp.parquet')
   transactions["user"] = transactions["user"].astype(object)
   # print(transactions)
 
