@@ -1,5 +1,6 @@
 """ Computing active and registered users on the network over time
 """
+from datetime import datetime, timedelta
 
 import altair as alt
 import pandas as pd
@@ -9,6 +10,8 @@ import infra.dask
 import infra.pd
 import infra.platform
 
+
+# Contact tracing apps: PeduliLindungi, Bersatu Lawan COVID-19,
 
 HEALTH_FQDN_TOKENS = {
     "infeksi",
@@ -29,8 +32,84 @@ HEALTH_FQDN_TOKENS = {
     "health",
     "virus",
     "vaccine",
-    "vaksin"
+    "vaksin",
+    "PeduliLindungi",
+    "peduli",
+    "lindungi",
+    "medical",
+    "telemedicine",
+    "medicine",
+    "obat"
 }
+
+FALSE_POSITIVE_EXLUSIONS = {
+    "wholesale", # Ad network, not WHO : )
+    "antivirus", # Computer antivirus
+    "mobihealthplus.com.", # Antivirus
+    "bras-base-hpwhon5203w-grc-03-65-94-57-54.dsl.bell.ca", # Telecom
+    "the-who-8.core.ynet.pl", # Telecom
+    "adminmusic-test.mobihealthplus.com",
+    "whos.amung.us", # Analytics
+    "samsunghealth.com", # Phone personal health tracking
+    "samsungcloud.com", # Phone personal health tracking
+    "coronalabs.com", # Online gaming
+    "unhealthyrange.com", # Generic example code generating bad domain???
+    "bpjs-kesehatan.go.id", # Public social welfare program cash transfer
+    "wholeless-mileage.volia.net", # No response, seems not health related
+    "whoareyou.ff.garena.com", # Game survey
+    "hologfx.com", # Anime media sharing
+    "acrobat.com", # Not medicine in indonesian : )
+    "adobe.com", # Related to acrobat
+    "tanobato.wordpress.com", # Religious blog
+    "sobatdrama.net.", # Media
+    "sobatkerja.zendesk.com.", # Sobat != obat
+    "sobatmateri.com", # sobat != obat
+    "sobatnewss.blogspot.com.", # sobat != obat
+    "sobat-otomotif.blogspot.com", # sobat != obat
+    "comm.miui.com.", # alternative android UI
+    "jualobatpembesarpenisherbalklg.blogspot.com.", # Spam "male enhancement health"
+    "dunia-kesehatan01.blogspot.com.", # Blog removed and address seized!
+    "kesehatan.kontan.co.id.", # Indonesian news website health section
+    "health.detik.com.", # Indonesian news website health section
+    "health.kompas.com.", # News website health section
+    "healthcareitnews.com.", # News website
+
+}
+
+def _contains_any_token(test_string, token_list):
+    matches = filter(lambda x: x in test_string, token_list)
+
+    matched = False
+    for match in matches:
+        matched = True
+        break
+
+    return matched
+
+
+def _make_primary_domain_from_fqdn(fqdn):
+    parts = fqdn.strip().strip(".").split(".")
+
+    # Special case for amp domains
+    if len(parts) == 4 and parts[1:4] == ["cdn", "ampproject", "org"]:
+        source_host = parts[0].split("-")
+        parts = source_host
+
+    # Special case for alodokter firebase links
+    if fqdn == "alodokter.page.link." or fqdn == "alodokterdev.page.link." or fqdn == "alodokterstaging.page.link.":
+        return "alodokter.com."
+
+    # Special case for onesignal.com
+    if fqdn == "doktersehat.onesignal.com.":
+        return "doktersehat.com."
+
+    # All country code TLDs are two characters long, and will have sub-tlds (i.e. .co.uk ~ .com)
+    is_cc_domain = bool(len(parts[-1]) == 2)
+
+    if is_cc_domain:
+        return ".".join(parts[max(-len(parts), -3):]) + "."
+    else:
+        return ".".join(parts[max(-len(parts), -2):]) + "."
 
 
 def categorize_all_fqdns(df):
@@ -39,14 +118,11 @@ def categorize_all_fqdns(df):
 
     def _categorize_health(fqdn):
         test_string = fqdn.lower()
-        matches = filter(lambda x: x in test_string, HEALTH_FQDN_TOKENS)
 
-        matched = False
-        for match in matches:
-            matched = True
-            break
-
-        return matched
+        return bool(
+            _contains_any_token(test_string, HEALTH_FQDN_TOKENS) and
+            not _contains_any_token(test_string, FALSE_POSITIVE_EXLUSIONS)
+        )
 
     df["is_health"] = df["fqdn"].apply(_categorize_health)
 
@@ -64,17 +140,98 @@ def make_health_domain_plots(infile):
     _make_relative_volume_plot(df)
     _make_unique_users_plot(df)
     _make_individual_domain_plot(df)
+    _make_individual_domain_unique_users_plot(df)
+
+
+def _make_individual_domain_unique_users_plot(df):
+    df["GB_total"] = (df["bytes_up"] + df["bytes_down"])/(1000**3)
+    df["primary_domain"] = df["fqdn"].apply(_make_primary_domain_from_fqdn)
+
+    df = df.loc[df["is_health"] == True]
+
+    # Consolidate by week instead of by day
+    # df = df[
+    #     ["day", "primary_domain", "user"]
+    # ].groupby(
+    #     [pd.Grouper(key="day", freq="W-MON"), "primary_domain"]
+    # )["user"].nunique().reset_index()
+    df = df[
+        ["day", "primary_domain", "user"]
+    ].groupby(
+        [pd.Grouper(key="day", freq="W-MON"), "primary_domain"]
+    )
+
+    df = df["user"].nunique().reset_index()
+
+    week_range = pd.DataFrame({"day": pd.date_range(infra.constants.MIN_DATE, infra.constants.MAX_DATE + timedelta(days=1), freq="W-MON")})
+    domain_range = pd.DataFrame({"primary_domain": df["primary_domain"].unique()}, dtype=object)
+    dense_index = infra.pd.cartesian_product(week_range, domain_range)
+
+    df = df.merge(dense_index, on=["day", "primary_domain"], how="outer")
+    df = df.fillna(0)
+
+    df["timedelta"] = (df["day"] - datetime.strptime('2020-04-01 00:00:00', '%Y-%m-%d %H:%M:%S')).dt.to_pytimedelta()
+    df["week_number"] = df["timedelta"].apply(lambda x: int(x.days/7))
+    df = df.drop("timedelta", axis=1)
+
+    alt.Chart(df).mark_line(opacity=0.5, interpolate='step-after').encode(
+        x=alt.X(
+            "day:T"
+        ),
+        y=alt.Y(
+            "user",
+            title="Weekly Unique Users",
+            axis=alt.Axis(labels=True),
+            # scale=alt.Scale(
+            #     type="symlog"
+            # ),
+        ),
+        color=alt.Color(
+            "primary_domain:N",
+            scale=alt.Scale(scheme="tableau20"),
+        ),
+    ).properties(
+        width=500,
+    ).save(
+        "renders/health_domain_individual_domain_weekly.png",
+        scale_factor=2,
+    )
+
+    alt.Chart(df).mark_rect(opacity=1.0).encode(
+        x=alt.X(
+            "week_number:O",
+        ),
+        y=alt.Y(
+            "primary_domain:N",
+            title="Weekly Unique Users",
+            # axis=alt.Axis(labels=True),
+            # scale=alt.Scale(
+            #     type="symlog"
+            # ),
+        ),
+        color=alt.Color(
+            "user:Q",
+            # scale=alt.Scale(scheme="tableau20"),
+        ),
+    ).properties(
+        width=500,
+    ).save(
+        "renders/health_domain_individual_domain_weekly_heatmap.png",
+        scale_factor=2,
+    )
 
 
 def _make_individual_domain_plot(df):
     df["GB_total"] = (df["bytes_up"] + df["bytes_down"])/(1000**3)
+    df["primary_domain"] = df["fqdn"].apply(_make_primary_domain_from_fqdn)
+
     df = df.loc[df["is_health"] == True]
 
     # Consolidate by week instead of by day
     df = df[
-        ["day", "fqdn", "GB_total"]
+        ["day", "primary_domain", "GB_total"]
     ].groupby(
-        [pd.Grouper(key="day", freq="W-MON"), "fqdn"]
+        [pd.Grouper(key="day", freq="W-MON"), "primary_domain"]
     ).sum().reset_index()
 
     alt.Chart(df).mark_line(opacity=1.0).encode(
@@ -90,7 +247,8 @@ def _make_individual_domain_plot(df):
             # ),
         ),
         color=alt.Color(
-            "fqdn:N"
+            "primary_domain:N",
+            scale=alt.Scale(scheme="tableau20"),
         ),
     ).properties(
         width=500,
@@ -111,7 +269,7 @@ def _make_unique_users_plot(df):
         ["day", "user"]
     ].groupby(
         [pd.Grouper(key="day", freq="W-MON")]
-    ).count().reset_index()
+    )["user"].nunique().reset_index()
 
     alt.Chart(df).mark_line(opacity=1.0, interpolate='step-after').encode(
         x=alt.X(
