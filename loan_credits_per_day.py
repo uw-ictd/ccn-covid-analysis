@@ -1,6 +1,6 @@
 """
 Exploring the loan credits per users.
-Version 5/28: Normalization only get users present bf and after
+Version 5/28: Normalization:only get users present bf and after
 """
 
 import altair as alt
@@ -92,6 +92,15 @@ def get_data(timeline):
   #   check if any of the users or dest_user never exists before/after
   # print(~df_before['dest_user'].isin(intersection))
   # print(~df_after['dest_user'].isin(intersection))
+
+  #   export full dataset for tableau
+  intersect_before['timeline'] = 'before'
+  intersect_after['timeline'] = 'after'
+  
+  full_table_same_set = pd.concat([intersect_before, intersect_after], ignore_index=True)
+  full_table_same_set.to_csv (r'/home/cwkt/Documents/ccn-traffic-analysis-2020/data/clean/' + 'full-table-same-users.csv', index = False, header=True)
+
+
 
   if timeline == 'before':
     data_cleaned = intersect_before
@@ -205,5 +214,5 @@ if __name__ == "__main__":
 
 
     make_plot(get_data("before"), "before")
-    make_plot(get_data("after"), "after")
+    # make_plot(get_data("after"), "after")
     
