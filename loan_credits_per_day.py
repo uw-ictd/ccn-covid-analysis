@@ -1,26 +1,22 @@
 """
 Exploring the loan credits per users.
-Version 5/26: updated without tainted date
+Version 5/28: Normalization only get users present bf and after
 """
 
 import altair as alt
 import numpy as np
 import pandas as pd
-
+ 
 import infra.constants
 import infra.dask
 import infra.pd
 import infra.platform
 
 def get_data(timeline):
- 
-  # transactions = infra.pd.read_parquet("data/clean/transactions_TZ.parquet")
-  # # df = pd.DataFrame(transactions).reset_index()
-  # print(len(transactions.user))
   
-  transactions = infra.pd.read_parquet('./data/derived/untainted_transactions_INDEX_timestamp.parquet')
+  transactions = infra.pd.read_parquet('./data/derived/untainted_transactions_INDEX_timestamp.parquet').reset_index()
   transactions["user"] = transactions["user"].astype(object)
-  # print(transactions)
+  print("Total number of transactions: " + str(len(transactions.user)))
 
   # find the admin to exclude from data for both before and after covid
   df_admin = transactions[transactions["kind"] == "admin_topup"]
@@ -52,8 +48,7 @@ def get_data(timeline):
 
   # assert(num_days == (pd.to_datetime(end_date) - pd.to_datetime(lockdown_date)).days)
 
-  # Normalization: only get users present bf - after
-  ## get only users from 238 days before
+  # get only users from 238 days before
   query_start = f"(timestamp >= '{start_date}') & (timestamp < '{end_date}')"
   df_range = df_no_tainted.query(query_start)
 
@@ -61,14 +56,17 @@ def get_data(timeline):
   df_range = df_range[df_range['user'].notnull()]
   df_range = df_range[df_range['dest_user'].notnull()]
 
-  all_users = pd.concat([df_range['user'], df_range['dest_user']]).rename('user').to_frame().drop_duplicates()
+  def get_users(df):
+    return pd.concat([df['user'], df['dest_user']]).rename('user').to_frame().drop_duplicates()
+  
+  all_users = get_users(df_range)
   all_users['key'] = 1
   all_users['row_num'] = np.arange(len(all_users))
   all_users['user_derive'] = 'user-' + all_users['row_num'].astype(str).map(lambda x:x.zfill(2))
   x_users = pd.merge(all_users, all_users.rename(columns={'user': 'dest_user', 'user_derive': 'dest_user_derive'}), on='key')[['user', 'dest_user', 'user_derive', 'dest_user_derive']]
 
-  derive_users = pd.merge(df_range, all_users, on='user')
-  # derive_users.to_csv (r'/home/cwkt/Documents/ccn-traffic-analysis-2020/data/clean/' + 'full-nov-nb.csv', index = False, header=True)
+  df_range = pd.merge(df_range, all_users, on='user')
+  # df_range.to_csv (r'/home/cwkt/Documents/ccn-traffic-analysis-2020/data/clean/' + 'full-nov-nb.csv', index = False, header=True)
 
   # split the timeline before and after COVID
   ## March 25th, 2020 school closes  April 1st, 2020 roads to capital closed to town 
@@ -79,24 +77,38 @@ def get_data(timeline):
   df_before = df_range.query(query_before)
   df_after = df_range.query(query_after)
 
+  
+  # Normalization:only get users present bf and after
+  #    do inner join
+  all_before_users = get_users(df_before)
+  all_after_users = get_users(df_after)
+  all_after_users_user = all_after_users['user'].unique()
+  intersection = all_before_users[all_before_users['user'].isin(all_after_users_user)]['user'].unique()
+
+  #   both users and dest_users must be in the set of before and after dataset
+  intersect_before = df_before[df_before['user'].isin(intersection) & df_before['dest_user'].isin(intersection)]
+  intersect_after = df_after[df_after['user'].isin(intersection) & df_after['dest_user'].isin(intersection)]
+
+  #   check if any of the users or dest_user never exists before/after
+  # print(~df_before['dest_user'].isin(intersection))
+  # print(~df_after['dest_user'].isin(intersection))
+
   if timeline == 'before':
-    data_cleaned = df_range.query(query_before)
+    data_cleaned = intersect_before
   elif timeline == 'after':
-    data_cleaned = df_range.query(query_after)
+    data_cleaned = intersect_after
   else:
     raise ValueError("Timeline should be only 'before' or 'after' the pandemic lockdown.")
 
   get_count(df_before, df_after, timeline)
 
   data_cleaned = df_range.merge(x_users, on=['user', 'dest_user'], how='outer')
+  data_cleaned['user_derive'] = data_cleaned['user_derive_x']
   data_cleaned['amount_idr'] = data_cleaned['amount_idr'].fillna(0)
 
   # total loan for each user
   total_loan = data_cleaned.groupby(["user_derive", "dest_user_derive"]).agg({"amount_idr" : 'sum'}) 
   total_loan['amount_idr'] = total_loan['amount_idr'].div(num_days)
-  
-  # # optional: exclude the maximum amount of loan (entire row)
-  # total_loan = total_loan[total_loan['amount_idr'] != total_loan['amount_idr'].max()]
 
   # reset index for plotting
   df = pd.DataFrame(total_loan).reset_index()
