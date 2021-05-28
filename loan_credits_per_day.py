@@ -1,6 +1,6 @@
 """
 Exploring the loan credits per users.
-Version 5/19: updated without self-transfer
+Version 5/26: updated without tainted date
 """
 
 import altair as alt
@@ -33,18 +33,29 @@ def get_data(timeline):
   # #excluded self-transfer bug
   excluded_self = excluded_retailers[excluded_retailers['user'] != excluded_retailers['dest_user']]
 
+  
+  # exclude dirty money
+  start_tainted = "2020-05-24"
+  end_tainted = "2020-06-14"
+
+  query_start = f"(timestamp < '{start_tainted}') | (timestamp > '{end_tainted}')"
+  df_no_tainted = excluded_self.query(query_start)
+
   # normalize by time: taking temperal average divide by months
-  # temperal average -- 238 days after (@11/24/2020) and before (@8/7/2019) exactly 34 weeks.
+  # temperal average -- 238 days after (@12/16/2020) and before (@8/7/2019) exactly 34 weeks ---excluding tainted date.
   start_date = "2019-08-07  00:00:00"
   lockdown_date = "2020-04-01  00:00:00"
+
   num_days = (pd.to_datetime(lockdown_date) - pd.to_datetime(start_date)).days
-  end_date = str(pd.to_datetime(lockdown_date) + pd.DateOffset(num_days))
-  assert(num_days == (pd.to_datetime(end_date) - pd.to_datetime(lockdown_date)).days)
+  tainted_date_makeup = pd.DateOffset(7 * 3)
+  end_date = str(pd.to_datetime(lockdown_date) + pd.DateOffset(num_days) + tainted_date_makeup)
+
+  # assert(num_days == (pd.to_datetime(end_date) - pd.to_datetime(lockdown_date)).days)
 
   # Normalization: only get users present bf - after
   ## get only users from 238 days before
   query_start = f"(timestamp >= '{start_date}') & (timestamp < '{end_date}')"
-  df_range = excluded_self.query(query_start)
+  df_range = df_no_tainted.query(query_start)
 
 
   df_range = df_range[df_range['user'].notnull()]
@@ -134,8 +145,21 @@ def get_count(df_before, def_after, timeline):
   else:
     raise ValueError("Timeline should be only 'before' or 'after' the pandemic lockdown.")
 
+  
+  loan_week = total_loan / 34.00
+  loan_day = total_loan / 238.00
+  freq_week = total_freq / 34
+  freq_day = total_freq / 238
+
+
   print("Total loan all users for " + timeline + ": " + str(total_loan))
+  print(" Average loan per week for " + timeline + ": " + str(loan_week))
+  print(" Average loan per day for " + timeline + ": " + str(loan_day))
+
   print("Total frequency all users for " + timeline + ": " + str(total_freq))
+  print(" Average frequency per week for " + timeline + ": " + str(freq_week))
+  print(" Average frequency per day for " + timeline + ": " + str(freq_day))
+
   print(" ")
   print(" ")
 
